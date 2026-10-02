@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
+import 'auth_database.dart';
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -10,7 +11,12 @@ class CreateAccountScreen extends StatefulWidget {
 
 class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final _formKey = GlobalKey<FormState>();
-  
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _mobileController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
+
   String selectedRole = 'Resident';
   String? selectedBarangay;
   bool _obscurePassword = true;
@@ -19,34 +25,55 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   bool _isLoading = false;
 
   final List<String> barangays = [
-    'Angarian', 'Asinan', 'Bañaga', 'Bacabac', 'Bolaoen', 'Buenlag', 
-    'Cabayaoasan', 'Cayanga', 'Gueset', 'Hacienda', 'Laguit Centro', 
-    'Laguit Padilla', 'Magtaking', 'Pangascasan', 'Pantal', 'Poblacion', 
-    'Polong', 'Portic', 'Salasa', 'Salomague Norte', 'Salomague Sur', 
+    'Angarian', 'Asinan', 'Bañaga', 'Bacabac', 'Bolaoen', 'Buenlag',
+    'Cabayaoasan', 'Cayanga', 'Gueset', 'Hacienda', 'Laguit Centro',
+    'Laguit Padilla', 'Magtaking', 'Pangascasan', 'Pantal', 'Poblacion',
+    'Polong', 'Portic', 'Salasa', 'Salomague Norte', 'Salomague Sur',
     'Samat', 'San Francisco', 'Umanday'
   ];
 
-  void _handleCreateAccount() {
-    if (_formKey.currentState!.validate()) {
-      if (selectedBarangay == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a Barangay')));
-        return;
-      }
-      if (!_acceptedTerms) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You must accept the Terms of Service')));
-        return;
-      }
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _mobileController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
 
-      setState(() => _isLoading = true);
-
-      // Simulate saving to database
-      Future.delayed(const Duration(seconds: 2), () {
-        if (!mounted) return;
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account Created Successfully!')));
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
-      });
+  Future<void> _handleCreateAccount() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (selectedBarangay == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a Barangay')));
+      return;
     }
+    if (!_acceptedTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You must accept the Terms of Service')));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final error = await AuthDatabase.instance.register(
+      fullName: _nameController.text,
+      email: _emailController.text,
+      mobile: _mobileController.text,
+      barangay: selectedBarangay!,
+      role: selectedRole,
+      password: _passwordController.text,
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account Created Successfully!')));
+    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
   }
 
   @override
@@ -55,12 +82,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       // This hides the keyboard when you tap anywhere outside a text field
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        // THIS IS THE FIX: Allows the screen to shrink and scroll when the keyboard opens
-        resizeToAvoidBottomInset: true, 
+        // Allows the screen to shrink and scroll when the keyboard opens
+        resizeToAvoidBottomInset: true,
         backgroundColor: Colors.white,
         body: SafeArea(
           child: SingleChildScrollView(
-            // Removed the complex MediaQuery padding, Flutter handles it now
             padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
             child: Form(
               key: _formKey,
@@ -82,14 +108,31 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
                   // Input Fields
                   _buildLabel('Full Name'),
-                  _buildTextField('Abinesh Jino', Icons.person_outline),
-                  
+                  _buildTextField(
+                    'Abinesh Jino',
+                    Icons.person_outline,
+                    controller: _nameController,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter your full name' : null,
+                  ),
+
                   _buildLabel('Email address'),
-                  _buildTextField('Email Address', Icons.mail_outline, isEmail: true),
-                  
+                  _buildTextField(
+                    'Email Address',
+                    Icons.mail_outline,
+                    controller: _emailController,
+                    isEmail: true,
+                    validator: (v) => (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
+                  ),
+
                   _buildLabel('Mobile number'),
-                  _buildTextField('Mobile Number', Icons.phone_outlined, isPhone: true),
-                  
+                  _buildTextField(
+                    'Mobile Number',
+                    Icons.phone_outlined,
+                    controller: _mobileController,
+                    isPhone: true,
+                    validator: (v) => (v == null || v.trim().length < 10) ? 'Enter a valid mobile number' : null,
+                  ),
+
                   _buildLabel('Barangay'),
                   DropdownButtonFormField<String>(
                     decoration: InputDecoration(
@@ -106,11 +149,23 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   const SizedBox(height: 15),
 
                   _buildLabel('Create a Password'),
-                  _buildPasswordField('Enter a Password', _obscurePassword, () => setState(() => _obscurePassword = !_obscurePassword)),
-                  
+                  _buildPasswordField(
+                    'Enter a Password',
+                    _obscurePassword,
+                    () => setState(() => _obscurePassword = !_obscurePassword),
+                    controller: _passwordController,
+                    validator: (v) => (v == null || v.length < 6) ? 'At least 6 characters' : null,
+                  ),
+
                   _buildLabel('Confirm Password'),
-                  _buildPasswordField('Retype Password', _obscureConfirmPassword, () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword)),
-                  
+                  _buildPasswordField(
+                    'Retype Password',
+                    _obscureConfirmPassword,
+                    () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                    controller: _confirmController,
+                    validator: (v) => v != _passwordController.text ? 'Passwords do not match' : null,
+                  ),
+
                   const SizedBox(height: 10),
 
                   // Terms Checkbox
@@ -193,6 +248,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       ),
     );
   }
+
   // UI Helpers
   Widget _buildLabel(String text) {
     return Padding(
@@ -201,10 +257,19 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     );
   }
 
-  Widget _buildTextField(String hint, IconData icon, {bool isEmail = false, bool isPhone = false}) {
+  Widget _buildTextField(
+    String hint,
+    IconData icon, {
+    required TextEditingController controller,
+    bool isEmail = false,
+    bool isPhone = false,
+    String? Function(String?)? validator,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15.0),
       child: TextFormField(
+        controller: controller,
+        validator: validator,
         keyboardType: isEmail ? TextInputType.emailAddress : isPhone ? TextInputType.phone : TextInputType.text,
         decoration: InputDecoration(
           prefixIcon: Icon(icon, color: Colors.grey, size: 22),
@@ -218,10 +283,18 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     );
   }
 
-  Widget _buildPasswordField(String hint, bool obscure, VoidCallback onToggle) {
+  Widget _buildPasswordField(
+    String hint,
+    bool obscure,
+    VoidCallback onToggle, {
+    required TextEditingController controller,
+    String? Function(String?)? validator,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15.0),
       child: TextFormField(
+        controller: controller,
+        validator: validator,
         obscureText: obscure,
         decoration: InputDecoration(
           prefixIcon: const Icon(Icons.lock_outline, color: Colors.grey, size: 22),

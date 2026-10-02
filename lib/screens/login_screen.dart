@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'create_account_screen.dart';
-import 'dashboard_screen.dart'; // Add this line!
+import 'dashboard_screen.dart';
+import 'resident_dashboard_screen.dart'; // NEW: Imported the Resident dashboard
+import 'auth_database.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,23 +13,51 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
   bool _obscurePassword = true;
   bool _rememberMe = false;
   bool _isLoading = false;
-  bool _isGoogleLoading = false; // Added state for Google Sign-In
+  bool _isGoogleLoading = false;
 
- void _handleLogin() {
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    
-    Future.delayed(const Duration(seconds: 1), () {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      
+
+    final user = await AuthDatabase.instance.login(
+      email: _emailController.text,
+      password: _passwordController.text,
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Incorrect email or password')));
+      return;
+    }
+
+    // NEW: Route the user based on their specific role!
+    if (user['role'] == 'Resident') {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const DashboardScreen()), // Changed!
+        MaterialPageRoute(builder: (context) => const ResidentDashboardScreen()),
       );
-    });
+    } else {
+      // Defaults to the GoBiker/Admin dashboard
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const DashboardScreen()),
+      );
+    }
   }
 
   @override
@@ -53,6 +83,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Text('Email address', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87)),
                   const SizedBox(height: 8),
                   TextFormField(
+                    controller: _emailController,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter your email' : null,
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.mail_outline, color: Colors.grey, size: 22),
@@ -69,6 +101,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Text('Password', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87)),
                   const SizedBox(height: 8),
                   TextFormField(
+                    controller: _passwordController,
+                    validator: (v) => (v == null || v.isEmpty) ? 'Enter your password' : null,
                     obscureText: _obscurePassword,
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.lock_outline, color: Colors.grey, size: 22),
@@ -121,16 +155,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       elevation: 0,
                     ),
-                    child: _isLoading 
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text('Login Now', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-                            SizedBox(width: 8),
-                            Icon(Icons.arrow_forward, color: Colors.white, size: 20),
-                          ],
-                        ),
+                    child: _isLoading
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text('Login Now', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                              SizedBox(width: 8),
+                              Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+                            ],
+                          ),
                   ),
                   const SizedBox(height: 30),
 
@@ -147,22 +181,25 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 30),
 
-                  // Sign In With Google Button
+                  // Sign In With Google Button (still simulated)
                   OutlinedButton(
-                    onPressed: _isGoogleLoading ? null : () {
-                      setState(() => _isGoogleLoading = true);
-                      
-                      // Simulating the Google account selection popup and verification
-                      Future.delayed(const Duration(seconds: 2), () {
-                        if (!mounted) return;
-                        setState(() => _isGoogleLoading = false);
-                        
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (context) => const DashboardScreen()), // Changed!
-                        );
-                      });
-                    },
+                    onPressed: _isGoogleLoading
+                        ? null
+                        : () {
+                            setState(() => _isGoogleLoading = true);
+
+                            // Simulating the Google account selection popup and verification
+                            Future.delayed(const Duration(seconds: 2), () {
+                              if (!mounted) return;
+                              setState(() => _isGoogleLoading = false);
+
+                              // Defaults Google users to the GoBiker dashboard for now
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (context) => const DashboardScreen()),
+                              );
+                            });
+                          },
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 55),
                       side: BorderSide(color: Colors.grey.shade300),
