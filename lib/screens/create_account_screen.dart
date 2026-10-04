@@ -1,6 +1,20 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../widgets/app_text_field.dart';
+import '../widgets/app_toast.dart';
+import '../widgets/auth_widgets.dart';
+import '../widgets/loading_overlay.dart';
+import '../core/auth_service.dart';
+import 'legal_screen.dart';
 import 'login_screen.dart';
-import 'auth_database.dart';
+
+/// Set to false if GoBiker accounts are active right away (no admin approval).
+const bool _kGoBikerNeedsApproval = true;
+
+final RegExp _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+final RegExp _mobileRegex = RegExp(r'^09\d{9}$');
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -19,18 +33,71 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
   String selectedRole = 'Resident';
   String? selectedBarangay;
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
   bool _acceptedTerms = false;
   bool _isLoading = false;
 
+  late final TapGestureRecognizer _termsTap = TapGestureRecognizer()
+    ..onTap = _openTerms;
+  late final TapGestureRecognizer _privacyTap = TapGestureRecognizer()
+    ..onTap = _openPrivacy;
+
   final List<String> barangays = [
-    'Angarian', 'Asinan', 'Bañaga', 'Bacabac', 'Bolaoen', 'Buenlag',
-    'Cabayaoasan', 'Cayanga', 'Gueset', 'Hacienda', 'Laguit Centro',
-    'Laguit Padilla', 'Magtaking', 'Pangascasan', 'Pantal', 'Poblacion',
-    'Polong', 'Portic', 'Salasa', 'Salomague Norte', 'Salomague Sur',
-    'Samat', 'San Francisco', 'Umanday'
+    'Angarian',
+    'Asinan',
+    'Bañaga',
+    'Bacabac',
+    'Bolaoen',
+    'Buenlag',
+    'Cabayaoasan',
+    'Cayanga',
+    'Gueset',
+    'Hacienda',
+    'Laguit Centro',
+    'Laguit Padilla',
+    'Magtaking',
+    'Pangascasan',
+    'Pantal',
+    'Poblacion',
+    'Polong',
+    'Portic',
+    'Salasa',
+    'Salomague Norte',
+    'Salomague Sur',
+    'Samat',
+    'San Francisco',
+    'Umanday',
   ];
+
+  bool get _isGoBiker => selectedRole == 'GoBiker';
+
+  /// The button enables once everything is filled and Terms is ticked.
+  /// Detailed validation (and the red messages) happen when it is pressed.
+  bool get _canSubmit =>
+      _nameController.text.trim().isNotEmpty &&
+      _emailController.text.trim().isNotEmpty &&
+      _mobileController.text.trim().isNotEmpty &&
+      selectedBarangay != null &&
+      _passwordController.text.isNotEmpty &&
+      _confirmController.text.isNotEmpty &&
+      _acceptedTerms;
+
+  @override
+  void initState() {
+    super.initState();
+    for (final c in [
+      _nameController,
+      _emailController,
+      _mobileController,
+      _passwordController,
+      _confirmController,
+    ]) {
+      c.addListener(_refresh);
+    }
+  }
+
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
 
   @override
   void dispose() {
@@ -39,24 +106,52 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     _mobileController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
+    _termsTap.dispose();
+    _privacyTap.dispose();
     super.dispose();
   }
 
+  void _openTerms() => Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const LegalScreen(type: LegalType.terms),
+    ),
+  );
+
+  void _openPrivacy() => Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const LegalScreen(type: LegalType.privacy),
+    ),
+  );
+
+  void _goToLogin() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+    );
+  }
+
   Future<void> _handleCreateAccount() async {
+    FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
     if (selectedBarangay == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a Barangay')));
+      AppToast.show(context, 'Please select a Barangay', type: ToastType.error);
       return;
     }
     if (!_acceptedTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You must accept the Terms of Service')));
+      AppToast.show(
+        context,
+        'You must accept the Terms of Service',
+        type: ToastType.error,
+      );
       return;
     }
 
     setState(() => _isLoading = true);
 
-    final error = await AuthDatabase.instance.register(
-      fullName: _nameController.text,
+    final result = await AuthService.instance.register(
+      name: _nameController.text,
       email: _emailController.text,
       mobile: _mobileController.text,
       barangay: selectedBarangay!,
@@ -67,180 +162,346 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     if (!mounted) return;
     setState(() => _isLoading = false);
 
-    if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+    if (!result.ok) {
+      AppToast.show(
+        context,
+        result.message ?? 'Something went wrong. Please try again.',
+        type: ToastType.error,
+      );
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account Created Successfully!')));
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
+    AppToast.show(
+      context,
+      result.pendingApproval
+          ? 'Account created. An admin must approve it before you can log in.'
+          : 'Account created successfully! You can log in now.',
+      type: result.pendingApproval ? ToastType.info : ToastType.success,
+    );
+    _goToLogin();
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      // This hides the keyboard when you tap anywhere outside a text field
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        // Allows the screen to shrink and scroll when the keyboard opens
-        resizeToAvoidBottomInset: true,
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(child: Image.asset('assets/images/logo.png', height: 70)),
-                  const SizedBox(height: 20),
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    final muted = onSurface.withValues(alpha: 0.6);
 
-                  // Role Selection
-                  Row(
+    return LoadingOverlay(
+      isLoading: _isLoading,
+      message: 'Creating account...',
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          resizeToAvoidBottomInset: true,
+          backgroundColor: authBackground(context),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+              child: AutofillGroup(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(child: _buildRoleCard('Resident', Icons.person, 'Request check-ups')),
-                      const SizedBox(width: 10),
-                      Expanded(child: _buildRoleCard('GoBiker', Icons.medical_services, 'Manage visits')),
-                    ],
-                  ),
-                  const SizedBox(height: 25),
-
-                  // Input Fields
-                  _buildLabel('Full Name'),
-                  _buildTextField(
-                    'Abinesh Jino',
-                    Icons.person_outline,
-                    controller: _nameController,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter your full name' : null,
-                  ),
-
-                  _buildLabel('Email address'),
-                  _buildTextField(
-                    'Email Address',
-                    Icons.mail_outline,
-                    controller: _emailController,
-                    isEmail: true,
-                    validator: (v) => (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
-                  ),
-
-                  _buildLabel('Mobile number'),
-                  _buildTextField(
-                    'Mobile Number',
-                    Icons.phone_outlined,
-                    controller: _mobileController,
-                    isPhone: true,
-                    validator: (v) => (v == null || v.trim().length < 10) ? 'Enter a valid mobile number' : null,
-                  ),
-
-                  _buildLabel('Barangay'),
-                  DropdownButtonFormField<String>(
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.location_on_outlined, color: Colors.grey),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.grey)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-                    ),
-                    hint: const Text('Select Barangay', style: TextStyle(color: Colors.grey, fontSize: 14)),
-                    value: selectedBarangay,
-                    items: barangays.map((String b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
-                    onChanged: (newValue) => setState(() => selectedBarangay = newValue),
-                  ),
-                  const SizedBox(height: 15),
-
-                  _buildLabel('Create a Password'),
-                  _buildPasswordField(
-                    'Enter a Password',
-                    _obscurePassword,
-                    () => setState(() => _obscurePassword = !_obscurePassword),
-                    controller: _passwordController,
-                    validator: (v) => (v == null || v.length < 6) ? 'At least 6 characters' : null,
-                  ),
-
-                  _buildLabel('Confirm Password'),
-                  _buildPasswordField(
-                    'Retype Password',
-                    _obscureConfirmPassword,
-                    () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
-                    controller: _confirmController,
-                    validator: (v) => v != _passwordController.text ? 'Passwords do not match' : null,
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  // Terms Checkbox
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: Checkbox(
-                          value: _acceptedTerms,
-                          onChanged: (value) => setState(() => _acceptedTerms = value!),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: IconButton(
+                          tooltip: 'Back to login',
+                          icon: Icon(
+                            Icons.arrow_back_rounded,
+                            color: onSurface,
+                          ),
+                          onPressed: _goToLogin,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: RichText(
-                          text: const TextSpan(
-                            text: 'By Signing up you accept our ',
-                            style: TextStyle(color: Colors.black87, fontSize: 12),
-                            children: [
-                              TextSpan(text: 'Terms of Service', style: TextStyle(color: Color(0xFF2962FF), fontWeight: FontWeight.w500)),
-                              TextSpan(text: ' & '),
-                              TextSpan(text: 'Privacy Policy', style: TextStyle(color: Color(0xFF2962FF), fontWeight: FontWeight.w500)),
-                            ],
-                          ),
+                      const Center(child: AuthLogo(height: 64)),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Create your account',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: onSurface,
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 25),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Join OneGoBike',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 14, color: muted),
+                      ),
+                      const SizedBox(height: 24),
 
-                  // Primary Button
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _handleCreateAccount,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2962FF),
-                      minimumSize: const Size(double.infinity, 55),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      elevation: 0,
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('Get Set to Explore', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-                              SizedBox(width: 8),
-                              Icon(Icons.arrow_forward, color: Colors.white, size: 20),
-                            ],
-                          ),
-                  ),
-                  const SizedBox(height: 15),
-
-                  // Secondary Button
-                  OutlinedButton(
-                    onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen())),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 55),
-                      side: BorderSide(color: Colors.grey.shade300),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: RichText(
-                      text: const TextSpan(
-                        text: 'Already a Member ? ',
-                        style: TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w500),
+                      // Role selector
+                      Row(
                         children: [
-                          TextSpan(text: 'Login Now', style: TextStyle(color: Color(0xFF2962FF), fontWeight: FontWeight.bold)),
+                          Expanded(
+                            child: _buildRoleCard(
+                              'Resident',
+                              Icons.person_rounded,
+                              'Request check-ups',
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildRoleCard(
+                              'GoBiker',
+                              Icons.directions_bike_rounded,
+                              'Manage visits',
+                            ),
+                          ),
                         ],
                       ),
-                    ),
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.topCenter,
+                        child: (_isGoBiker && _kGoBikerNeedsApproval)
+                            ? Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: kAuthBlue.withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(
+                                        Icons.info_outline_rounded,
+                                        size: 18,
+                                        color: kAuthBlue,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          'GoBiker accounts need admin approval before you can log in.',
+                                          style: TextStyle(
+                                            fontSize: 12.5,
+                                            height: 1.35,
+                                            color: onSurface,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : const SizedBox(width: double.infinity),
+                      ),
+                      const SizedBox(height: 24),
+
+                      AppTextField(
+                        label: 'Full Name',
+                        hint: 'Juan Dela Cruz',
+                        icon: Icons.person_outline_rounded,
+                        controller: _nameController,
+                        textInputAction: TextInputAction.next,
+                        autofillHints: const [AutofillHints.name],
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Enter your full name'
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+
+                      AppTextField(
+                        label: 'Email address',
+                        hint: 'name@email.com',
+                        icon: Icons.mail_outline_rounded,
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        autofillHints: const [AutofillHints.email],
+                        validator: (v) {
+                          final value = (v ?? '').trim();
+                          if (value.isEmpty) return 'Enter your email';
+                          if (!_emailRegex.hasMatch(value)) {
+                            return 'Enter a valid email';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      AppTextField(
+                        label: 'Mobile number',
+                        hint: '09123456789',
+                        icon: Icons.phone_outlined,
+                        controller: _mobileController,
+                        keyboardType: TextInputType.phone,
+                        textInputAction: TextInputAction.next,
+                        autofillHints: const [AutofillHints.telephoneNumber],
+                        maxLength: 11,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        validator: (v) {
+                          final value = (v ?? '').trim();
+                          if (value.isEmpty) return 'Enter your mobile number';
+                          if (!_mobileRegex.hasMatch(value)) {
+                            return 'Use 11 digits starting with 09';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      AppDropdownField(
+                        label: 'Barangay',
+                        hint: 'Select your barangay',
+                        icon: Icons.location_on_outlined,
+                        items: barangays,
+                        value: selectedBarangay,
+                        onChanged: (v) => setState(() => selectedBarangay = v),
+                        validator: (v) =>
+                            v == null ? 'Select your barangay' : null,
+                      ),
+                      const SizedBox(height: 16),
+
+                      AppTextField(
+                        label: 'Create a password',
+                        hint: 'At least 8 characters',
+                        icon: Icons.lock_outline_rounded,
+                        controller: _passwordController,
+                        obscure: true,
+                        textInputAction: TextInputAction.next,
+                        autofillHints: const [AutofillHints.newPassword],
+                        validator: (v) => (v == null || v.length < 8)
+                            ? 'At least 8 characters'
+                            : null,
+                      ),
+                      PasswordStrengthMeter(password: _passwordController.text),
+                      const SizedBox(height: 16),
+
+                      AppTextField(
+                        label: 'Confirm password',
+                        hint: 'Retype your password',
+                        icon: Icons.lock_outline_rounded,
+                        controller: _confirmController,
+                        obscure: true,
+                        textInputAction: TextInputAction.done,
+                        autofillHints: const [AutofillHints.newPassword],
+                        validator: (v) {
+                          if (v == null || v.isEmpty) {
+                            return 'Confirm your password';
+                          }
+                          if (v != _passwordController.text) {
+                            return 'Passwords do not match';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Terms
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: Checkbox(
+                              value: _acceptedTerms,
+                              activeColor: kAuthBlue,
+                              side: authCheckboxSide(context),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              onChanged: (v) =>
+                                  setState(() => _acceptedTerms = v ?? false),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text.rich(
+                                TextSpan(
+                                  text: 'I agree to the ',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    height: 1.4,
+                                    color: onSurface,
+                                  ),
+                                  children: [
+                                    TextSpan(
+                                      text: 'Terms of Service',
+                                      recognizer: _termsTap,
+                                      style: const TextStyle(
+                                        color: kAuthBlue,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const TextSpan(text: ' and '),
+                                    TextSpan(
+                                      text: 'Privacy Policy',
+                                      recognizer: _privacyTap,
+                                      style: const TextStyle(
+                                        color: kAuthBlue,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      ElevatedButton(
+                        onPressed: (_isLoading || !_canSubmit)
+                            ? null
+                            : _handleCreateAccount,
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(52),
+                        ),
+                        child: const Text(
+                          'Create Account',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Already have an account?',
+                            style: TextStyle(fontSize: 14, color: muted),
+                          ),
+                          TextButton(
+                            onPressed: _goToLogin,
+                            style: TextButton.styleFrom(
+                              foregroundColor: kAuthBlue,
+                              minimumSize: const Size(0, 48),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              'Log in',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                ],
+                ),
               ),
             ),
           ),
@@ -249,86 +510,54 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     );
   }
 
-  // UI Helpers
-  Widget _buildLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87)),
-    );
-  }
-
-  Widget _buildTextField(
-    String hint,
-    IconData icon, {
-    required TextEditingController controller,
-    bool isEmail = false,
-    bool isPhone = false,
-    String? Function(String?)? validator,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 15.0),
-      child: TextFormField(
-        controller: controller,
-        validator: validator,
-        keyboardType: isEmail ? TextInputType.emailAddress : isPhone ? TextInputType.phone : TextInputType.text,
-        decoration: InputDecoration(
-          prefixIcon: Icon(icon, color: Colors.grey, size: 22),
-          hintText: hint,
-          hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
-          contentPadding: const EdgeInsets.symmetric(vertical: 16),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.grey)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPasswordField(
-    String hint,
-    bool obscure,
-    VoidCallback onToggle, {
-    required TextEditingController controller,
-    String? Function(String?)? validator,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 15.0),
-      child: TextFormField(
-        controller: controller,
-        validator: validator,
-        obscureText: obscure,
-        decoration: InputDecoration(
-          prefixIcon: const Icon(Icons.lock_outline, color: Colors.grey, size: 22),
-          suffixIcon: IconButton(
-            icon: Icon(obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: Colors.grey, size: 20),
-            onPressed: onToggle,
-          ),
-          hintText: hint,
-          hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
-          contentPadding: const EdgeInsets.symmetric(vertical: 16),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.grey)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-        ),
-      ),
-    );
-  }
-
   Widget _buildRoleCard(String role, IconData icon, String subtitle) {
-    bool isSelected = selectedRole == role;
+    final selected = selectedRole == role;
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final onSurface = theme.colorScheme.onSurface;
+    final border = dark ? const Color(0xFF33415F) : const Color(0xFFD8DDEA);
+
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => setState(() => selectedRole = role),
-      child: Container(
-        padding: const EdgeInsets.all(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFF0F4FF) : Colors.white,
-          border: Border.all(color: isSelected ? const Color(0xFF2962FF) : Colors.grey.shade300, width: 1.5),
-          borderRadius: BorderRadius.circular(10),
+          color: selected
+              ? kAuthBlue.withValues(alpha: 0.08)
+              : Colors.transparent,
+          border: Border.all(
+            color: selected ? kAuthBlue : border,
+            width: selected ? 1.5 : 1,
+          ),
+          borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
           children: [
-            Icon(icon, size: 28, color: isSelected ? const Color(0xFF2962FF) : Colors.grey),
-            const SizedBox(height: 5),
-            Text(role, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isSelected ? const Color(0xFF2962FF) : Colors.black87)),
-            Text(subtitle, style: const TextStyle(fontSize: 9, color: Colors.grey), textAlign: TextAlign.center),
+            Icon(
+              icon,
+              size: 28,
+              color: selected ? kAuthBlue : onSurface.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              role,
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                color: selected ? kAuthBlue : onSurface,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                color: onSurface.withValues(alpha: 0.6),
+              ),
+            ),
           ],
         ),
       ),

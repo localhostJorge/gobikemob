@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; 
-import 'add_patient_screen.dart'; 
-import 'view_patient_screen.dart'; 
-import 'global_state.dart'; 
+import 'package:intl/intl.dart';
+import 'add_patient_screen.dart';
+import 'view_patient_screen.dart';
+import 'global_state.dart';
+import '../widgets/app_toast.dart';
 
 class ActiveRondaScreen extends StatefulWidget {
   const ActiveRondaScreen({super.key});
@@ -114,14 +115,14 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen> {
           _todayPatients.removeWhere((p) => p['id'] == patient['id']);
           globalPatients.removeWhere((p) => p['id'] == patient['id']);
           _patientsVisited--;
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Record deleted.')));
+          AppToast.show(context, 'Record deleted.', type: ToastType.success);
         } 
         else if (result['action'] == 'update') {
           // Update local and global lists
           _todayPatients[index] = result['data'];
           int globalIndex = globalPatients.indexWhere((p) => p['id'] == patient['id']);
           if (globalIndex != -1) globalPatients[globalIndex] = result['data'];
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Record updated!'), backgroundColor: Colors.green));
+          AppToast.show(context, 'Record updated!', type: ToastType.success);
         }
       });
     }

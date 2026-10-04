@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'add_patient_screen.dart'; 
-import 'view_patient_screen.dart'; 
-import 'global_state.dart'; 
+import 'add_patient_screen.dart';
+import 'view_patient_screen.dart';
+import 'global_state.dart';
+import '../widgets/app_toast.dart';
 
 class PatientManagementScreen extends StatefulWidget {
   const PatientManagementScreen({super.key});
@@ -35,12 +36,12 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
       setState(() {
         if (result['action'] == 'delete') {
           globalPatients.removeWhere((p) => p['id'] == patient['id']);
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Record deleted.')));
+          AppToast.show(context, 'Record deleted.', type: ToastType.success);
         } 
         else if (result['action'] == 'update') {
           int index = globalPatients.indexWhere((p) => p['id'] == patient['id']);
           if (index != -1) globalPatients[index] = result['data'];
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Record updated!'), backgroundColor: Colors.green));
+          AppToast.show(context, 'Record updated!', type: ToastType.success);
         }
       });
     }

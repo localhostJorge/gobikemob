@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+
+import '../widgets/app_text_field.dart';
+import '../widgets/app_toast.dart';
+import '../widgets/auth_widgets.dart';
+import '../widgets/loading_overlay.dart';
+import '../core/app_router.dart';
+import '../core/auth_service.dart';
 import 'create_account_screen.dart';
-import 'dashboard_screen.dart';
-import 'resident_dashboard_screen.dart'; // NEW: Imported the Resident dashboard
-import 'auth_database.dart';
+
+final RegExp _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,7 +22,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  bool _obscurePassword = true;
   bool _rememberMe = false;
   bool _isLoading = false;
   bool _isGoogleLoading = false;
@@ -29,232 +34,271 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    final user = await AuthDatabase.instance.login(
+    final result = await AuthService.instance.login(
       email: _emailController.text,
       password: _passwordController.text,
+      remember: _rememberMe,
     );
 
     if (!mounted) return;
     setState(() => _isLoading = false);
+    await _finishSignIn(result);
+  }
 
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Incorrect email or password')));
+  /// Shared by email login and Google sign-in.
+  Future<void> _finishSignIn(AuthResult result) async {
+    if (result.cancelled) return; // user closed the Google window
+
+    final user = result.user;
+    if (!result.ok || user == null) {
+      AppToast.show(
+        context,
+        result.message ?? 'Something went wrong. Please try again.',
+        type: ToastType.error,
+      );
       return;
     }
 
-    // NEW: Route the user based on their specific role!
-    if (user['role'] == 'Resident') {
-      Navigator.pushReplacement(
+    if (!canUseMobileApp(user)) {
+      await AuthService.instance.logout();
+      if (!mounted) return;
+      AppToast.show(
         context,
-        MaterialPageRoute(builder: (context) => const ResidentDashboardScreen()),
+        'Admin accounts use the web admin panel.',
+        type: ToastType.error,
       );
-    } else {
-      // Defaults to the GoBiker/Admin dashboard
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const DashboardScreen()),
-      );
+      return;
     }
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => screenForUser(user)),
+      (route) => false,
+    );
+  }
+
+  Future<void> _handleGoogle() async {
+    FocusScope.of(context).unfocus();
+    setState(() => _isGoogleLoading = true);
+
+    final result = await AuthService.instance.signInWithGoogle();
+
+    if (!mounted) return;
+    setState(() => _isGoogleLoading = false);
+    await _finishSignIn(result);
+  }
+
+  void _goToSignUp() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const CreateAccountScreen()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      // This hides the keyboard when you tap anywhere outside a text field
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        resizeToAvoidBottomInset: true,
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(child: Image.asset('assets/images/logo.png', height: 80)),
-                  const SizedBox(height: 40),
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    final muted = onSurface.withValues(alpha: 0.6);
 
-                  // Email Field
-                  const Text('Email address', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87)),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _emailController,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter your email' : null,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.mail_outline, color: Colors.grey, size: 22),
-                      hintText: 'Enter your email',
-                      hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Password Field
-                  const Text('Password', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87)),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _passwordController,
-                    validator: (v) => (v == null || v.isEmpty) ? 'Enter your password' : null,
-                    obscureText: _obscurePassword,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.lock_outline, color: Colors.grey, size: 22),
-                      suffixIcon: IconButton(
-                        icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: Colors.grey, size: 20),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                      ),
-                      hintText: 'Password',
-                      hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-
-                  // Remember Me & Forgot Password
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return LoadingOverlay(
+      isLoading: _isLoading || _isGoogleLoading,
+      message: _isGoogleLoading ? 'Signing in with Google...' : 'Signing in...',
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          resizeToAvoidBottomInset: true,
+          backgroundColor: authBackground(context),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+              child: AutofillGroup(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Row(
-                        children: [
-                          SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: Checkbox(
-                              value: _rememberMe,
-                              onChanged: (value) => setState(() => _rememberMe = value!),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      const Center(child: AuthLogo(height: 88)),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Welcome back',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Log in to continue',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 14, color: muted),
+                      ),
+                      const SizedBox(height: 32),
+
+                      AppTextField(
+                        label: 'Email address',
+                        hint: 'name@email.com',
+                        icon: Icons.mail_outline_rounded,
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        autofillHints: const [AutofillHints.email],
+                        validator: (v) {
+                          final value = (v ?? '').trim();
+                          if (value.isEmpty) return 'Enter your email';
+                          if (!_emailRegex.hasMatch(value)) {
+                            return 'Enter a valid email';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      AppTextField(
+                        label: 'Password',
+                        hint: 'Enter your password',
+                        icon: Icons.lock_outline_rounded,
+                        controller: _passwordController,
+                        obscure: true,
+                        textInputAction: TextInputAction.done,
+                        autofillHints: const [AutofillHints.password],
+                        validator: (v) => (v == null || v.isEmpty)
+                            ? 'Enter your password'
+                            : null,
+                        onSubmitted: (_) => _handleLogin(),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Remember me (label now uses theme colors, so it is always visible)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () =>
+                              setState(() => _rememberMe = !_rememberMe),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: Checkbox(
+                                    value: _rememberMe,
+                                    activeColor: kAuthBlue,
+                                    side: authCheckboxSide(context),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    onChanged: (v) => setState(
+                                      () => _rememberMe = v ?? false,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  'Remember me',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: onSurface,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          const Text('Remember me', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                        ],
+                        ),
                       ),
-                      TextButton(
-                        onPressed: () {},
-                        child: const Text('Forgot password ?', style: TextStyle(color: Color(0xFF9098B1), fontSize: 13)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 25),
+                      const SizedBox(height: 24),
 
-                  // Login Button
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _handleLogin,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2962FF),
-                      minimumSize: const Size(double.infinity, 55),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      elevation: 0,
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('Login Now', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-                              SizedBox(width: 8),
-                              Icon(Icons.arrow_forward, color: Colors.white, size: 20),
-                            ],
+                      // Primary action
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : _handleLogin,
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(52),
+                        ),
+                        child: const Text(
+                          'Login',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
                           ),
-                  ),
-                  const SizedBox(height: 30),
-
-                  // OR Divider
-                  Row(
-                    children: [
-                      Expanded(child: Divider(color: Colors.grey.shade300, thickness: 1)),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Text('OR', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
                       ),
-                      Expanded(child: Divider(color: Colors.grey.shade300, thickness: 1)),
-                    ],
-                  ),
-                  const SizedBox(height: 30),
+                      const SizedBox(height: 24),
 
-                  // Sign In With Google Button (still simulated)
-                  OutlinedButton(
-                    onPressed: _isGoogleLoading
-                        ? null
-                        : () {
-                            setState(() => _isGoogleLoading = true);
+                      const OrDivider(),
+                      const SizedBox(height: 24),
 
-                            // Simulating the Google account selection popup and verification
-                            Future.delayed(const Duration(seconds: 2), () {
-                              if (!mounted) return;
-                              setState(() => _isGoogleLoading = false);
+                      // Secondary action
+                      OutlinedButton(
+                        onPressed: _isGoogleLoading ? null : _handleGoogle,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(52),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Image.asset(
+                              'assets/images/google_logo.png',
+                              height: 22,
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Continue with Google',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
 
-                              // Defaults Google users to the GoBiker dashboard for now
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(builder: (context) => const DashboardScreen()),
-                              );
-                            });
-                          },
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 55),
-                      side: BorderSide(color: Colors.grey.shade300),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: _isGoogleLoading
-                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                        : Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text('Sign In with Google', style: TextStyle(color: Colors.black87, fontSize: 15, fontWeight: FontWeight.w600)),
-                              const SizedBox(width: 10),
-                              Image.asset('assets/images/google_logo.png', height: 24),
-                            ],
-                          ),
-                  ),
-                  const SizedBox(height: 15),
-
-                  // Go to Sign Up Button
-                  OutlinedButton(
-                    onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const CreateAccountScreen())),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 55),
-                      side: BorderSide(color: Colors.grey.shade300),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: RichText(
-                      text: const TextSpan(
-                        text: 'New Here ? ',
-                        style: TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w500),
+                      // Tertiary action: plain text link
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          TextSpan(text: 'Sign Up', style: TextStyle(color: Color(0xFF2962FF), fontWeight: FontWeight.bold)),
+                          Text(
+                            "Don't have an account?",
+                            style: TextStyle(fontSize: 14, color: muted),
+                          ),
+                          TextButton(
+                            onPressed: _goToSignUp,
+                            style: TextButton.styleFrom(
+                              foregroundColor: kAuthBlue,
+                              minimumSize: const Size(0, 48),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              'Sign Up',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
         ),
       ),
-    );
-  }
-}
-
-// Dummy Home Screen placeholder so the app doesn't crash on login
-class DummyHomeScreen extends StatelessWidget {
-  const DummyHomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Go Bike Dashboard')),
-      body: const Center(child: Text('Welcome to Go Bike!')),
     );
   }
 }
