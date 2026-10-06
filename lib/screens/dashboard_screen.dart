@@ -14,7 +14,7 @@ import '../widgets/slide_to_start.dart';
 import 'active_ronda_screen.dart';
 import 'global_state.dart';
 import 'patient_management_screen.dart';
-import '../core/emergency_flow.dart';
+import '../core/ronda_store.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -27,7 +27,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     with WidgetsBindingObserver {
   final SlideToStartController _slider = SlideToStartController();
   bool _starting = false;
+  bool _resuming = false;
   bool _profileOpen = false;
+  SavedRonda? _savedRonda; // a ronda that was left open (app was closed/killed)
 
   // TODO(api): the schedule and announcement should come from the server.
   static const String _sampleSchedule = '8:00 AM - 12:00 PM';
@@ -39,6 +41,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _loadSavedRonda();
   }
 
   @override
@@ -54,6 +57,88 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // ------------------------------------------------------------------ actions
+  /// Looks for a ronda that was left open and shows the Resume card.
+  Future<void> _loadSavedRonda() async {
+    // If an earlier "End ronda" never reached the server (offline), retry now.
+    await TrackingService.instance.flushPendingStop();
+    if (!mounted) return;
+
+    // Tracking is already running in this session, so nothing to resume.
+    if (TrackingService.instance.isActive) {
+      setState(() => _savedRonda = null);
+      return;
+    }
+
+    final saved = await RondaStore.load();
+    if (!mounted) return;
+    if (saved == null) {
+      setState(() => _savedRonda = null);
+      return;
+    }
+
+    // Ask Laravel if the ronda is still open. If the server says it is not,
+    // the saved copy is stale, so delete it.
+    final res = await AuthService.instance.callAuthed('GET', '/gobiker/active');
+    if (!mounted) return;
+    if (res.ok && res.body['active'] == false) {
+      await RondaStore.clear();
+      if (!mounted) return;
+      setState(() => _savedRonda = null);
+      return;
+    }
+
+    // Server says "active", or we are offline: show the card either way.
+    setState(() => _savedRonda = saved);
+  }
+
+  /// Continue the ronda without restarting it on the server.
+  Future<void> _resumeRonda() async {
+    final saved = _savedRonda;
+    if (saved == null) return;
+
+    setState(() => _resuming = true);
+    final error = await TrackingService.instance.resumeRonda(saved);
+    if (!mounted) return;
+    setState(() => _resuming = false);
+
+    if (error != null) {
+      AppToast.show(context, error, type: ToastType.error);
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ActiveRondaScreen(resumeFrom: saved),
+      ),
+    );
+    if (!mounted) return;
+    _slider.reset();
+    await _loadSavedRonda(); // card disappears if the ronda was ended
+    if (mounted) setState(() {}); // refresh today's metrics
+  }
+
+  /// Close the open ronda without resuming it.
+  Future<void> _endSavedRonda() async {
+    final confirmed = await ConfirmModal.show(
+      context: context,
+      icon: Icons.stop_circle_rounded,
+      color: AppTheme.errorRed,
+      title: 'End this ronda?',
+      description:
+          'This closes your open ronda. Live location sharing stays off.',
+      confirmText: 'End Ronda',
+      onConfirm: () {},
+    );
+    if (confirmed != true || !mounted) return;
+
+    await RondaStore.clear();
+    await RondaStore.setPendingStop(true);
+    await TrackingService.instance.flushPendingStop();
+    if (!mounted) return;
+    setState(() => _savedRonda = null);
+    AppToast.show(context, 'Ronda ended.', type: ToastType.success);
+  }
 
   Future<void> _openProfile() async {
     setState(() => _profileOpen = true);
@@ -71,13 +156,23 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _onSlideComplete() async {
+    if (_savedRonda != null) {
+      _slider.reset();
+      AppToast.show(
+        context,
+        'Resume or end your open ronda first.',
+        type: ToastType.info,
+      );
+      return;
+    }
+
     final confirmed = await ConfirmModal.show(
       context: context,
       icon: Icons.directions_bike_rounded,
       color: AppTheme.blue,
       title: 'Start your ronda?',
       description:
-          'Your location will be shared with the RHU admin while the ronda is active. '
+          'Your location will be shared with the Go Bike admin while the ronda is active. '
           'Visit each assigned household and record your findings. You can end the ronda anytime.',
       confirmText: 'Start Ronda',
       onConfirm: () {},
@@ -109,7 +204,25 @@ class _DashboardScreenState extends State<DashboardScreen>
     setState(() {}); // refresh today's metrics
   }
 
-  Future<void> _onEmergency() => EmergencyFlow.run(context);
+  Future<void> _onEmergency() async {
+    final confirmed = await ConfirmModal.show(
+      context: context,
+      icon: Icons.warning_amber_rounded,
+      color: AppTheme.errorRed,
+      title: 'Send emergency alert?',
+      description: 'This immediately alerts the admin with your current location. Use only for real emergencies.',
+      confirmText: 'Send Alert',
+      onConfirm: () {},
+    );
+    if (confirmed != true || !mounted) return;
+
+    // TODO(api): the emergency alert endpoint is built in step 3C.
+    AppToast.show(
+      context,
+      'Alerts to the admin are not connected yet. For a real emergency, call 911.',
+      type: ToastType.error,
+    );
+  }
 
   void _onAppointments() {
     // TODO(api): the Appointments screen is built in step 3C.
@@ -121,7 +234,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   void _showMessageAdminSheet() {
-    final messageCtrl = TextEditingController();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -129,69 +241,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          24,
-          8,
-          24,
-          MediaQuery.of(ctx).viewInsets.bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Message Admin',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Send a report or question to the RHU admin.',
-              style: TextStyle(
-                fontSize: 13,
-                color: Theme.of(ctx).colorScheme.onSurface
-                    .withValues(alpha: 0.6),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: messageCtrl,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                hintText: 'Type your message to the Admin...',
-              ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                if (messageCtrl.text.trim().isEmpty) {
-                  AppToast.show(
-                    ctx,
-                    'Please type a message first.',
-                    type: ToastType.error,
-                  );
-                  return;
-                }
-                Navigator.pop(ctx);
-                // TODO(api): messages are saved on the server in step 3C.
-                AppToast.show(
-                  context,
-                  'Message sent to Admin!',
-                  type: ToastType.success,
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(50),
-              ),
-              child: const Text(
-                'Send',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ).whenComplete(messageCtrl.dispose);
+      builder: (ctx) => _MessageAdminSheet(rootContext: context),
+    );
   }
 
   void _showRondaHistorySheet() {
@@ -332,8 +383,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
 
     return LoadingOverlay(
-      isLoading: _starting,
-      message: 'Starting ronda...',
+      isLoading: _starting || _resuming,
+      message: _resuming ? 'Resuming ronda...' : 'Starting ronda...',
       child: Scaffold(
         body: SafeArea(
           child: Column(
@@ -356,6 +407,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (_savedRonda != null) ...[
+                              _sectionTitle('OPEN RONDA', muted),
+                              _buildResumeCard(theme, muted),
+                              const SizedBox(height: 24),
+                            ],
                             _sectionTitle("TODAY'S ASSIGNMENT", muted),
                             _buildAssignmentCard(theme, muted, barangay),
                           ],
@@ -662,6 +718,86 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  Widget _buildResumeCard(ThemeData theme, Color muted) {
+    final saved = _savedRonda!;
+    final started = DateFormat('hh:mm a').format(saved.startedAt);
+    final km = (saved.distanceMeters / 1000).toStringAsFixed(2);
+    final place = (saved.barangay != null && saved.barangay!.isNotEmpty)
+        ? 'Brgy. ${saved.barangay}'
+        : 'Ronda in progress';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.orange.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.orange.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _iconBadge(Icons.history_rounded, AppTheme.orange),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'You have an open ronda',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '$place • Started $started\n'
+                      '${saved.patientsCount} patients • $km km',
+                      style: TextStyle(fontSize: 13, height: 1.4, color: muted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _endSavedRonda,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.errorRed,
+                    side: const BorderSide(color: AppTheme.errorRed),
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                  child: const Text('End it'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: _resumeRonda,
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text(
+                    'Resume ronda',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAssignmentCard(ThemeData theme, Color muted, String barangay) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -868,6 +1004,178 @@ class _NavItem extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Message Admin bottom sheet — sends a real POST to /gobiker/message
+// ---------------------------------------------------------------------------
+class _MessageAdminSheet extends StatefulWidget {
+  const _MessageAdminSheet({required this.rootContext});
+
+  /// The dashboard's BuildContext, which stays alive after the sheet closes.
+  final BuildContext rootContext;
+
+  @override
+  State<_MessageAdminSheet> createState() => _MessageAdminSheetState();
+}
+
+class _MessageAdminSheetState extends State<_MessageAdminSheet> {
+  final _ctrl = TextEditingController();
+  bool _sending = false;
+  static const int _maxChars = 500;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final text = _ctrl.text.trim();
+    if (text.isEmpty) {
+      AppToast.show(context, 'Please type a message first.', type: ToastType.error);
+      return;
+    }
+    // Capture before the async gap (lint: use_build_context_synchronously)
+    final rootCtx = widget.rootContext;
+    setState(() => _sending = true);
+
+    final res = await AuthService.instance.callAuthed(
+      'POST',
+      '/gobiker/message',
+      body: {'message': text},
+    );
+
+    if (!mounted) return;
+    setState(() => _sending = false);
+
+    if (res.ok) {
+      Navigator.of(context).pop();
+      if (rootCtx.mounted) {
+        AppToast.show(
+          rootCtx,
+          'Message sent to admin!',
+          type: ToastType.success,
+        );
+      }
+    } else {
+      AppToast.show(context, res.message, type: ToastType.error);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurface.withValues(alpha: 0.6);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        24,
+        8,
+        24,
+        MediaQuery.of(context).viewInsets.bottom + 28,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Sheet header
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppTheme.blue.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.chat_bubble_rounded,
+                  color: AppTheme.blue,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Message Admin',
+                      style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      'Send a report or question to the Go Bike admin.',
+                      style: TextStyle(fontSize: 12, color: muted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+
+          // Message field
+          ListenableBuilder(
+            listenable: _ctrl,
+            builder: (context, _) {
+              final count = _ctrl.text.length;
+              final overLimit = count > _maxChars;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  TextField(
+                    controller: _ctrl,
+                    maxLines: 5,
+                    minLines: 4,
+                    maxLength: _maxChars,
+                    buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
+                    textInputAction: TextInputAction.newline,
+                    decoration: InputDecoration(
+                      hintText: 'Type your message here…',
+                      alignLabelWithHint: true,
+                      counterText: '',
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '$count / $_maxChars',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: overLimit ? AppTheme.errorRed : muted,
+                      fontWeight: overLimit ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // Send button
+          ElevatedButton(
+            onPressed: _sending ? null : _send,
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+            ),
+            child: _sending
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'Send Message',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+          ),
+        ],
       ),
     );
   }

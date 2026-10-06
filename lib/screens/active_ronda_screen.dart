@@ -170,7 +170,7 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
       icon: Icons.stop_circle_rounded,
       color: AppTheme.errorRed,
       title: 'End your ronda?',
-      description: 'Your live location will stop being shared with the RHU admin and this ronda will be saved to your history.',
+      description: 'Your live location will stop being shared with the Go Bike admin and this ronda will be saved to your history.',
       confirmText: 'End Ronda',
       onConfirm: () {},
     );
@@ -389,7 +389,7 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
               SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  'Your live location is shared with the RHU admin.',
+                  'Your live location is shared with the Go Bike admin.',
                   style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
               ),

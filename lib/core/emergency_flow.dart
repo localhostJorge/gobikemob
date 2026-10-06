@@ -15,7 +15,7 @@ class EmergencyFlow {
       icon: Icons.warning_amber_rounded,
       color: AppTheme.errorRed,
       title: 'Send emergency alert?',
-      description: 'This immediately alerts the RHU admin with your current location. Use only for real emergencies.',
+      description: 'This immediately alerts the Go Bike admin with your current location. Use only for real emergencies.',
       confirmText: 'Send Alert',
       onConfirm: () {},
     );

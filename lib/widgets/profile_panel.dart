@@ -11,6 +11,7 @@ import '../screens/login_screen.dart';
 import 'app_toast.dart';
 import 'confirm_modal.dart';
 import '../screens/global_state.dart';
+import '../core/ronda_store.dart';
 
 class ProfilePanel {
   /// Opens the profile panel, sliding in from the right.
@@ -59,7 +60,9 @@ class ProfilePanel {
     );
 
     await TrackingService.instance.stopRonda();
+    await RondaStore.clear(); // a killed ronda must not leak to the next login
     await AuthService.instance.logout();
+
     globalPatients
         .clear(); // private health data: never keep it for the next person
     globalRondas.clear();

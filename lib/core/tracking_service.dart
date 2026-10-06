@@ -246,6 +246,7 @@ class TrackingService {
         .listen((p) {
           _latest = p;
           _latestAt = DateTime.now();
+          _track(p); // accumulate distance on every stream update (~5s)
         }, onError: (Object e) => debugPrint('Location stream error: $e'));
   }
 
@@ -261,7 +262,7 @@ class TrackingService {
       p.latitude,
       p.longitude,
     );
-    if (meters < 8) return; // GPS jitter while standing still
+    if (meters < 3) return; // GPS jitter while standing still
     if (meters < 2000) _distanceMeters += meters; // ignore impossible jumps
     _lastPosition = p;
   }
