@@ -45,7 +45,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
       icon: Icons.person_add_alt_1_rounded,
       color: AppTheme.blue,
       title: 'Save this patient record?',
-      description: "The record will be saved to the RHU's patient log.",
+      description: "The record will be saved to the Go Bike patient log.",
       confirmText: 'Save',
       onConfirm: () {},
     );

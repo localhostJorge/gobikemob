@@ -13,7 +13,7 @@ import 'add_patient_screen.dart';
 import 'global_state.dart';
 import 'view_patient_screen.dart';
 import 'login_screen.dart';
-import '../core/emergency_flow.dart';
+import '../core/ronda_store.dart';
 
 const List<String> _barangays = [
   'Angarian',
@@ -43,7 +43,10 @@ const List<String> _barangays = [
 ];
 
 class ActiveRondaScreen extends StatefulWidget {
-  const ActiveRondaScreen({super.key});
+  const ActiveRondaScreen({super.key, this.resumeFrom});
+
+  /// Not null when the GoBiker is continuing a ronda after the app closed.
+  final SavedRonda? resumeFrom;
 
   @override
   State<ActiveRondaScreen> createState() => _ActiveRondaScreenState();
@@ -51,9 +54,20 @@ class ActiveRondaScreen extends StatefulWidget {
 
 class _ActiveRondaScreenState extends State<ActiveRondaScreen>
     with SingleTickerProviderStateMixin {
-  // The ronda was already started on the server by the dashboard,
-  // so the clock starts as soon as this screen opens.
-  final DateTime _startedAt = DateTime.now();
+  // The ronda was already started on the server by the dashboard
+  late final DateTime _startedAt =
+      widget.resumeFrom?.startedAt ?? DateTime.now();
+
+  // Patients saved before the app closed.
+  late final int _resumedCount = widget.resumeFrom?.patientsCount ?? 0;
+  int get _patientsCount => _resumedCount + _todayPatients.length;
+
+  /// Tells TrackingService what to save to the phone.
+  void _syncTracking() {
+    TrackingService.instance.rondaBarangay = _barangay;
+    TrackingService.instance.rondaPatients = _patientsCount;
+  }
+
   late final String _startTime = DateFormat('hh:mm a').format(_startedAt);
 
   late final AnimationController _pulse = AnimationController(
@@ -70,7 +84,10 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
     super.initState();
 
     final mine = AuthService.instance.currentUser?.barangay;
-    _barangay = _barangays.contains(mine) ? mine : null;
+    _barangay =
+        widget.resumeFrom?.barangay ??
+        (_barangays.contains(mine) ? mine : null);
+    _syncTracking();
 
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
@@ -169,7 +186,7 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
       'startTime': _startTime,
       'endTime': DateFormat('hh:mm a').format(DateTime.now()),
       'endDateTime': DateTime.now(), // used for "minutes ago"
-      'patientsCount': _todayPatients.length,
+      'patientsCount': _patientsCount,
       'distance': TrackingService.instance.distanceKm, // real GPS distance
     });
     return true;
@@ -192,6 +209,7 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
     setState(() {
       _todayPatients.add(created);
       globalPatients.insert(0, created);
+      _syncTracking();
     });
     AppToast.show(context, 'Patient record saved.', type: ToastType.success);
   }
@@ -217,6 +235,7 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
         if (g != -1) globalPatients[g] = result['data'];
         AppToast.show(context, 'Record updated.', type: ToastType.success);
       }
+      _syncTracking();
     });
   }
 
@@ -250,7 +269,10 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
                       icon: Icons.location_on_outlined,
                       items: _barangays,
                       value: _barangay,
-                      onChanged: (v) => setState(() => _barangay = v),
+                      onChanged: (v) {
+                        setState(() => _barangay = v);
+                        _syncTracking();
+                      },
                     ),
                     const SizedBox(height: 24),
                     Row(
@@ -356,7 +378,7 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
           Row(
             children: [
               _heroStat('Started', _startTime),
-              _heroStat('Patients', '${_todayPatients.length}'),
+              _heroStat('Patients', '$_patientsCount'),
               _heroStat('Distance', '${km.toStringAsFixed(2)} km'),
             ],
           ),
@@ -548,47 +570,18 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
                 ),
               ),
             const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () => EmergencyFlow.run(context),
-                    icon: const Icon(Icons.warning_amber_rounded),
-                    label: const Text(
-                      'Emergency',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppTheme.errorRed,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(52),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _endRondaPressed,
-                    icon: const Icon(Icons.stop_circle_outlined),
-                    label: const Text(
-                      'End Ronda',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(52),
-                    ),
-                  ),
-                ),
-              ],
+            OutlinedButton.icon(
+              onPressed: _endRondaPressed,
+              icon: const Icon(Icons.stop_circle_outlined),
+              label: const Text(
+                'End Ronda',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.errorRed,
+                side: const BorderSide(color: AppTheme.errorRed),
+                minimumSize: const Size.fromHeight(52),
+              ),
             ),
           ],
         ),

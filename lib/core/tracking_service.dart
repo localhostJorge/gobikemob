@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'auth_service.dart';
+import 'ronda_store.dart';
 
 /// Starts/stops a ronda on the server and sends the Go Biker's position
 /// every 10 seconds while the ronda is active. A foreground service keeps
@@ -24,6 +25,9 @@ class TrackingService {
   Position? _latest; // newest position from the location stream
   DateTime? _latestAt;
   double _distanceMeters = 0;
+  DateTime? _startedAt;
+  String? rondaBarangay; // set by the Active Ronda screen
+  int rondaPatients = 0; // set by the Active Ronda screen
 
   /// Set by the active-ronda screen to react if the server rejects us.
   void Function(String message)? onFatalError;
@@ -58,6 +62,9 @@ class TrackingService {
     _latest = first;
     _latestAt = DateTime.now();
     _active = true;
+    _startedAt = DateTime.now();
+    await _persist();
+
     try {
       await WakelockPlus.enable();
     } catch (_) {}
@@ -70,12 +77,61 @@ class TrackingService {
     return null;
   }
 
+  /// Continue a ronda after the app was closed or killed.
+  /// It does NOT call /active/start, because that would reset the
+  /// start time on the server.
+  /// Returns null on success, otherwise a message to show to the user.
+  Future<String?> resumeRonda(SavedRonda saved) async {
+    if (_active) return null;
+
+    final accessError = await _ensureLocationAccess();
+    if (accessError != null) return accessError;
+
+    Position first;
+    try {
+      first = await _currentPosition();
+    } catch (e) {
+      debugPrint('resumeRonda location error: $e');
+      return "Couldn't get your location. Move to an open area and try again.";
+    }
+
+    _startedAt = saved.startedAt;
+    _distanceMeters = saved.distanceMeters;
+    rondaBarangay = saved.barangay;
+    rondaPatients = saved.patientsCount;
+    _lastPosition = first; // don't count the gap while the app was closed
+    _latest = first;
+    _latestAt = DateTime.now();
+    _active = true;
+
+    try {
+      await WakelockPlus.enable();
+    } catch (_) {}
+
+    _startStream();
+    await _send(first);
+    if (!_active) return null; // the server rejected the location
+    _timer = Timer.periodic(_interval, (_) => _tick());
+    return null;
+  }
+
   Future<void> stopRonda() async {
     if (!_active) return;
     await _shutdown();
-    await AuthService.instance.postAuthed(
-      '/gobiker/active/stop',
-    ); // best effort
+    _startedAt = null;
+    await RondaStore.clear();
+    await RondaStore.setPendingStop(true); // "server still needs to know"
+    await flushPendingStop(); // try now; retried later if offline
+  }
+
+  /// Tells the server the ronda ended. If the phone is offline,
+  /// the flag stays and we try again next time the dashboard opens.
+  Future<void> flushPendingStop() async {
+    if (!await RondaStore.hasPendingStop()) return;
+    final res = await AuthService.instance.postAuthed('/gobiker/active/stop');
+    if (res.ok || res.status == 404) {
+      await RondaStore.setPendingStop(false);
+    }
   }
 
   /// Sends an emergency alert with the current position.
@@ -105,6 +161,21 @@ class TrackingService {
   }
 
   // ---------------------------------------------------------------- internals
+
+  /// Saves the ronda on the phone so it survives an app close.
+  Future<void> _persist() async {
+    final started = _startedAt;
+    if (started == null) return;
+    await RondaStore.save(
+      SavedRonda(
+        startedAt: started,
+        distanceMeters: _distanceMeters,
+        patientsCount: rondaPatients,
+        barangay: rondaBarangay,
+      ),
+    );
+    debugPrint('Ronda saved'); // temporary: delete after testing
+  }
 
   Future<String?> _ensureLocationAccess() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
@@ -208,6 +279,7 @@ class TrackingService {
 
       final Position p = isFresh ? latest : await _currentPosition();
       _track(p);
+      await _persist();
       await _send(p);
     } catch (e) {
       debugPrint('Location update skipped: $e');
