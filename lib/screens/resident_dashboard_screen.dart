@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-import 'login_screen.dart';
+import '../core/auth_service.dart';
+import '../core/greeting.dart';
+import '../core/theme.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/confirm_modal.dart';
+import '../widgets/fade_in_slide.dart';
+import '../widgets/profile_panel.dart';
 
 class ResidentDashboardScreen extends StatefulWidget {
   const ResidentDashboardScreen({super.key});
@@ -11,348 +17,212 @@ class ResidentDashboardScreen extends StatefulWidget {
       _ResidentDashboardScreenState();
 }
 
-class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
-  int _currentNavIndex = 0;
+class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
+    with WidgetsBindingObserver {
+  bool _profileOpen = false;
 
-  // Emergency SOS Trigger
-  void _triggerSOS() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 30),
-            SizedBox(width: 10),
-            Text(
-              'EMERGENCY SOS',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
-            ),
-          ],
-        ),
-        content: const Text(
-          'This will alert the admin and the nearest GoBiker that you need immediate medical assistance at your registered address.\n\nProceed?',
-          style: TextStyle(fontSize: 15),
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.grey.shade300,
-              elevation: 0,
-            ),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(
-                color: Colors.black87,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              AppToast.show(
-                context,
-                'SOS Alert Sent! Help is being dispatched.',
-                type: ToastType.error,
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text(
-              'SEND SOS',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // TODO(api): announcements should come from the server.
+  static const String _sampleAnnouncementTitle = 'Free Medicine';
+  static const String _sampleAnnouncementBody =
+      'Available at the RHU main center from 8 AM to 4 PM for all residents.';
 
-  // Request Check-up Trigger
-  void _requestVisit() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Text(
-          'Request Check-up',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: const Text(
-          'Would you like to schedule a standard visit for the next time a GoBiker is in your area?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              AppToast.show(
-                context,
-                'Visit requested successfully!',
-                type: ToastType.success,
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2E62C8),
-            ),
-            child: const Text('Confirm', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Refresh the greeting when the app comes back to the foreground.
+    if (state == AppLifecycleState.resumed && mounted) setState(() {});
+  }
+
+  // ------------------------------------------------------------------ actions
+
+  Future<void> _openProfile() async {
+    setState(() => _profileOpen = true);
+    await ProfilePanel.show(context);
+    if (mounted) setState(() => _profileOpen = false);
+  }
+
+  Future<void> _call911() async {
+    try {
+      final opened = await launchUrl(Uri(scheme: 'tel', path: '911'));
+      if (!opened && mounted) {
+        AppToast.show(
+          context,
+          "Couldn't open the phone dialer. Please dial 911 manually.",
+          type: ToastType.error,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        AppToast.show(
+          context,
+          "Couldn't open the phone dialer. Please dial 911 manually.",
+          type: ToastType.error,
+        );
+      }
+    }
+  }
+
+  Future<void> _onSos() async {
+    final confirmed = await ConfirmModal.show(
+      context: context,
+      icon: Icons.warning_amber_rounded,
+      color: AppTheme.errorRed,
+      title: 'Need emergency help?',
+      description:
+          'Alerts to the admin are not connected in this version of the app yet. '
+          'For immediate help, call 911 now.',
+      confirmText: 'Call 911',
+      onConfirm: () {},
+    );
+    if (confirmed == true) await _call911();
+  }
+
+  Future<void> _onRequestCheckup() async {
+    final confirmed = await ConfirmModal.show(
+      context: context,
+      icon: Icons.calendar_month_rounded,
+      color: AppTheme.blue,
+      title: 'Request a check-up?',
+      description: 'A Go Biker will visit your address the next time they are on a ronda in your barangay.',
+      confirmText: 'Request',
+      onConfirm: () {},
+    );
+    if (confirmed != true || !mounted) return;
+
+    // TODO(api): check-up requests are saved on the server in step 3C.
+    AppToast.show(
+      context,
+      'Check-up requests will be available in the next update.',
+      type: ToastType.info,
+    );
+  }
+
+  // -------------------------------------------------------------------- build
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurface.withValues(alpha: 0.6);
+    final user = AuthService.instance.currentUser;
+
+    final barangay = (user?.barangay != null && user!.barangay!.isNotEmpty)
+        ? 'Brgy. ${user.barangay}'
+        : null;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFE5E5E5),
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar Header
-            Container(
-              height: 70,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.white, Color(0xFF1E1E48)],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  stops: [0.3, 1.0],
-                ),
-              ),
-              child: Row(
-                children: [
-                  const CircleAvatar(
-                    radius: 22,
-                    backgroundColor: Color(0xFFCFE1FA),
-                    child: Icon(
-                      Icons.person,
-                      color: Color(0xFF1E1E48),
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Hello, Resident!',
-                        style: TextStyle(
-                          color: Color(0xFF1E1E48),
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'Brgy. Poblacion',
-                        style: TextStyle(
-                          color: Colors.black54,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  Image.asset(
-                    'assets/images/logo.png',
-                    height: 35,
-                    errorBuilder: (c, e, s) => const Icon(
-                      Icons.directions_bike,
-                      color: Colors.white,
-                      size: 30,
-                    ),
-                  ),
-                ],
+            // Greeting header
+            FadeInSlide(
+              offset: const Offset(0, -12),
+              child: _buildHeader(
+                theme,
+                muted,
+                user?.firstName ?? 'there',
+                barangay,
               ),
             ),
 
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // 1. Live Ronda Tracker
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 16,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        border: Border.all(color: Colors.green.shade400),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
+                    // 1) Emergency SOS (the primary action)
+                    FadeInSlide(
+                      delay: const Duration(milliseconds: 80),
+                      child: _buildSosCard(),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 2) Quick actions
+                    FadeInSlide(
+                      delay: const Duration(milliseconds: 160),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            height: 12,
-                            width: 12,
-                            decoration: const BoxDecoration(
-                              color: Colors.green,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Text(
-                              'A GoBiker is currently active in your barangay.',
-                              style: TextStyle(
-                                color: Colors.green,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
+                          _sectionTitle('QUICK ACTIONS', muted),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _quickAction(
+                                  theme,
+                                  icon: Icons.calendar_month_rounded,
+                                  color: AppTheme.blue,
+                                  label: 'Request\nCheck-up',
+                                  onTap: _onRequestCheckup,
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _quickAction(
+                                  theme,
+                                  icon: Icons.phone_in_talk_rounded,
+                                  color: AppTheme.successGreen,
+                                  label: 'Call 911',
+                                  onTap: _call911,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 25),
+                    const SizedBox(height: 24),
 
-                    // 2. The Lifeline (SOS Button)
-                    InkWell(
-                      onTap: _triggerSOS,
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 30),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFE53935), Color(0xFFB71C1C)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.red.withOpacity(0.4),
-                              blurRadius: 15,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: const Column(
-                          children: [
-                            Icon(
-                              Icons.emergency_share,
-                              color: Colors.white,
-                              size: 50,
-                            ),
-                            SizedBox(height: 10),
-                            Text(
-                              'EMERGENCY SOS',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.5,
-                              ),
-                            ),
-                            SizedBox(height: 5),
-                            Text(
-                              'Tap to request immediate medical help',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 25),
-
-                    // 3. Quick Actions (Request Visit & Health Records)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildResidentActionCard(
-                            title: 'Request\nCheck-up',
-                            icon: Icons.calendar_month,
-                            color: const Color(0xFF2E62C8),
-                            onTap: _requestVisit,
-                          ),
-                        ),
-                        const SizedBox(width: 15),
-                        Expanded(
-                          child: _buildResidentActionCard(
-                            title: 'My Health\nPassport',
-                            icon: Icons.monitor_heart_outlined,
-                            color: const Color(0xFF009688),
-                            onTap: () => AppToast.show(
-                              context,
-                              'Opening Health Records...',
-                              type: ToastType.info,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 30),
-
-                    // 4. Community Announcements
-                    const Text(
-                      'COMMUNITY ANNOUNCEMENTS',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(15),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Row(
+                    // 3) Announcements
+                    FadeInSlide(
+                      delay: const Duration(milliseconds: 240),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          _sectionTitle('COMMUNITY ANNOUNCEMENTS', muted),
                           Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade100,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.campaign,
-                              color: Colors.orange,
-                              size: 28,
-                            ),
-                          ),
-                          const SizedBox(width: 15),
-                          const Expanded(
-                            child: Column(
+                            padding: const EdgeInsets.all(16),
+                            decoration: _cardDecoration(theme),
+                            child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Free Flu Vaccines',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                  ),
+                                _iconBadge(
+                                  Icons.campaign_rounded,
+                                  AppTheme.orange,
                                 ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Available at the RHU main center this Friday from 8 AM to 3 PM for all residents.',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.black87,
-                                    height: 1.3,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        _sampleAnnouncementTitle,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _sampleAnnouncementBody,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          height: 1.4,
+                                          color: muted,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
@@ -366,78 +236,200 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               ),
             ),
 
-            // Bottom Navigation Bar
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade300),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 6,
-                    offset: Offset(0, 3),
-                  ),
-                ],
+            // Bottom bar (Profile at the far right)
+            FadeInSlide(
+              delay: const Duration(milliseconds: 320),
+              offset: const Offset(0, 24),
+              child: _buildBottomBar(theme, muted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------------ pieces
+
+  BoxDecoration _cardDecoration(ThemeData theme, {bool shadow = false}) {
+    final isLight = theme.brightness == Brightness.light;
+    return BoxDecoration(
+      color: theme.cardColor,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: theme.dividerColor),
+      boxShadow: (shadow && isLight)
+          ? const [
+              BoxShadow(
+                color: Color(0x141E1E48),
+                blurRadius: 14,
+                offset: Offset(0, 6),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.home,
-                      size: 32,
-                      color: _currentNavIndex == 0
-                          ? const Color(0xFF2E62C8)
-                          : Colors.black87,
-                    ),
-                    onPressed: () => setState(() => _currentNavIndex = 0),
+            ]
+          : null,
+    );
+  }
+
+  Widget _sectionTitle(String text, Color muted) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+          color: muted,
+        ),
+      ),
+    );
+  }
+
+  Widget _iconBadge(IconData icon, Color color) {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, color: color, size: 24),
+    );
+  }
+
+  Widget _buildHeader(
+    ThemeData theme,
+    Color muted,
+    String firstName,
+    String? barangay,
+  ) {
+    final isDark = theme.brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        border: Border(bottom: BorderSide(color: theme.dividerColor)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: isDark
+                ? const EdgeInsets.symmetric(horizontal: 8, vertical: 4)
+                : EdgeInsets.zero,
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Image.asset(
+              'assets/images/logo.png',
+              height: 36,
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.directions_bike_rounded,
+                color: AppTheme.blue,
+                size: 32,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  greetingForNow(),
+                  style: TextStyle(fontSize: 13, color: muted),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  firstName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
                   ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.history,
-                      size: 32,
-                      color: _currentNavIndex == 1
-                          ? const Color(0xFF2E62C8)
-                          : Colors.black87,
-                    ),
-                    onPressed: () => setState(() => _currentNavIndex = 1),
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.person_outline,
-                      size: 32,
-                      color: _currentNavIndex == 2
-                          ? const Color(0xFF2E62C8)
-                          : Colors.black87,
-                    ),
-                    onPressed: () => setState(() => _currentNavIndex = 2),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFDCDA),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(
-                        Icons.exit_to_app,
-                        color: Colors.redAccent,
-                        size: 28,
-                      ),
-                      onPressed: () {
-                        // Logout logic
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LoginScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+                ),
+                if (barangay != null)
+                  Text(barangay, style: TextStyle(fontSize: 12, color: muted)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSosCard() {
+    return InkWell(
+      onTap: _onSos,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+        decoration: BoxDecoration(
+          color: AppTheme.errorRed,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.errorRed.withValues(alpha: 0.35),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: const Column(
+          children: [
+            Icon(Icons.emergency_share_rounded, color: Colors.white, size: 48),
+            SizedBox(height: 10),
+            Text(
+              'EMERGENCY SOS',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Tap to request immediate medical help',
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _quickAction(
+    ThemeData theme, {
+    required IconData icon,
+    required Color color,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        decoration: _cardDecoration(theme),
+        child: Column(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                height: 1.25,
               ),
             ),
           ],
@@ -446,45 +438,82 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     );
   }
 
-  // Helper Widget for the square action buttons
-  Widget _buildResidentActionCard({
-    required String title,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(15),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: Colors.grey.shade300),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 5,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 40),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.black87,
-                height: 1.2,
+  Widget _buildBottomBar(ThemeData theme, Color muted) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: _cardDecoration(
+        theme,
+        shadow: true,
+      ).copyWith(borderRadius: BorderRadius.circular(20)),
+      child: Row(
+        children: [
+          _NavItem(
+            icon: Icons.home_rounded,
+            label: 'Home',
+            selected: !_profileOpen,
+            muted: muted,
+            onTap: () {},
+          ),
+          _NavItem(
+            icon: Icons.person_rounded,
+            label: 'Profile',
+            selected: _profileOpen,
+            muted: muted,
+            onTap: _openProfile,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.muted,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final Color muted;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppTheme.blue : muted;
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppTheme.blue.withValues(alpha: 0.10)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 26, color: color),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: color,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

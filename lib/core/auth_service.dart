@@ -214,19 +214,57 @@ class AuthService {
     _token = token;
     _user = user;
 
-    try {
-      if (remember) {
-        await _storage.write(key: _tokenKey, value: token);
-      } else {
-        await _storage.delete(key: _tokenKey);
+    Future<AppUser?> restoreSession() async {
+      String? saved;
+      try {
+        saved = await _storage.read(key: _tokenKey);
+      } catch (e) {
+        debugPrint('[session] could not read the saved token: $e');
       }
-    } catch (e) {
-      debugPrint('Secure storage failed: $e'); // keep the session in memory
+      debugPrint(
+        '[session] saved token found: ${saved != null && saved.isNotEmpty}',
+      );
+      if (saved == null || saved.isEmpty) return null;
+
+      _token = saved;
+      final res = await _request('GET', '/mobile/me', auth: true);
+      debugPrint(
+        '[session] /mobile/me -> status ${res.status} ${res.networkError ?? ''}',
+      );
+
+      if (res.ok) {
+        final u = res.body['user'];
+        if (u is Map<String, dynamic>) {
+          _user = AppUser.fromJson(u);
+          return _user;
+        }
+      }
+
+      if (res.status == 401 || res.status == 403) {
+        await _clearLocalSession(); // token no longer valid
+      } else {
+        _token = null; // server unreachable: keep the saved token for next time
+      }
+      return null;
     }
 
     return AuthResult.success(
       user: user,
       message: res.body['message']?.toString(),
+    );
+  }
+
+  /// Authenticated POST used by live tracking.
+  /// `message` is empty when the call succeeds.
+  Future<({bool ok, int status, String message})> postAuthed(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    final res = await _request('POST', path, body: body, auth: true);
+    return (
+      ok: res.ok,
+      status: res.status,
+      message: res.ok ? '' : res.errorMessage,
     );
   }
 
@@ -243,11 +281,19 @@ class AuthService {
     String? saved;
     try {
       saved = await _storage.read(key: _tokenKey);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[session] could not read the saved token: $e');
+    }
+    debugPrint(
+      '[session] saved token found: ${saved != null && saved.isNotEmpty}',
+    );
     if (saved == null || saved.isEmpty) return null;
 
     _token = saved;
     final res = await _request('GET', '/mobile/me', auth: true);
+    debugPrint(
+      '[session] /mobile/me -> status ${res.status} ${res.networkError ?? ''}',
+    );
 
     if (res.ok) {
       final u = res.body['user'];
