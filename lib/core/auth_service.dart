@@ -155,11 +155,21 @@ class AuthService {
     };
 
     try {
-      final http.Response res = method == 'GET'
-          ? await http.get(uri, headers: headers).timeout(_timeout)
-          : await http
-                .post(uri, headers: headers, body: jsonEncode(body ?? {}))
-                .timeout(_timeout);
+      final http.Response res;
+      switch (method) {
+        case 'GET':
+          res = await http.get(uri, headers: headers).timeout(_timeout);
+        case 'PUT':
+          res = await http
+              .put(uri, headers: headers, body: jsonEncode(body ?? {}))
+              .timeout(_timeout);
+        case 'DELETE':
+          res = await http.delete(uri, headers: headers).timeout(_timeout);
+        default:
+          res = await http
+              .post(uri, headers: headers, body: jsonEncode(body ?? {}))
+              .timeout(_timeout);
+      }
 
       Map<String, dynamic> json = {};
       try {
@@ -395,6 +405,19 @@ class AuthService {
       debugPrint('Google sign-in error: $e');
       return AuthResult.failure('Google sign-in failed. Please try again.');
     }
+  }
+
+  /// Authenticated JSON call. [method] is GET, POST, PUT or DELETE.
+  /// `message` is empty when the call succeeds.
+  Future<({bool ok, int status, String message, Map<String, dynamic> body})>
+  callAuthed(String method, String path, {Map<String, dynamic>? body}) async {
+    final res = await _request(method, path, body: body, auth: true);
+    return (
+      ok: res.ok,
+      status: res.status,
+      message: res.ok ? '' : res.errorMessage,
+      body: res.body,
+    );
   }
 
   Future<void> logout() async {

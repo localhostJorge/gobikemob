@@ -10,6 +10,7 @@ import '../screens/legal_screen.dart';
 import '../screens/login_screen.dart';
 import 'app_toast.dart';
 import 'confirm_modal.dart';
+import '../screens/global_state.dart';
 
 class ProfilePanel {
   /// Opens the profile panel, sliding in from the right.
@@ -59,6 +60,9 @@ class ProfilePanel {
 
     await TrackingService.instance.stopRonda();
     await AuthService.instance.logout();
+    globalPatients
+        .clear(); // private health data: never keep it for the next person
+    globalRondas.clear();
 
     if (!context.mounted) return;
     AppToast.show(context, 'You have been logged out', type: ToastType.success);

@@ -141,17 +141,17 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
   }
 
   Future<void> _addPatient() async {
-    final newPatient = await Navigator.push<Map<String, dynamic>>(
+    final created = await Navigator.push<Map<String, dynamic>>(
       context,
-      MaterialPageRoute(builder: (context) => const AddPatientScreen()),
+      MaterialPageRoute(
+        builder: (context) => AddPatientScreen(barangay: _barangay),
+      ),
     );
-    if (newPatient == null || !mounted) return;
+    if (created == null || !mounted) return;
 
     setState(() {
-      newPatient['id'] = DateTime.now().millisecondsSinceEpoch.toString();
-      newPatient['date'] = DateFormat('MMMM d, yyyy').format(DateTime.now());
-      _todayPatients.add(newPatient);
-      globalPatients.add(newPatient);
+      _todayPatients.add(created);
+      globalPatients.insert(0, created);
     });
     AppToast.show(context, 'Patient record saved.', type: ToastType.success);
   }

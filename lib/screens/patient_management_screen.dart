@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../core/auth_service.dart';
+import '../core/patient_service.dart';
 import '../core/theme.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/fade_in_slide.dart';
@@ -19,11 +21,48 @@ class PatientManagementScreen extends StatefulWidget {
 class _PatientManagementScreenState extends State<PatientManagementScreen> {
   final _searchCtrl = TextEditingController();
   String _query = '';
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _load({bool showSpinner = true}) async {
+    if (showSpinner) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+
+    final result = await PatientService.instance.list();
+    if (!mounted) return;
+
+    setState(() {
+      _loading = false;
+      if (result.ok) {
+        globalPatients
+          ..clear()
+          ..addAll(result.data!);
+        _error = null;
+      } else {
+        _error = result.error;
+      }
+    });
+
+    // A failed refresh keeps the old list on screen, so just tell the user.
+    if (!result.ok && globalPatients.isNotEmpty) {
+      AppToast.show(context, result.error!, type: ToastType.error);
+    }
   }
 
   Map<String, List<Map<String, dynamic>>> get _grouped {
@@ -84,17 +123,17 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
   }
 
   Future<void> _addPatient() async {
-    final newPatient = await Navigator.push<Map<String, dynamic>>(
+    final created = await Navigator.push<Map<String, dynamic>>(
       context,
-      MaterialPageRoute(builder: (context) => const AddPatientScreen()),
+      MaterialPageRoute(
+        builder: (context) => AddPatientScreen(
+          barangay: AuthService.instance.currentUser?.barangay,
+        ),
+      ),
     );
-    if (newPatient == null || !mounted) return;
+    if (created == null || !mounted) return;
 
-    setState(() {
-      newPatient['id'] = DateTime.now().millisecondsSinceEpoch.toString();
-      newPatient['date'] = DateFormat('MMMM d, yyyy').format(DateTime.now());
-      globalPatients.add(newPatient);
-    });
+    setState(() => globalPatients.insert(0, created));
     AppToast.show(context, 'Patient record saved.', type: ToastType.success);
   }
 
@@ -135,64 +174,114 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            if (globalPatients.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: TextField(
-                  controller: _searchCtrl,
-                  onChanged: (v) => setState(() => _query = v.trim()),
-                  decoration: InputDecoration(
-                    hintText: 'Search by name',
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    suffixIcon: _query.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: 'Clear',
-                            icon: const Icon(Icons.close_rounded),
-                            onPressed: () {
-                              _searchCtrl.clear();
-                              setState(() => _query = '');
-                            },
-                          ),
-                  ),
-                ),
+      body: SafeArea(child: _buildBody(theme, muted, grouped, dates)),
+    );
+  }
+
+  Widget _buildBody(
+    ThemeData theme,
+    Color muted,
+    Map<String, List<Map<String, dynamic>>> grouped,
+    List<String> dates,
+  ) {
+    // 1) First load: centered loader
+    if (_loading && globalPatients.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // 2) Could not load and nothing to show: error with Retry
+    if (_error != null && globalPatients.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.cloud_off_rounded, size: 56, color: muted),
+              const SizedBox(height: 16),
+              const Text(
+                "Couldn't load patients",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
               ),
-            Expanded(
-              child: globalPatients.isEmpty
-                  ? _emptyState(
-                      muted,
-                      icon: Icons.assignment_ind_outlined,
-                      title: 'No patient records yet',
-                      body: 'Records you add during a ronda will appear here.',
-                    )
-                  : dates.isEmpty
-                  ? _emptyState(
-                      muted,
-                      icon: Icons.search_off_rounded,
-                      title: 'No matches',
-                      body: 'No patient matches "$_query".',
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                      itemCount: dates.length,
-                      itemBuilder: (context, index) {
-                        final date = dates[index];
-                        final items = grouped[date]!;
-                        return FadeInSlide(
-                          delay: Duration(
-                            milliseconds: 60 * (index > 5 ? 5 : index),
-                          ),
-                          child: _dateGroup(theme, muted, date, items),
-                        );
+              const SizedBox(height: 6),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: muted),
+              ),
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                onPressed: _load,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 3) No records at all
+    if (globalPatients.isEmpty) {
+      return _emptyState(
+        muted,
+        icon: Icons.assignment_ind_outlined,
+        title: 'No patient records yet',
+        body: 'Records you add during a ronda will appear here.',
+      );
+    }
+
+    // 4) The list (search + groups, pull down to refresh)
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: TextField(
+            controller: _searchCtrl,
+            onChanged: (v) => setState(() => _query = v.trim()),
+            decoration: InputDecoration(
+              hintText: 'Search by name',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: _query.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Clear',
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                        setState(() => _query = '');
                       },
                     ),
             ),
-          ],
+          ),
         ),
-      ),
+        Expanded(
+          child: dates.isEmpty
+              ? _emptyState(
+                  muted,
+                  icon: Icons.search_off_rounded,
+                  title: 'No matches',
+                  body: 'No patient matches "$_query".',
+                )
+              : RefreshIndicator(
+                  onRefresh: () => _load(showSpinner: false),
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                    itemCount: dates.length,
+                    itemBuilder: (context, index) {
+                      final date = dates[index];
+                      return FadeInSlide(
+                        delay: Duration(
+                          milliseconds: 60 * (index > 5 ? 5 : index),
+                        ),
+                        child: _dateGroup(theme, muted, date, grouped[date]!),
+                      );
+                    },
+                  ),
+                ),
+        ),
+      ],
     );
   }
 
