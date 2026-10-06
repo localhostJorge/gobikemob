@@ -139,7 +139,7 @@ class AuthService {
     if (_token != null) 'Authorization': 'Bearer $_token',
   };
 
-  // ------------------------------------------------------------------ HTTP
+  //  HTTP
 
   Future<_ApiResponse> _request(
     String method,
@@ -206,7 +206,7 @@ class AuthService {
     }
   }
 
-  // ------------------------------------------------------------- sessions
+  //  sessions
 
   Future<AuthResult> _sessionFrom(
     _ApiResponse res, {
@@ -224,38 +224,15 @@ class AuthService {
     _token = token;
     _user = user;
 
-    Future<AppUser?> restoreSession() async {
-      String? saved;
-      try {
-        saved = await _storage.read(key: _tokenKey);
-      } catch (e) {
-        debugPrint('[session] could not read the saved token: $e');
-      }
-      debugPrint(
-        '[session] saved token found: ${saved != null && saved.isNotEmpty}',
-      );
-      if (saved == null || saved.isEmpty) return null;
-
-      _token = saved;
-      final res = await _request('GET', '/mobile/me', auth: true);
-      debugPrint(
-        '[session] /mobile/me -> status ${res.status} ${res.networkError ?? ''}',
-      );
-
-      if (res.ok) {
-        final u = res.body['user'];
-        if (u is Map<String, dynamic>) {
-          _user = AppUser.fromJson(u);
-          return _user;
-        }
-      }
-
-      if (res.status == 401 || res.status == 403) {
-        await _clearLocalSession(); // token no longer valid
+    // Remember me: save the token. If unchecked, make sure nothing is saved.
+    try {
+      if (remember) {
+        await _storage.write(key: _tokenKey, value: token);
       } else {
-        _token = null; // server unreachable: keep the saved token for next time
+        await _storage.delete(key: _tokenKey);
       }
-      return null;
+    } catch (e) {
+      debugPrint('[session] could not save the token: $e');
     }
 
     return AuthResult.success(
