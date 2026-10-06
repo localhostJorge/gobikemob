@@ -12,6 +12,8 @@ import '../widgets/confirm_modal.dart';
 import 'add_patient_screen.dart';
 import 'global_state.dart';
 import 'view_patient_screen.dart';
+import 'login_screen.dart';
+import '../core/emergency_flow.dart';
 
 const List<String> _barangays = [
   'Angarian',
@@ -75,9 +77,7 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
     });
 
     // If the server rejects the live location (expired login, etc.), tell the user.
-    TrackingService.instance.onFatalError = (message) {
-      if (mounted) AppToast.show(context, message, type: ToastType.error);
-    };
+    TrackingService.instance.onFatalError = _handleFatalError;
   }
 
   @override
@@ -105,7 +105,47 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
     return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
-  // ------------------------------------------------------------------ actions
+  //  actions
+
+  bool _handlingFatal = false;
+
+  Future<void> _handleFatalError(String message) async {
+    if (_handlingFatal || !mounted) return;
+    _handlingFatal = true;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          icon: const Icon(
+            Icons.location_off_rounded,
+            color: AppTheme.errorRed,
+            size: 40,
+          ),
+          title: const Text('Tracking stopped'),
+          content: Text('$message\n\nPlease log in again.'),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Log in again'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    await AuthService.instance.logout();
+    globalPatients.clear();
+    globalRondas.clear();
+
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
 
   Future<bool> _confirmEndRonda() async {
     final shouldEnd = await ConfirmModal.show(
@@ -508,18 +548,47 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
                 ),
               ),
             const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: _endRondaPressed,
-              icon: const Icon(Icons.stop_circle_outlined),
-              label: const Text(
-                'End Ronda',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppTheme.errorRed,
-                side: const BorderSide(color: AppTheme.errorRed),
-                minimumSize: const Size.fromHeight(52),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => EmergencyFlow.run(context),
+                    icon: const Icon(Icons.warning_amber_rounded),
+                    label: const Text(
+                      'Emergency',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.errorRed,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _endRondaPressed,
+                    icon: const Icon(Icons.stop_circle_outlined),
+                    label: const Text(
+                      'End Ronda',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

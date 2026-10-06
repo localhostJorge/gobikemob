@@ -7,25 +7,30 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'auth_service.dart';
 
 /// Starts/stops a ronda on the server and sends the Go Biker's position
-/// every 10 seconds while the ronda is active. Also adds up the distance.
+/// every 10 seconds while the ronda is active. A foreground service keeps
+/// this running when the screen is locked or the app is in the background.
 class TrackingService {
   TrackingService._();
   static final TrackingService instance = TrackingService._();
 
   static const Duration _interval = Duration(seconds: 10);
+  static const Duration _freshFor = Duration(seconds: 20);
 
   Timer? _timer;
+  StreamSubscription<Position>? _stream;
   bool _active = false;
   bool _sending = false;
-  Position? _lastPosition;
+  Position? _lastPosition; // used to add up the distance
+  Position? _latest; // newest position from the location stream
+  DateTime? _latestAt;
   double _distanceMeters = 0;
 
-  /// Set by the active-ronda screen to show a toast if the server rejects us.
+  /// Set by the active-ronda screen to react if the server rejects us.
   void Function(String message)? onFatalError;
 
   bool get isActive => _active;
 
-  /// Distance walked/ridden during the current (or last) ronda, from GPS.
+  /// Distance during the current (or last) ronda, from GPS.
   double get distanceKm => _distanceMeters / 1000;
 
   /// Returns null on success, otherwise a message to show to the user.
@@ -38,7 +43,8 @@ class TrackingService {
     Position first;
     try {
       first = await _currentPosition();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('startRonda location error: $e');
       return "Couldn't get your location. Move to an open area and try again.";
     }
 
@@ -49,11 +55,14 @@ class TrackingService {
 
     _distanceMeters = 0;
     _lastPosition = null;
+    _latest = first;
+    _latestAt = DateTime.now();
     _active = true;
     try {
-      await WakelockPlus.enable(); // keep the screen on so tracking keeps running
+      await WakelockPlus.enable();
     } catch (_) {}
 
+    _startStream();
     _track(first);
     await _send(first);
     if (!_active) return null; // the server rejected the first location
@@ -69,6 +78,32 @@ class TrackingService {
     ); // best effort
   }
 
+  /// Sends an emergency alert with the current position.
+  /// Returns null on success, otherwise a message to show to the user.
+  Future<String?> sendEmergency() async {
+    Position? p;
+
+    if (_active && _latest != null) {
+      // During a ronda we already have a fresh position: send right away.
+      p = _latest;
+    } else {
+      final accessError = await _ensureLocationAccess();
+      if (accessError != null) return accessError;
+      try {
+        p = await _currentPosition();
+      } catch (e) {
+        debugPrint('sendEmergency location error: $e');
+        return "Couldn't get your location. If this is urgent, call 911 directly.";
+      }
+    }
+
+    final res = await AuthService.instance.postAuthed(
+      '/gobiker/emergency',
+      body: {'latitude': p!.latitude, 'longitude': p.longitude},
+    );
+    return res.ok ? null : res.message;
+  }
+
   // ---------------------------------------------------------------- internals
 
   Future<String?> _ensureLocationAccess() async {
@@ -81,7 +116,7 @@ class TrackingService {
       permission = await Geolocator.requestPermission();
     }
     if (permission == LocationPermission.denied) {
-      return 'Location permission is needed to share your position with the RHU during a ronda.';
+      return 'Location permission is needed to share your position to the Go Bike during a ronda.';
     }
     if (permission == LocationPermission.deniedForever) {
       return 'Location permission is blocked. Enable it for this app in your phone settings.';
@@ -89,13 +124,58 @@ class TrackingService {
     return null;
   }
 
-  Future<Position> _currentPosition() {
-    return Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        timeLimit: Duration(seconds: 15),
+  Future<Position> _currentPosition() async {
+    // 1) Best accuracy first (works outdoors)
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+    } catch (e) {
+      debugPrint('High accuracy failed: $e');
+    }
+
+    // 2) Wi-Fi / cell tower location (works indoors)
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Medium accuracy failed: $e');
+    }
+
+    // 3) Last known position, if the phone has one
+    final last = await Geolocator.getLastKnownPosition();
+    if (last != null) return last;
+
+    throw Exception('No location available');
+  }
+
+  /// Keeps location updates coming, and shows the foreground notification
+  /// that stops Android from pausing the app in the background.
+  void _startStream() {
+    _stream?.cancel();
+    final settings = AndroidSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 0,
+      intervalDuration: const Duration(seconds: 5),
+      foregroundNotificationConfig: const ForegroundNotificationConfig(
+        notificationTitle: 'Go Bike ronda in progress',
+        notificationText: 'Sharing your live location to the Go Bike.',
+        enableWakeLock: true,
+        setOngoing: true,
       ),
     );
+    _stream = Geolocator.getPositionStream(locationSettings: settings)
+        .listen((p) {
+          _latest = p;
+          _latestAt = DateTime.now();
+        }, onError: (Object e) => debugPrint('Location stream error: $e'));
   }
 
   void _track(Position p) {
@@ -119,7 +199,14 @@ class TrackingService {
     if (!_active || _sending) return;
     _sending = true;
     try {
-      final p = await _currentPosition();
+      final at = _latestAt;
+      final latest = _latest;
+      final isFresh =
+          latest != null &&
+          at != null &&
+          DateTime.now().difference(at) < _freshFor;
+
+      final Position p = isFresh ? latest : await _currentPosition();
       _track(p);
       await _send(p);
     } catch (e) {
@@ -147,6 +234,8 @@ class TrackingService {
     _active = false;
     _timer?.cancel();
     _timer = null;
+    await _stream?.cancel();
+    _stream = null;
     try {
       await WakelockPlus.disable();
     } catch (_) {}
