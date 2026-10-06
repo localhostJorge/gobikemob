@@ -65,6 +65,17 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
     }
   }
 
+  // ------------------------------------------------------------- data helpers
+
+  DateTime? _dateOf(Map<String, dynamic> patient) {
+    try {
+      return DateFormat('MMMM d, yyyy')
+          .parse(patient['date']?.toString() ?? '');
+    } catch (_) {
+      return null;
+    }
+  }
+
   Map<String, List<Map<String, dynamic>>> get _grouped {
     final grouped = <String, List<Map<String, dynamic>>>{};
     for (final patient in globalPatients) {
@@ -98,6 +109,8 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
     if (parts.length == 1) return parts.first[0].toUpperCase();
     return (parts.first[0] + parts.last[0]).toUpperCase();
   }
+
+  // ----------------------------------------------------------------- actions
 
   Future<void> _openPatientViewer(Map<String, dynamic> patient) async {
     final result = await Navigator.push(
@@ -136,6 +149,8 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
     setState(() => globalPatients.insert(0, created));
     AppToast.show(context, 'Patient record saved.', type: ToastType.success);
   }
+
+  // ------------------------------------------------------------------- build
 
   @override
   Widget build(BuildContext context) {
@@ -221,67 +236,193 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
       );
     }
 
-    // 3) No records at all
-    if (globalPatients.isEmpty) {
-      return _emptyState(
-        muted,
-        icon: Icons.assignment_ind_outlined,
-        title: 'No patient records yet',
-        body: 'Records you add during a ronda will appear here.',
-      );
-    }
-
-    // 4) The list (search + groups, pull down to refresh)
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: TextField(
-            controller: _searchCtrl,
-            onChanged: (v) => setState(() => _query = v.trim()),
-            decoration: InputDecoration(
-              hintText: 'Search by name',
-              prefixIcon: const Icon(Icons.search_rounded),
-              suffixIcon: _query.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: 'Clear',
-                      icon: const Icon(Icons.close_rounded),
-                      onPressed: () {
-                        _searchCtrl.clear();
-                        setState(() => _query = '');
-                      },
-                    ),
+    // 3) Dashboard: overview + search + records (pull down to refresh)
+    return RefreshIndicator(
+      onRefresh: () => _load(showSpinner: false),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+        children: [
+          FadeInSlide(child: _overview(theme, muted)),
+          const SizedBox(height: 24),
+          if (globalPatients.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 24),
+              child: _emptyState(
+                muted,
+                icon: Icons.assignment_ind_outlined,
+                title: 'No patient records yet',
+                body: 'Records you add during a ronda will appear here.',
+              ),
+            )
+          else ...[
+            FadeInSlide(
+              delay: const Duration(milliseconds: 80),
+              child: _recordsHeader(muted),
             ),
-          ),
-        ),
-        Expanded(
-          child: dates.isEmpty
-              ? _emptyState(
+            const SizedBox(height: 16),
+            if (dates.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 24),
+                child: _emptyState(
                   muted,
                   icon: Icons.search_off_rounded,
                   title: 'No matches',
                   body: 'No patient matches "$_query".',
-                )
-              : RefreshIndicator(
-                  onRefresh: () => _load(showSpinner: false),
-                  child: ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                    itemCount: dates.length,
-                    itemBuilder: (context, index) {
-                      final date = dates[index];
-                      return FadeInSlide(
-                        delay: Duration(
-                          milliseconds: 60 * (index > 5 ? 5 : index),
-                        ),
-                        child: _dateGroup(theme, muted, date, grouped[date]!),
-                      );
-                    },
-                  ),
                 ),
+              )
+            else
+              for (var i = 0; i < dates.length; i++)
+                FadeInSlide(
+                  delay: Duration(milliseconds: 60 * (i > 5 ? 5 : i)),
+                  child: _dateGroup(theme, muted, dates[i], grouped[dates[i]]!),
+                ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // --------------------------------------------------------------- dashboard
+
+  Widget _overview(ThemeData theme, Color muted) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final weekStart = today.subtract(const Duration(days: 6));
+
+    var todayCount = 0;
+    var weekCount = 0;
+    for (final p in globalPatients) {
+      final d = _dateOf(p);
+      if (d == null) continue;
+      if (!d.isBefore(today)) todayCount++;
+      if (!d.isBefore(weekStart)) weekCount++;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('OVERVIEW', muted),
+        Row(
+          children: [
+            Expanded(
+              child: _statCard(
+                theme,
+                muted,
+                icon: Icons.folder_shared_rounded,
+                color: AppTheme.blue,
+                value: '${globalPatients.length}',
+                label: 'Total records',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _statCard(
+                theme,
+                muted,
+                icon: Icons.today_rounded,
+                color: AppTheme.successGreen,
+                value: '$todayCount',
+                label: 'Today',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _statCard(
+                theme,
+                muted,
+                icon: Icons.date_range_rounded,
+                color: AppTheme.orange,
+                value: '$weekCount',
+                label: 'This week',
+              ),
+            ),
+          ],
         ),
       ],
+    );
+  }
+
+  Widget _recordsHeader(Color muted) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('RECORDS', muted),
+        TextField(
+          controller: _searchCtrl,
+          onChanged: (v) => setState(() => _query = v.trim()),
+          decoration: InputDecoration(
+            hintText: 'Search by name',
+            prefixIcon: const Icon(Icons.search_rounded),
+            suffixIcon: _query.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Clear',
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () {
+                      _searchCtrl.clear();
+                      setState(() => _query = '');
+                    },
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _sectionTitle(String text, Color muted) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+          color: muted,
+        ),
+      ),
+    );
+  }
+
+  BoxDecoration _cardDecoration(ThemeData theme) => BoxDecoration(
+    color: theme.cardColor,
+    borderRadius: BorderRadius.circular(16),
+    border: Border.all(color: theme.dividerColor),
+  );
+
+  Widget _statCard(
+    ThemeData theme,
+    Color muted, {
+    required IconData icon,
+    required Color color,
+    required String value,
+    required String label,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+      decoration: _cardDecoration(theme),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 10),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12, color: muted),
+          ),
+        ],
+      ),
     );
   }
 
@@ -362,11 +503,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
             ),
           ),
           Container(
-            decoration: BoxDecoration(
-              color: theme.cardColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: theme.dividerColor),
-            ),
+            decoration: _cardDecoration(theme),
             child: Column(
               children: [
                 for (var i = 0; i < items.length; i++) ...[
