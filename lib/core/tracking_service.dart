@@ -7,7 +7,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'auth_service.dart';
 
 /// Starts/stops a ronda on the server and sends the Go Biker's position
-/// every 10 seconds while the ronda is active.
+/// every 10 seconds while the ronda is active. Also adds up the distance.
 class TrackingService {
   TrackingService._();
   static final TrackingService instance = TrackingService._();
@@ -17,11 +17,16 @@ class TrackingService {
   Timer? _timer;
   bool _active = false;
   bool _sending = false;
+  Position? _lastPosition;
+  double _distanceMeters = 0;
 
   /// Set by the active-ronda screen to show a toast if the server rejects us.
   void Function(String message)? onFatalError;
 
   bool get isActive => _active;
+
+  /// Distance walked/ridden during the current (or last) ronda, from GPS.
+  double get distanceKm => _distanceMeters / 1000;
 
   /// Returns null on success, otherwise a message to show to the user.
   Future<String?> startRonda() async {
@@ -42,11 +47,14 @@ class TrackingService {
     );
     if (!start.ok) return start.message;
 
+    _distanceMeters = 0;
+    _lastPosition = null;
     _active = true;
     try {
       await WakelockPlus.enable(); // keep the screen on so tracking keeps running
     } catch (_) {}
 
+    _track(first);
     await _send(first);
     if (!_active) return null; // the server rejected the first location
     _timer = Timer.periodic(_interval, (_) => _tick());
@@ -90,11 +98,30 @@ class TrackingService {
     );
   }
 
+  void _track(Position p) {
+    final last = _lastPosition;
+    if (last == null) {
+      _lastPosition = p;
+      return;
+    }
+    final meters = Geolocator.distanceBetween(
+      last.latitude,
+      last.longitude,
+      p.latitude,
+      p.longitude,
+    );
+    if (meters < 8) return; // GPS jitter while standing still
+    if (meters < 2000) _distanceMeters += meters; // ignore impossible jumps
+    _lastPosition = p;
+  }
+
   Future<void> _tick() async {
     if (!_active || _sending) return;
     _sending = true;
     try {
-      await _send(await _currentPosition());
+      final p = await _currentPosition();
+      _track(p);
+      await _send(p);
     } catch (e) {
       debugPrint('Location update skipped: $e');
     } finally {
