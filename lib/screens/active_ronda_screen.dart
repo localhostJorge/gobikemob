@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../core/auth_service.dart';
+import '../core/emergency_flow.dart';
 import '../core/theme.dart';
 import '../core/tracking_service.dart';
 import '../widgets/app_text_field.dart';
@@ -569,6 +570,20 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
                   style: TextStyle(fontSize: 12, color: muted),
                 ),
               ),
+            const SizedBox(height: 10),
+            FilledButton.icon(
+              onPressed: () => EmergencyFlow.run(context),
+              icon: const Icon(Icons.emergency_share_rounded),
+              label: const Text(
+                'Emergency',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.errorRed,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(52),
+              ),
+            ),
             const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: _endRondaPressed,

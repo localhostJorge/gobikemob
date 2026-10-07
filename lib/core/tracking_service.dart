@@ -134,13 +134,13 @@ class TrackingService {
     }
   }
 
-  /// Sends an emergency alert with the current position.
-  /// Returns null on success, otherwise a message to show to the user.
-  Future<String?> sendEmergency() async {
+  /// Gets a location locally for the emergency flow.
+  /// Returns null when a location is available, otherwise an error message.
+  Future<String?> prepareEmergencyLocation() async {
     Position? p;
 
     if (_active && _latest != null) {
-      // During a ronda we already have a fresh position: send right away.
+      // During a ronda, reuse the position already available to tracking.
       p = _latest;
     } else {
       final accessError = await _ensureLocationAccess();
@@ -148,16 +148,14 @@ class TrackingService {
       try {
         p = await _currentPosition();
       } catch (e) {
-        debugPrint('sendEmergency location error: $e');
+        debugPrint('prepareEmergencyLocation error: $e');
         return "Couldn't get your location. If this is urgent, call 911 directly.";
       }
     }
 
-    final res = await AuthService.instance.postAuthed(
-      '/gobiker/emergency',
-      body: {'latitude': p!.latitude, 'longitude': p.longitude},
-    );
-    return res.ok ? null : res.message;
+    _latest = p;
+    _latestAt = DateTime.now();
+    return null;
   }
 
   // ---------------------------------------------------------------- internals

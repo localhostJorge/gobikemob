@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../core/auth_service.dart';
+import '../core/emergency_flow.dart';
 import '../core/greeting.dart';
 import '../core/theme.dart';
 import '../core/tracking_service.dart';
@@ -205,23 +206,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _onEmergency() async {
-    final confirmed = await ConfirmModal.show(
-      context: context,
-      icon: Icons.warning_amber_rounded,
-      color: AppTheme.errorRed,
-      title: 'Send emergency alert?',
-      description: 'This immediately alerts the admin with your current location. Use only for real emergencies.',
-      confirmText: 'Send Alert',
-      onConfirm: () {},
-    );
-    if (confirmed != true || !mounted) return;
-
-    // TODO(api): the emergency alert endpoint is built in step 3C.
-    AppToast.show(
-      context,
-      'Alerts to the admin are not connected yet. For a real emergency, call 911.',
-      type: ToastType.error,
-    );
+    await EmergencyFlow.run(context);
   }
 
   void _onAppointments() {
