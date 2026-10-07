@@ -33,6 +33,49 @@ class TrackingService {
   void Function(String message)? onFatalError;
 
   bool get isActive => _active;
+  bool _sendingEmergency = false;
+
+  /// Sends the emergency alert to the admin. The server marks this
+  /// GoBiker as "emergency", which shows red on the admin Live Map.
+  Future<({bool ok, int status, String message})> sendEmergencyAlert() async {
+    if (_sendingEmergency) {
+      return (
+        ok: false,
+        status: 0,
+        message: 'Your alert is already being sent.',
+      );
+    }
+    _sendingEmergency = true;
+    try {
+      final locError = await prepareEmergencyLocation();
+      final p = _latest;
+      if (locError != null || p == null) {
+        return (
+          ok: false,
+          status: 0,
+          message: locError ?? "Couldn't get your location.",
+        );
+      }
+
+      final res = await AuthService.instance.postAuthed(
+        '/gobiker/emergency',
+        body: {'latitude': p.latitude, 'longitude': p.longitude},
+      );
+      if (res.ok) {
+        return (ok: true, status: res.status, message: '');
+      }
+      if (res.status == 401) {
+        return (
+          ok: false,
+          status: res.status,
+          message: 'Your login expired. Please log in again.',
+        );
+      }
+      return (ok: false, status: res.status, message: res.message);
+    } finally {
+      _sendingEmergency = false;
+    }
+  }
 
   /// Distance during the current (or last) ronda, from GPS.
   double get distanceKm => _distanceMeters / 1000;
