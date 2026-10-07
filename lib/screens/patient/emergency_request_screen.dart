@@ -4,6 +4,7 @@ import 'dart:ui' show PathMetric;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
+import 'patient_store.dart';
 
 import 'app_colors.dart';
 
@@ -184,6 +185,12 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
     // user id, timestamp, _municipality, _barangay, _landmark.text,
     // _description.text, _image?.path, _video?.path
     await Future.delayed(const Duration(seconds: 1));
+
+        await PatientStore.instance.log(
+      ActivityType.sos,
+      'SOS emergency request sent',
+      '$_barangay, $_municipality · ${_landmark.text.trim()}',
+    );
 
     if (!mounted) return;
     setState(() => _sending = false);

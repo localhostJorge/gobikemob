@@ -18,14 +18,20 @@ class ConfirmModal {
       transitionDuration: const Duration(milliseconds: 220),
       transitionBuilder: (context, animation, secondaryAnimation, child) {
         return FadeTransition(
-          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          ),
           child: ScaleTransition(
-            scale: CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+            scale: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutBack,
+            ),
             child: child,
           ),
         );
       },
-      pageBuilder: (context, _, __) {
+      pageBuilder: (context, _, _) {
         return Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -53,9 +59,8 @@ class ConfirmModal {
                       Text(
                         title,
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: Theme.of(context).textTheme.titleLarge
+                            ?.copyWith(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 8),
                       Text(

@@ -1,302 +1,322 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'add_patient_screen.dart';
-import 'view_patient_screen.dart';
-import 'global_state.dart';
+
+import '../core/auth_service.dart';
+import '../core/theme.dart';
+import '../core/tracking_service.dart';
+import '../widgets/app_text_field.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/confirm_modal.dart';
+import 'add_patient_screen.dart';
+import 'global_state.dart';
+import 'view_patient_screen.dart';
+import 'login_screen.dart';
+import '../core/ronda_store.dart';
+
+const List<String> _barangays = [
+  'Angarian',
+  'Asinan',
+  'Bacabac',
+  'Bañaga',
+  'Bolaoen',
+  'Buenlag',
+  'Cabayaoasan',
+  'Cayanga',
+  'Gueset',
+  'Hacienda',
+  'Laguit Centro',
+  'Laguit Padilla',
+  'Magtaking',
+  'Pangascasan',
+  'Pantal',
+  'Poblacion',
+  'Polong',
+  'Portic',
+  'Salasa',
+  'Salomague Norte',
+  'Salomague Sur',
+  'Samat',
+  'San Francisco',
+  'Umanday',
+];
 
 class ActiveRondaScreen extends StatefulWidget {
-  const ActiveRondaScreen({super.key});
+  const ActiveRondaScreen({super.key, this.resumeFrom});
+
+  /// Not null when the GoBiker is continuing a ronda after the app closed.
+  final SavedRonda? resumeFrom;
 
   @override
   State<ActiveRondaScreen> createState() => _ActiveRondaScreenState();
 }
 
-class _ActiveRondaScreenState extends State<ActiveRondaScreen> {
-  String? selectedBarangay; 
-  int _patientsVisited = 0;
-  
+class _ActiveRondaScreenState extends State<ActiveRondaScreen>
+    with SingleTickerProviderStateMixin {
+  // The ronda was already started on the server by the dashboard
+  late final DateTime _startedAt =
+      widget.resumeFrom?.startedAt ?? DateTime.now();
+
+  // Patients saved before the app closed.
+  late final int _resumedCount = widget.resumeFrom?.patientsCount ?? 0;
+  int get _patientsCount => _resumedCount + _todayPatients.length;
+
+  /// Tells TrackingService what to save to the phone.
+  void _syncTracking() {
+    TrackingService.instance.rondaBarangay = _barangay;
+    TrackingService.instance.rondaPatients = _patientsCount;
+  }
+
+  late final String _startTime = DateFormat('hh:mm a').format(_startedAt);
+
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  )..repeat();
+
   Timer? _timer;
-  int _secondsElapsed = 0; 
-  String _startTime = '--:--'; 
-
+  String? _barangay;
   final List<Map<String, dynamic>> _todayPatients = [];
-
-  final List<String> barangays = [
-    'Angarian', 'Asinan', 'Bacabac', 'Bañaga', 'Bolaoen', 'Buenlag',
-    'Cabayaoasan', 'Cayanga', 'Gueset', 'Hacienda', 'Laguit Centro',
-    'Laguit Padilla', 'Magtaking', 'Pangascasan', 'Pantal', 'Poblacion',
-    'Polong', 'Portic', 'Salasa', 'Salomague Norte', 'Salomague Sur',
-    'Samat', 'San Francisco', 'Umanday'
-  ];
 
   @override
   void initState() {
     super.initState();
-  }
 
-  void _startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() => _secondsElapsed++);
+    final mine = AuthService.instance.currentUser?.barangay;
+    _barangay =
+        widget.resumeFrom?.barangay ??
+        (_barangays.contains(mine) ? mine : null);
+    _syncTracking();
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
     });
+
+    // If the server rejects the live location (expired login, etc.), tell the user.
+    TrackingService.instance.onFatalError = _handleFatalError;
   }
 
   @override
   void dispose() {
+    TrackingService.instance.onFatalError = null;
     _timer?.cancel();
+    _pulse.dispose();
     super.dispose();
   }
 
-  String get _formattedTime {
-    int hours = _secondsElapsed ~/ 3600;
-    int minutes = (_secondsElapsed % 3600) ~/ 60;
-    int seconds = _secondsElapsed % 60;
-    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  String get _duration {
+    final d = DateTime.now().difference(_startedAt);
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(d.inHours)}:${two(d.inMinutes % 60)}:${two(d.inSeconds % 60)}';
   }
 
-  Future<bool> _confirmEndRonda() async {
-    final shouldEnd = await showDialog<bool>(
+  String _initials(String name) {
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first[0].toUpperCase();
+    return (parts.first[0] + parts.last[0]).toUpperCase();
+  }
+
+  //  actions
+
+  bool _handlingFatal = false;
+
+  Future<void> _handleFatalError(String message) async {
+    if (_handlingFatal || !mounted) return;
+    _handlingFatal = true;
+
+    await showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Text('Stop Ronda?', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text('Are you sure you want to stop the ronda?', textAlign: TextAlign.center),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF8B2525)),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          icon: const Icon(
+            Icons.location_off_rounded,
+            color: AppTheme.errorRed,
+            size: 40,
           ),
-          const SizedBox(width: 10),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2962FF)),
-            child: const Text('Stop', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
+          title: const Text('Tracking stopped'),
+          content: Text('$message\n\nPlease log in again.'),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Log in again'),
+            ),
+          ],
+        ),
       ),
     );
 
-    if (shouldEnd == true) {
-      _timer?.cancel();
-      
-      // Save the completed shift to the Global Dashboard History
-      if (selectedBarangay != null) {
-        globalRondas.add({
-          'barangay': selectedBarangay,
-          'date': DateFormat('MMMM d, yyyy').format(DateTime.now()),
-          'startTime': _startTime,
-          'endTime': DateFormat('hh:mm a').format(DateTime.now()),
-          'endDateTime': DateTime.now(), // Used to calculate "Minutes ago"
-          'patientsCount': _patientsVisited,
-          'distance': 1.5 + (_patientsVisited * 0.3), // Simulates distance dynamically
-        });
-      }
-      
-      return true; 
-    }
-    return false; 
+    await AuthService.instance.logout();
+    globalPatients.clear();
+    globalRondas.clear();
+
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
   }
 
-  // Opens the full-screen editor
+  Future<bool> _confirmEndRonda() async {
+    final shouldEnd = await ConfirmModal.show(
+      context: context,
+      icon: Icons.stop_circle_rounded,
+      color: AppTheme.errorRed,
+      title: 'End your ronda?',
+      description: 'Your live location will stop being shared with the Go Bike admin and this ronda will be saved to your history.',
+      confirmText: 'End Ronda',
+      onConfirm: () {},
+    );
+    if (shouldEnd != true) return false;
+
+    _timer?.cancel();
+    await TrackingService.instance.stopRonda();
+
+    // Save the completed shift to the history shown on the dashboard.
+    globalRondas.add({
+      'barangay': _barangay ?? 'Not specified',
+      'date': DateFormat('MMMM d, yyyy').format(DateTime.now()),
+      'startTime': _startTime,
+      'endTime': DateFormat('hh:mm a').format(DateTime.now()),
+      'endDateTime': DateTime.now(), // used for "minutes ago"
+      'patientsCount': _patientsCount,
+      'distance': TrackingService.instance.distanceKm, // real GPS distance
+    });
+    return true;
+  }
+
+  Future<void> _endRondaPressed() async {
+    final ended = await _confirmEndRonda();
+    if (ended && mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _addPatient() async {
+    final created = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddPatientScreen(barangay: _barangay),
+      ),
+    );
+    if (created == null || !mounted) return;
+
+    setState(() {
+      _todayPatients.add(created);
+      globalPatients.insert(0, created);
+      _syncTracking();
+    });
+    AppToast.show(context, 'Patient record saved.', type: ToastType.success);
+  }
+
   Future<void> _openPatientViewer(int index) async {
     final patient = _todayPatients[index];
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => ViewPatientScreen(patient: patient)),
+      MaterialPageRoute(
+        builder: (context) => ViewPatientScreen(patient: patient),
+      ),
     );
+    if (result == null || !mounted) return;
 
-    if (result != null) {
-      setState(() {
-        if (result['action'] == 'delete') {
-          // Remove from local and global lists
-          _todayPatients.removeWhere((p) => p['id'] == patient['id']);
-          globalPatients.removeWhere((p) => p['id'] == patient['id']);
-          _patientsVisited--;
-          AppToast.show(context, 'Record deleted.', type: ToastType.success);
-        } 
-        else if (result['action'] == 'update') {
-          // Update local and global lists
-          _todayPatients[index] = result['data'];
-          int globalIndex = globalPatients.indexWhere((p) => p['id'] == patient['id']);
-          if (globalIndex != -1) globalPatients[globalIndex] = result['data'];
-          AppToast.show(context, 'Record updated!', type: ToastType.success);
-        }
-      });
-    }
+    setState(() {
+      if (result['action'] == 'delete') {
+        _todayPatients.removeWhere((p) => p['id'] == patient['id']);
+        globalPatients.removeWhere((p) => p['id'] == patient['id']);
+        AppToast.show(context, 'Record deleted.', type: ToastType.success);
+      } else if (result['action'] == 'update') {
+        _todayPatients[index] = result['data'];
+        final g = globalPatients.indexWhere((p) => p['id'] == patient['id']);
+        if (g != -1) globalPatients[g] = result['data'];
+        AppToast.show(context, 'Record updated.', type: ToastType.success);
+      }
+      _syncTracking();
+    });
   }
+
+  // -------------------------------------------------------------------- build
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: _confirmEndRonda,
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurface.withValues(alpha: 0.6);
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _endRondaPressed(); // back button asks to end the ronda
+      },
       child: Scaffold(
-        backgroundColor: const Color(0xFF1E1E48), 
         body: SafeArea(
+          bottom: false,
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 15.0),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: selectedBarangay == null ? Colors.redAccent : Colors.grey.shade400, width: 2), 
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      isExpanded: true,
-                      hint: const Text('CHOOSE BARANGAY TO START', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.0)),
-                      value: selectedBarangay,
-                      icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF9E2A2B), size: 40), 
-                      style: const TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.0),
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          selectedBarangay = newValue;
-                          if (_timer == null || !_timer!.isActive) {
-                            _startTime = DateFormat('hh:mm a').format(DateTime.now());
-                            _startTimer();
-                          }
-                        });
-                      },
-                      items: barangays.map<DropdownMenuItem<String>>((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value, 
-                          child: Text(value.toUpperCase())
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ),
-              ),
-
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 5.0),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('TODAY\'S PATIENT LOG', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-                ),
-              ),
-
               Expanded(
-                child: _todayPatients.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.assignment_ind_outlined, size: 50, color: Colors.white.withOpacity(0.5)),
-                            const SizedBox(height: 10),
-                            Text(
-                              selectedBarangay == null 
-                                  ? 'Select a Barangay above\nto begin your Ronda.'
-                                  : 'No patients logged yet.\nClick "Add Patient" to start.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        itemCount: _todayPatients.length,
-                        itemBuilder: (context, index) {
-                          final patient = _todayPatients[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(10),
-                              onTap: () => _openPatientViewer(index), 
-                              child: Padding(
-                                padding: const EdgeInsets.all(15.0),
-                                child: Row(
-                                  children: [
-                                    SizedBox(
-                                      width: 75,
-                                      child: Text(patient['time'], style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2962FF), fontSize: 13)),
-                                    ),
-                                    Container(height: 20, width: 1, color: Colors.grey.shade300, margin: const EdgeInsets.symmetric(horizontal: 10)),
-                                    Expanded(
-                                      child: Text(patient['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis),
-                                    ),
-                                    const Icon(Icons.chevron_right, color: Colors.grey),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30)),
-                ),
-                child: Column(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   children: [
-                    Text('Started at: $_startTime', style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.bold, fontSize: 13)),
-                    const SizedBox(height: 15),
-
+                    _heroCard(),
+                    const SizedBox(height: 20),
+                    AppDropdownField(
+                      label: 'Barangay on ronda',
+                      hint: 'Select barangay',
+                      icon: Icons.location_on_outlined,
+                      items: _barangays,
+                      value: _barangay,
+                      onChanged: (v) {
+                        setState(() => _barangay = v);
+                        _syncTracking();
+                      },
+                    ),
+                    const SizedBox(height: 24),
                     Row(
                       children: [
-                        Expanded(child: _buildMetricCard('Duration', _formattedTime, Icons.timer, Colors.red)),
-                        const SizedBox(width: 15),
-                        Expanded(child: _buildMetricCard('Patients Visited', '$_patientsVisited', Icons.person_add_alt_1, const Color(0xFF2962FF))),
+                        Text(
+                          "TODAY'S PATIENT LOG",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                            color: muted,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.blue.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${_todayPatients.length}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.blue,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 25),
-                    
-                    ElevatedButton.icon(
-                      onPressed: selectedBarangay == null ? null : () async {
-                        final newPatient = await Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const AddPatientScreen()),
-                        );
-
-                        if (newPatient != null) {
-                          setState(() {
-                            newPatient['id'] = DateTime.now().millisecondsSinceEpoch.toString();
-                            newPatient['date'] = DateFormat('MMMM d, yyyy').format(DateTime.now());
-
-                            _todayPatients.add(newPatient); 
-                            globalPatients.add(newPatient); 
-                            _patientsVisited++; 
-                          });
-                        }
-                      },
-                      icon: Icon(Icons.add, color: selectedBarangay == null ? Colors.grey.shade400 : Colors.white),
-                      label: Text('Add Patient', style: TextStyle(color: selectedBarangay == null ? Colors.grey.shade500 : Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: selectedBarangay == null ? Colors.grey.shade300 : const Color(0xFF2962FF),
-                        minimumSize: const Size(double.infinity, 55),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 15),
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        bool shouldExit = await _confirmEndRonda();
-                        if (shouldExit && mounted) {
-                          Navigator.pop(context);
-                        }
-                      },
-                      icon: const Icon(Icons.stop_circle, color: Colors.white),
-                      label: const Text('END RONDA', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD32F2F),
-                        minimumSize: const Size(double.infinity, 55),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
+                    const SizedBox(height: 12),
+                    if (_todayPatients.isEmpty)
+                      _emptyLog(muted)
+                    else
+                      for (var i = 0; i < _todayPatients.length; i++)
+                        _patientTile(theme, muted, i),
                   ],
                 ),
               ),
+              _bottomActions(theme, muted),
             ],
           ),
         ),
@@ -304,18 +324,267 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen> {
     );
   }
 
-  Widget _buildMetricCard(String title, String value, IconData icon, Color color) {
+  // ------------------------------------------------------------------ pieces
+
+  Widget _heroCard() {
+    final km = TrackingService.instance.distanceKm;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
-      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(12)),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.navy,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x261E1E48),
+            blurRadius: 16,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _pulseDot(),
+              const SizedBox(width: 10),
+              const Text(
+                'RONDA IN PROGRESS',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            _duration,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 40,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const Text(
+            'Duration',
+            style: TextStyle(color: Colors.white60, fontSize: 12),
+          ),
+          const SizedBox(height: 18),
+          const Divider(color: Colors.white24, height: 1),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _heroStat('Started', _startTime),
+              _heroStat('Patients', '$_patientsCount'),
+              _heroStat('Distance', '${km.toStringAsFixed(2)} km'),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Row(
+            children: [
+              Icon(Icons.location_on_rounded, color: Colors.white70, size: 16),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Your live location is shared with the Go Bike admin.',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pulseDot() {
+    return SizedBox(
+      width: 22,
+      height: 22,
+      child: AnimatedBuilder(
+        animation: _pulse,
+        builder: (context, _) {
+          final v = _pulse.value;
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 10 + 12 * v,
+                height: 10 + 12 * v,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.successGreen.withValues(alpha: (1 - v) * 0.5),
+                ),
+              ),
+              Container(
+                width: 10,
+                height: 10,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.successGreen,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _heroStat(String label, String value) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white60, fontSize: 12),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyLog(Color muted) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
       child: Column(
         children: [
-          Icon(icon, color: color, size: 28),
-          const SizedBox(height: 8),
-          Text(title, style: const TextStyle(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.w600)),
+          Icon(Icons.assignment_ind_outlined, size: 48, color: muted),
+          const SizedBox(height: 12),
+          const Text(
+            'No patients logged yet',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 4),
-          Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
+          Text(
+            'Tap Add Patient to record your first check-up.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: muted),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _patientTile(ThemeData theme, Color muted, int index) {
+    final p = _todayPatients[index];
+    final name = p['name']?.toString() ?? 'Unnamed';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        onTap: () => _openPatientViewer(index),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: theme.dividerColor),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: AppTheme.blue.withValues(alpha: 0.12),
+                child: Text(
+                  _initials(name),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.blue,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${p['time'] ?? ''}',
+                      style: TextStyle(fontSize: 12, color: muted),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: muted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _bottomActions(ThemeData theme, Color muted) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          border: Border(top: BorderSide(color: theme.dividerColor)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ElevatedButton.icon(
+              onPressed: _barangay == null ? null : _addPatient,
+              icon: const Icon(Icons.person_add_alt_1_rounded),
+              label: const Text(
+                'Add Patient',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
+            ),
+            if (_barangay == null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'Select a barangay to add patients.',
+                  style: TextStyle(fontSize: 12, color: muted),
+                ),
+              ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _endRondaPressed,
+              icon: const Icon(Icons.stop_circle_outlined),
+              label: const Text(
+                'End Ronda',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.errorRed,
+                side: const BorderSide(color: AppTheme.errorRed),
+                minimumSize: const Size.fromHeight(52),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -10,13 +10,22 @@ import 'package:sqflite/sqflite.dart';
 /// Laravel API. The screens won't need to change.
 class AuthDatabase {
   AuthDatabase._();
+
   static final AuthDatabase instance = AuthDatabase._();
 
   Database? _db;
 
+  // Stores the ID of the currently logged-in user.
+  int? currentUserId;
+
   Future<Database> get _database async {
     if (_db != null) return _db!;
-    final path = join(await getDatabasesPath(), 'gobike_local.db');
+
+    final path = join(
+      await getDatabasesPath(),
+      'gobike_local.db',
+    );
+
     _db = await openDatabase(
       path,
       version: 1,
@@ -36,6 +45,7 @@ class AuthDatabase {
         ''');
       },
     );
+
     return _db!;
   }
 
@@ -43,12 +53,19 @@ class AuthDatabase {
 
   String _generateSalt() {
     final random = Random.secure();
-    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+
+    final bytes = List<int>.generate(
+      16,
+      (_) => random.nextInt(256),
+    );
+
     return base64Url.encode(bytes);
   }
 
   String _hash(String password, String salt) {
-    return sha256.convert(utf8.encode(salt + password)).toString();
+    return sha256
+        .convert(utf8.encode(salt + password))
+        .toString();
   }
 
   // ---------- public API ----------
@@ -63,6 +80,7 @@ class AuthDatabase {
     required String password,
   }) async {
     final db = await _database;
+
     final cleanEmail = email.trim().toLowerCase();
 
     final existing = await db.query(
@@ -71,21 +89,27 @@ class AuthDatabase {
       whereArgs: [cleanEmail],
       limit: 1,
     );
+
     if (existing.isNotEmpty) {
       return 'An account with this email already exists';
     }
 
     final salt = _generateSalt();
-    await db.insert('users', {
-      'full_name': fullName.trim(),
-      'email': cleanEmail,
-      'mobile': mobile.trim(),
-      'barangay': barangay,
-      'role': role,
-      'password_hash': _hash(password, salt),
-      'salt': salt,
-      'created_at': DateTime.now().toIso8601String(),
-    });
+
+    await db.insert(
+      'users',
+      {
+        'full_name': fullName.trim(),
+        'email': cleanEmail,
+        'mobile': mobile.trim(),
+        'barangay': barangay,
+        'role': role,
+        'password_hash': _hash(password, salt),
+        'salt': salt,
+        'created_at': DateTime.now().toIso8601String(),
+      },
+    );
+
     return null;
   }
 
@@ -96,17 +120,33 @@ class AuthDatabase {
     required String password,
   }) async {
     final db = await _database;
+
     final rows = await db.query(
       'users',
       where: 'email = ?',
-      whereArgs: [email.trim().toLowerCase()],
+      whereArgs: [
+        email.trim().toLowerCase(),
+      ],
       limit: 1,
     );
-    if (rows.isEmpty) return null;
+
+    if (rows.isEmpty) {
+      return null;
+    }
 
     final user = rows.first;
-    final hash = _hash(password, user['salt'] as String);
-    if (hash != user['password_hash']) return null;
+
+    final hash = _hash(
+      password,
+      user['salt'] as String,
+    );
+
+    if (hash != user['password_hash']) {
+      return null;
+    }
+
+    // Save the ID of the logged-in user.
+    currentUserId = user['id'] as int;
 
     return {
       'id': user['id'],
@@ -118,9 +158,153 @@ class AuthDatabase {
     };
   }
 
+  // ---------- logout ----------
+
+  void logout() {
+    currentUserId = null;
+  }
+
+  // ---------- current user ----------
+
+  Future<Map<String, dynamic>?> currentUserRow() async {
+    final id = currentUserId;
+
+    if (id == null) {
+      return null;
+    }
+
+    final db = await _database;
+
+    final rows = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    final user = rows.first;
+
+    return {
+      'id': user['id'],
+      'full_name': user['full_name'],
+      'email': user['email'],
+      'mobile': user['mobile'],
+      'barangay': user['barangay'],
+      'role': user['role'],
+    };
+  }
+
+  // ---------- update profile ----------
+
+  /// Returns null on success, or an error message.
+  Future<String?> updateProfile({
+    required String fullName,
+    required String email,
+    required String mobile,
+    required String barangay,
+  }) async {
+    final id = currentUserId;
+
+    if (id == null) {
+      return 'Please log in again';
+    }
+
+    final db = await _database;
+
+    final cleanEmail = email.trim().toLowerCase();
+
+    final taken = await db.query(
+      'users',
+      where: 'email = ? AND id != ?',
+      whereArgs: [
+        cleanEmail,
+        id,
+      ],
+      limit: 1,
+    );
+
+    if (taken.isNotEmpty) {
+      return 'That email is already used by another account';
+    }
+
+    await db.update(
+      'users',
+      {
+        'full_name': fullName.trim(),
+        'email': cleanEmail,
+        'mobile': mobile.trim(),
+        'barangay': barangay,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    return null;
+  }
+
+  // ---------- change password ----------
+
+  Future<String?> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final id = currentUserId;
+
+    if (id == null) {
+      return 'Please log in again';
+    }
+
+    final db = await _database;
+
+    final rows = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) {
+      return 'Account not found';
+    }
+
+    final user = rows.first;
+
+    if (_hash(
+          currentPassword,
+          user['salt'] as String,
+        ) !=
+        user['password_hash']) {
+      return 'Current password is incorrect';
+    }
+
+    final salt = _generateSalt();
+
+    await db.update(
+      'users',
+      {
+        'password_hash': _hash(newPassword, salt),
+        'salt': salt,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    return null;
+  }
+
+  // ---------- testing ----------
+
   /// Handy while testing: wipes all accounts.
   Future<void> clearAllUsers() async {
     final db = await _database;
+
     await db.delete('users');
+
+    // Also clear the current logged-in user.
+    currentUserId = null;
   }
 }

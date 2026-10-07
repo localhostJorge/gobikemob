@@ -2,8 +2,8 @@ import 'dart:math';
 
 import 'vital_status.dart';
 
-/// One GoBiker check-up during a ronda. The patient's Medical History is a
-/// read-only list of these.
+/// One GoBiker check-up during a ronda.
+/// The patient's Medical History is a read-only list of these.
 class VisitRecord {
   final String id;
   final DateTime date;
@@ -28,6 +28,9 @@ class VisitRecord {
   /// GoBiker remarks. Patients can see these.
   final String remarks;
 
+  /// Date and time when the visit record was last updated.
+  final DateTime? updatedAt;
+
   VisitRecord({
     required this.id,
     required this.date,
@@ -45,6 +48,7 @@ class VisitRecord {
     required this.heightCm,
     required this.weightKg,
     this.remarks = '',
+    this.updatedAt,
   });
 
   bool get isAdult => Vitals.isAdult(age);
@@ -52,30 +56,50 @@ class VisitRecord {
   double get bmi => weightKg / pow(heightCm / 100, 2);
 
   VitalStatus? get bpStatus => Vitals.bp(systolic, diastolic, age);
+
   VitalStatus? get pulseStatus => Vitals.pulse(pulse, age);
-  VitalStatus? get respirationStatus => Vitals.respiration(respiration, age);
-  VitalStatus? get temperatureStatus => Vitals.temperature(temperature, age);
+
+  VitalStatus? get respirationStatus =>
+      Vitals.respiration(respiration, age);
+
+  VitalStatus? get temperatureStatus =>
+      Vitals.temperature(temperature, age);
+
   VitalStatus? get bmiStatus => Vitals.bmi(bmi, age);
 }
 
 const _months = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
-String formatDate(DateTime d) => '${_months[d.month - 1]} ${d.day}, ${d.year}';
+String formatDate(DateTime d) =>
+    '${_months[d.month - 1]} ${d.day}, ${d.year}';
 
-String monthShort(DateTime d) => _months[d.month - 1].toUpperCase();
+String monthShort(DateTime d) =>
+    _months[d.month - 1].toUpperCase();
 
 String formatTime(DateTime d) {
   final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
   final m = d.minute.toString().padLeft(2, '0');
+
   return '$h:$m ${d.hour >= 12 ? 'PM' : 'AM'}';
 }
 
 /// TEMPORARY sample data so the screens can be tested.
-/// Later, replace this with records fetched from your Laravel API for the
-/// logged-in patient only.
+///
+/// Later, replace this with records fetched from your Laravel API
+/// for the logged-in patient only.
 final List<VisitRecord> sampleVisits = [
   VisitRecord(
     id: 'v3',
@@ -93,9 +117,12 @@ final List<VisitRecord> sampleVisits = [
     temperature: 36.8,
     heightCm: 165,
     weightKg: 72,
-    remarks: 'Advised to reduce salt intake and recheck BP in one week. '
+    remarks:
+        'Advised to reduce salt intake and recheck BP in one week. '
         'Please visit the barangay health center if headaches continue.',
+    updatedAt: DateTime(2026, 10, 4, 10, 30),
   ),
+
   VisitRecord(
     id: 'v2',
     date: DateTime(2026, 8, 15, 14, 10),
@@ -113,7 +140,9 @@ final List<VisitRecord> sampleVisits = [
     heightCm: 165,
     weightKg: 71,
     remarks: 'No complaints. Encouraged regular exercise.',
+    updatedAt: DateTime(2026, 8, 16, 9, 15),
   ),
+
   VisitRecord(
     id: 'v1',
     date: DateTime(2026, 6, 2, 8, 45),

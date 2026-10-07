@@ -85,6 +85,7 @@ class AppTextField extends StatefulWidget {
     this.onSubmitted,
     this.focusNode,
     this.enabled = true,
+    this.readOnly = false,
   });
 
   final String label;
@@ -102,6 +103,7 @@ class AppTextField extends StatefulWidget {
   final ValueChanged<String>? onSubmitted;
   final FocusNode? focusNode;
   final bool enabled;
+  final bool readOnly;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -136,6 +138,7 @@ class _AppTextFieldState extends State<AppTextField> {
           controller: widget.controller,
           focusNode: widget.focusNode,
           enabled: widget.enabled,
+          readOnly: widget.readOnly,
           obscureText: _hidden,
           keyboardType: widget.keyboardType,
           textInputAction: widget.textInputAction,

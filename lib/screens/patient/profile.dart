@@ -1,131 +1,142 @@
 import 'package:flutter/material.dart';
+
+import '../../core/auth_service.dart';
+import '../auth_database.dart';
+import '../welcome_screen.dart';
 import 'app_colors.dart';
+import 'change_password_screen.dart';
+import 'edit_profile_screen.dart';
+import 'notification_settings_screen.dart';
+import 'patient_store.dart';
+import 'patient_ui.dart';
+import 'profile_avatar.dart';
 
 class ProfileScreen extends StatelessWidget {
-  final String name;
-  final String phone;
-  final ImageProvider? avatar;
-  final VoidCallback? onLogout;
+  final AppUser currentUser;
 
-    const ProfileScreen({
-    super.key,
-    required this.name,
-    required this.phone,
-    this.avatar,
-    this.onLogout,
-  });
-  
-  void _soon(BuildContext context, String label) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('$label coming soon')));
+  const ProfileScreen({super.key, required this.currentUser});
+
+  Future<void> _logout(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text('You will need to log in again to use the app.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Log out',
+                style: TextStyle(color: AppColors.red)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+
+    AuthDatabase.instance.logout();
+    PatientStore.instance.clearSession();
+    // TODO: also clear your auth_service / global_state session here.
+
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+      (route) => false,
+    );
+  }
+
+  void _open(BuildContext context, Widget screen) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Profile',
-          style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textDark),
-        ),
-      ),
+      appBar: patientAppBar(context, 'Profile'),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: CircleAvatar(
-                  radius: 52,
-                  backgroundColor: AppColors.redSoft,
-                  backgroundImage: avatar,
-                  child: avatar == null
-                      ? const Icon(Icons.person,
-                          size: 56, color: AppColors.red)
-                      : null,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(name,
-                  style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textDark)),
-              const SizedBox(height: 2),
-              Text(phone,
-                  style: const TextStyle(
-                      fontSize: 13, color: AppColors.textMuted)),
-              const SizedBox(height: 28),
-              _row(context, Icons.person_outline, 'Edit Profile'),
-              const SizedBox(height: 10),
-              _row(context, Icons.lock_outline, 'Change Password'),
-              const SizedBox(height: 10),
-              _row(context, Icons.notifications_none_rounded,
-                  'Notification Settings'),
-              const SizedBox(height: 28),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: Material(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: onLogout ?? () => _soon(context, 'Logout'),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.logout_rounded,
-                            color: AppColors.red, size: 20),
-                        SizedBox(width: 8),
-                        Text('Logout',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.red)),
-                      ],
+        child: ListenableBuilder(
+          listenable: PatientStore.instance,
+          builder: (context, _) {
+            final store = PatientStore.instance;
+            final name = store.fullName ?? currentUser.name;
+            final phone = store.mobile ?? currentUser.mobile ?? '';
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              child: Column(
+                children: [
+                  ProfileAvatar(
+                    radius: 52,
+                    showCamera: true,
+                    onCameraTap: () => changeProfilePhoto(context),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(name,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textDark)),
+                  const SizedBox(height: 2),
+                  Text(phone,
+                      style: const TextStyle(
+                          fontSize: 13, color: AppColors.textMuted)),
+                  const SizedBox(height: 28),
+                  _row(Icons.person_outline, 'Edit Profile',
+                      () => _open(context, const EditProfileScreen())),
+                  const SizedBox(height: 10),
+                  _row(Icons.lock_outline, 'Change Password',
+                      () => _open(context, const ChangePasswordScreen())),
+                  const SizedBox(height: 10),
+                  _row(
+                      Icons.notifications_none_rounded,
+                      'Notification Settings',
+                      () =>
+                          _open(context, const NotificationSettingsScreen())),
+                  const SizedBox(height: 28),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: Material(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => _logout(context),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.logout_rounded,
+                                color: AppColors.red, size: 20),
+                            SizedBox(width: 8),
+                            Text('Logout',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.red)),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _row(BuildContext context, IconData icon, String label) {
+  Widget _row(IconData icon, String label, VoidCallback onTap) {
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => _soon(context, label),
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Row(

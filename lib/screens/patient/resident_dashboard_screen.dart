@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
-import 'menu.dart';
-import 'sos_button.dart';
-import 'emergency_request_screen.dart';
-import 'profile.dart';
-import '../../core/auth_service.dart';
-import 'medical_history_screen.dart';
-import 'visit_record.dart';
 
+import '../../core/auth_service.dart';
+import 'app_colors.dart';
+import 'emergency_request_screen.dart';
+import 'history_screen.dart';
+import 'medical_history_screen.dart';
+import 'menu.dart';
+import 'patient_store.dart';
+import 'profile.dart';
+import 'profile_avatar.dart';
+import 'settings_screen.dart';
+import 'sos_button.dart';
+import 'visit_record.dart';
 
 class ResidentDashboardScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -22,11 +26,20 @@ class ResidentDashboardScreen extends StatefulWidget {
 class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   int _tab = 0;
 
-     String get _patientName =>
-      (widget.currentUser.name ?? '').toUpperCase();
-  String get _barangay =>
-      (widget.currentUser.barangay ?? '').toUpperCase();
+  @override
+  void initState() {
+    super.initState();
+    PatientStore.instance.load();
+  }
 
+  String get _patientName =>
+      (PatientStore.instance.fullName ?? widget.currentUser.name)
+          .toUpperCase();
+
+  String get _barangay => (PatientStore.instance.barangay ??
+          widget.currentUser.barangay ??
+          '')
+      .toUpperCase();
 
   void _soon(String label) {
     ScaffoldMessenger.of(context)
@@ -43,9 +56,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           index: _tab,
           children: [
             _home(),
-            const _Placeholder('History'),
+            HistoryTab(visits: sampleVisits),
             const _Placeholder('Safety'),
-            const _Placeholder('Settings'),
+            const SettingsTab(),
           ],
         ),
       ),
@@ -58,7 +71,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         children: [
-                    _header(),
+          _header(),
           const SizedBox(height: 20),
           MenuCard(
             icon: Icons.medical_services_rounded,
@@ -89,13 +102,22 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             onTap: () => _soon('Health services'),
           ),
           const SizedBox(height: 28),
-          SosButton(
-            onActivated: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const EmergencyRequestScreen(),
-              ),
-            ),
+          ListenableBuilder(
+            listenable: PatientStore.instance,
+            builder: (context, _) {
+              final hold = PatientStore.instance.sosHoldSeconds;
+              return SosButton(
+                // New key so the button restarts when the hold time changes.
+                key: ValueKey(hold),
+                holdDuration: Duration(seconds: hold),
+                onActivated: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const EmergencyRequestScreen(),
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -103,73 +125,66 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   }
 
   Widget _header() {
-    return Row(
-      children: [
-                Image.asset(
-          'assets/images/logo.png',
-          height: 44,
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) => const Icon(
-            Icons.pedal_bike_rounded,
-            color: AppColors.red,
-            size: 36,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                _patientName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
-                ),
-              ),
-              Text(
-                _barangay,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
-                ),
-              ),
-            ],
-          ),
-        ),
-        InkWell(
-          customBorder: const CircleBorder(),
-                    onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-               builder: (_) => ProfileScreen(
-                name: widget.currentUser.name ?? '',
-                phone: widget.currentUser.mobile ?? '',
+    return ListenableBuilder(
+      listenable: PatientStore.instance,
+      builder: (context, _) {
+        return Row(
+          children: [
+            Image.asset(
+              'assets/images/logo.png',
+              height: 44,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.pedal_bike_rounded,
+                color: AppColors.red,
+                size: 36,
               ),
             ),
-          ),
-          child: Container(
-            width: 38,
-            height: 38,
-            decoration: const BoxDecoration(
-              color: AppColors.redSoft,
-              shape: BoxShape.circle,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _patientName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                  Text(
+                    _barangay,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            child: const Icon(Icons.person_outline_rounded,
-                color: AppColors.red, size: 22),
-          ),
-        ),
-      ],
+            InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      ProfileScreen(currentUser: widget.currentUser),
+                ),
+              ),
+              child: const ProfileAvatar(radius: 19),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  
   Widget _bottomNav() {
     return Container(
       decoration: BoxDecoration(

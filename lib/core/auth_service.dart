@@ -139,7 +139,7 @@ class AuthService {
     if (_token != null) 'Authorization': 'Bearer $_token',
   };
 
-  // ------------------------------------------------------------------ HTTP
+  //  HTTP
 
   Future<_ApiResponse> _request(
     String method,
@@ -155,11 +155,21 @@ class AuthService {
     };
 
     try {
-      final http.Response res = method == 'GET'
-          ? await http.get(uri, headers: headers).timeout(_timeout)
-          : await http
-                .post(uri, headers: headers, body: jsonEncode(body ?? {}))
-                .timeout(_timeout);
+      final http.Response res;
+      switch (method) {
+        case 'GET':
+          res = await http.get(uri, headers: headers).timeout(_timeout);
+        case 'PUT':
+          res = await http
+              .put(uri, headers: headers, body: jsonEncode(body ?? {}))
+              .timeout(_timeout);
+        case 'DELETE':
+          res = await http.delete(uri, headers: headers).timeout(_timeout);
+        default:
+          res = await http
+              .post(uri, headers: headers, body: jsonEncode(body ?? {}))
+              .timeout(_timeout);
+      }
 
       Map<String, dynamic> json = {};
       try {
@@ -196,7 +206,7 @@ class AuthService {
     }
   }
 
-  // ------------------------------------------------------------- sessions
+  //  sessions
 
   Future<AuthResult> _sessionFrom(
     _ApiResponse res, {
@@ -214,6 +224,7 @@ class AuthService {
     _token = token;
     _user = user;
 
+    // Remember me: save the token. If unchecked, make sure nothing is saved.
     try {
       if (remember) {
         await _storage.write(key: _tokenKey, value: token);
@@ -221,12 +232,26 @@ class AuthService {
         await _storage.delete(key: _tokenKey);
       }
     } catch (e) {
-      debugPrint('Secure storage failed: $e'); // keep the session in memory
+      debugPrint('[session] could not save the token: $e');
     }
 
     return AuthResult.success(
       user: user,
       message: res.body['message']?.toString(),
+    );
+  }
+
+  /// Authenticated POST used by live tracking.
+  /// `message` is empty when the call succeeds.
+  Future<({bool ok, int status, String message})> postAuthed(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    final res = await _request('POST', path, body: body, auth: true);
+    return (
+      ok: res.ok,
+      status: res.status,
+      message: res.ok ? '' : res.errorMessage,
     );
   }
 
@@ -243,11 +268,19 @@ class AuthService {
     String? saved;
     try {
       saved = await _storage.read(key: _tokenKey);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[session] could not read the saved token: $e');
+    }
+    debugPrint(
+      '[session] saved token found: ${saved != null && saved.isNotEmpty}',
+    );
     if (saved == null || saved.isEmpty) return null;
 
     _token = saved;
     final res = await _request('GET', '/mobile/me', auth: true);
+    debugPrint(
+      '[session] /mobile/me -> status ${res.status} ${res.networkError ?? ''}',
+    );
 
     if (res.ok) {
       final u = res.body['user'];
@@ -349,6 +382,19 @@ class AuthService {
       debugPrint('Google sign-in error: $e');
       return AuthResult.failure('Google sign-in failed. Please try again.');
     }
+  }
+
+  /// Authenticated JSON call. [method] is GET, POST, PUT or DELETE.
+  /// `message` is empty when the call succeeds.
+  Future<({bool ok, int status, String message, Map<String, dynamic> body})>
+  callAuthed(String method, String path, {Map<String, dynamic>? body}) async {
+    final res = await _request(method, path, body: body, auth: true);
+    return (
+      ok: res.ok,
+      status: res.status,
+      message: res.ok ? '' : res.errorMessage,
+      body: res.body,
+    );
   }
 
   Future<void> logout() async {
