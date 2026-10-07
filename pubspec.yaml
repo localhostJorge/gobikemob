@@ -46,6 +46,8 @@ dependencies:
   sqflite: ^2.4.4
   path: ^1.9.1
   crypto: ^3.0.7
+  image_picker: ^1.2.4
+  video_player: ^2.14.1
 
 dev_dependencies:
   flutter_test:
