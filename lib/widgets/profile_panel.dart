@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
 
 import '../core/auth_service.dart';
 import '../core/theme.dart';
@@ -9,6 +9,7 @@ import '../core/tracking_service.dart';
 import '../screens/legal_screen.dart';
 import '../screens/login_screen.dart';
 import 'app_toast.dart';
+import 'app_text_field.dart';
 import 'confirm_modal.dart';
 import '../screens/global_state.dart';
 import '../core/ronda_store.dart';
@@ -104,21 +105,21 @@ class _LoadingCard extends StatelessWidget {
   }
 }
 
-class _ProfilePanelBody extends StatelessWidget {
+class _ProfilePanelBody extends StatefulWidget {
   const _ProfilePanelBody({required this.rootContext});
 
   /// The dashboard's context; it stays alive after the panel closes.
   final BuildContext rootContext;
 
+  @override
+  State<_ProfilePanelBody> createState() => _ProfilePanelBodyState();
+}
+
+class _ProfilePanelBodyState extends State<_ProfilePanelBody> {
   String _roleLabel(AppUser user) {
     if (user.isGoBiker) return 'Go Biker';
     if (user.isResident) return 'Resident';
     return user.role;
-  }
-
-  String _memberSince(String? raw) {
-    final date = DateTime.tryParse(raw ?? '');
-    return date == null ? '—' : DateFormat('MMMM d, yyyy').format(date);
   }
 
   String _initials(String name) {
@@ -146,7 +147,19 @@ class _ProfilePanelBody extends StatelessWidget {
     if (!context.mounted) return;
 
     Navigator.of(context).pop(); // close the panel
-    await ProfilePanel.logout(rootContext);
+    await ProfilePanel.logout(widget.rootContext);
+  }
+
+  Future<void> _editProfile(BuildContext context, AppUser user) async {
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (_) => _EditGoBikerProfileDialog(user: user),
+    );
+    if (!mounted || !context.mounted) return;
+    if (updated == true) {
+      setState(() {});
+      AppToast.show(context, 'Profile updated.', type: ToastType.success);
+    }
   }
 
   @override
@@ -250,31 +263,61 @@ class _ProfilePanelBody extends StatelessWidget {
                           ),
                           const SizedBox(height: 28),
 
-                          _SectionLabel('PERSONAL INFORMATION', muted),
-                          _InfoRow(
-                            Icons.mail_outline_rounded,
-                            'Email',
-                            user?.email,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _SectionLabel(
+                                  'PERSONAL INFORMATION',
+                                  muted,
+                                ),
+                              ),
+                              if (user != null && user.isGoBiker)
+                                TextButton.icon(
+                                  onPressed: () => _editProfile(context, user),
+                                  icon: const Icon(
+                                    Icons.edit_rounded,
+                                    size: 16,
+                                  ),
+                                  label: const Text('Edit'),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
-                          _InfoRow(
-                            Icons.phone_outlined,
-                            'Mobile',
-                            user?.mobile,
-                          ),
-                          _InfoRow(
-                            Icons.location_on_outlined,
-                            'Barangay',
-                            user?.barangay,
-                          ),
-                          _InfoRow(
-                            Icons.badge_outlined,
-                            'Role',
-                            user == null ? null : _roleLabel(user),
-                          ),
-                          _InfoRow(
-                            Icons.event_outlined,
-                            'Member since',
-                            _memberSince(user?.memberSince),
+                          Container(
+                            padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: theme.dividerColor),
+                            ),
+                            child: Column(
+                              children: [
+                                _InfoRow(
+                                  Icons.mail_outline_rounded,
+                                  'Email',
+                                  user?.email,
+                                ),
+                                _InfoRow(
+                                  Icons.phone_outlined,
+                                  'Mobile',
+                                  user?.mobile,
+                                ),
+                                _InfoRow(
+                                  Icons.location_on_outlined,
+                                  'Barangay',
+                                  user?.barangay,
+                                ),
+                                _InfoRow(
+                                  Icons.badge_outlined,
+                                  'Role',
+                                  user == null ? null : _roleLabel(user),
+                                ),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 24),
 
@@ -468,6 +511,213 @@ class _LinkRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _EditGoBikerProfileDialog extends StatefulWidget {
+  const _EditGoBikerProfileDialog({required this.user});
+
+  final AppUser user;
+
+  @override
+  State<_EditGoBikerProfileDialog> createState() =>
+      _EditGoBikerProfileDialogState();
+}
+
+class _EditGoBikerProfileDialogState extends State<_EditGoBikerProfileDialog> {
+  static const List<String> _barangays = [
+    'Angarian',
+    'Asinan',
+    'Bañaga',
+    'Bacabac',
+    'Bolaoen',
+    'Buenlag',
+    'Cabayaoasan',
+    'Cayanga',
+    'Gueset',
+    'Hacienda',
+    'Laguit Centro',
+    'Laguit Padilla',
+    'Magtaking',
+    'Pangascasan',
+    'Pantal',
+    'Poblacion',
+    'Polong',
+    'Portic',
+    'Salasa',
+    'Salomague Norte',
+    'Salomague Sur',
+    'Samat',
+    'San Francisco',
+    'Umanday',
+  ];
+
+  final _formKey = GlobalKey<FormState>();
+  late final _mobileController = TextEditingController(
+    text: widget.user.mobile ?? '',
+  );
+  final _currentPasswordController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  late String? _barangay = _barangays.contains(widget.user.barangay)
+      ? widget.user.barangay
+      : null;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _mobileController.dispose();
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _saving = true);
+    final result = await AuthService.instance.updateGoBikerProfile(
+      mobile: _mobileController.text,
+      barangay: _barangay!,
+      currentPassword: _currentPasswordController.text,
+      newPassword: _newPasswordController.text,
+    );
+
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (!result.ok) {
+      AppToast.show(context, result.message, type: ToastType.error);
+      return;
+    }
+    Navigator.of(context).pop(true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit profile'),
+      content: SizedBox(
+        width: 420,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppTextField(
+                  label: 'Mobile number',
+                  hint: '09123456789',
+                  icon: Icons.phone_outlined,
+                  controller: _mobileController,
+                  keyboardType: TextInputType.phone,
+                  textInputAction: TextInputAction.next,
+                  maxLength: 11,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (value) {
+                    if (!RegExp(r'^09\d{9}$').hasMatch((value ?? '').trim())) {
+                      return 'Use 11 digits starting with 09';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                AppDropdownField(
+                  label: 'Barangay',
+                  hint: 'Select your barangay',
+                  icon: Icons.location_on_outlined,
+                  items: _barangays,
+                  value: _barangay,
+                  onChanged: (value) => setState(() => _barangay = value),
+                  validator: (value) =>
+                      value == null ? 'Select your barangay' : null,
+                ),
+                const SizedBox(height: 16),
+                const SizedBox(height: 4),
+                Text(
+                  'CHANGE PASSWORD',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.7,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Leave these fields blank to keep your current password.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                AppTextField(
+                  label: 'Current password',
+                  hint: 'Enter current password',
+                  icon: Icons.lock_outline_rounded,
+                  controller: _currentPasswordController,
+                  obscure: true,
+                  autofillHints: const [AutofillHints.password],
+                  validator: (value) {
+                    if (_newPasswordController.text.isNotEmpty &&
+                        (value == null || value.isEmpty)) {
+                      return 'Enter your current password';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                AppTextField(
+                  label: 'New password',
+                  hint: 'At least 8 characters',
+                  icon: Icons.lock_reset_rounded,
+                  controller: _newPasswordController,
+                  obscure: true,
+                  autofillHints: const [AutofillHints.newPassword],
+                  validator: (value) {
+                    if (value != null && value.isNotEmpty && value.length < 8) {
+                      return 'Use at least 8 characters';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                AppTextField(
+                  label: 'Confirm new password',
+                  hint: 'Re-enter new password',
+                  icon: Icons.lock_outline_rounded,
+                  controller: _confirmPasswordController,
+                  obscure: true,
+                  autofillHints: const [AutofillHints.newPassword],
+                  validator: (value) {
+                    if (_newPasswordController.text.isNotEmpty &&
+                        value != _newPasswordController.text) {
+                      return 'Passwords do not match';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save changes'),
+        ),
+      ],
     );
   }
 }

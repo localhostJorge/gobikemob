@@ -28,7 +28,6 @@ class AppUser {
     required this.role,
     this.mobile,
     this.barangay,
-    this.memberSince,
   });
 
   final int id;
@@ -37,7 +36,6 @@ class AppUser {
   final String role; // "User" (resident), "GoBiker" or "Admin"
   final String? mobile;
   final String? barangay;
-  final String? memberSince; // yyyy-mm-dd
 
   factory AppUser.fromJson(Map<String, dynamic> json) => AppUser(
     id: (json['id'] as num?)?.toInt() ?? 0,
@@ -46,7 +44,6 @@ class AppUser {
     role: (json['role'] ?? 'User').toString(),
     mobile: json['mobile']?.toString(),
     barangay: json['barangay']?.toString(),
-    memberSince: json['member_since']?.toString(),
   );
 
   String get firstName {
@@ -253,6 +250,45 @@ class AuthService {
       status: res.status,
       message: res.ok ? '' : res.errorMessage,
     );
+  }
+
+  /// Updates a GoBiker profile. The API response must include the updated user.
+  // TODO(api): implement PUT /gobiker/profile in Laravel.
+  Future<({bool ok, String message})> updateGoBikerProfile({
+    required String mobile,
+    required String barangay,
+    String? currentPassword,
+    String? newPassword,
+  }) async {
+    final body = <String, dynamic>{
+      'mobile': mobile.trim(),
+      'barangay': barangay,
+    };
+    if (newPassword != null && newPassword.isNotEmpty) {
+      body['current_password'] = currentPassword;
+      body['password'] = newPassword;
+      body['password_confirmation'] = newPassword;
+    }
+
+    final res = await _request(
+      'PUT',
+      '/gobiker/profile',
+      body: body,
+      auth: true,
+    );
+    if (!res.ok) {
+      return (ok: false, message: res.errorMessage);
+    }
+
+    final userJson = res.body['user'];
+    if (userJson is! Map<String, dynamic>) {
+      return (
+        ok: false,
+        message: 'Profile update returned an unexpected server response.',
+      );
+    }
+    _user = AppUser.fromJson(userJson);
+    return (ok: true, message: '');
   }
 
   Future<void> _clearLocalSession() async {

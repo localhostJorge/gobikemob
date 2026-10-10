@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../core/auth_service.dart';
@@ -125,7 +126,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       context: context,
       icon: Icons.stop_circle_rounded,
       color: AppTheme.errorRed,
-      title: 'End this ronda?',
+      title: 'Are you already done?',
       description:
           'This closes your open ronda. Live location sharing stays off.',
       confirmText: 'End Ronda',
@@ -1010,7 +1011,7 @@ class _MessageAdminSheet extends StatefulWidget {
 class _MessageAdminSheetState extends State<_MessageAdminSheet> {
   final _ctrl = TextEditingController();
   bool _sending = false;
-  static const int _maxChars = 500;
+  static const int _maxChars = 300;
 
   @override
   void dispose() {
@@ -1021,7 +1022,11 @@ class _MessageAdminSheetState extends State<_MessageAdminSheet> {
   Future<void> _send() async {
     final text = _ctrl.text.trim();
     if (text.isEmpty) {
-      AppToast.show(context, 'Please type a message first.', type: ToastType.error);
+      AppToast.show(
+        context,
+        'Please type a message first.',
+        type: ToastType.error,
+      );
       return;
     }
     // Capture before the async gap (lint: use_build_context_synchronously)
@@ -1056,111 +1061,130 @@ class _MessageAdminSheetState extends State<_MessageAdminSheet> {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurface.withValues(alpha: 0.6);
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        24,
-        8,
-        24,
-        MediaQuery.of(context).viewInsets.bottom + 28,
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Sheet header
-          Row(
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppTheme.blue.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.chat_bubble_rounded,
-                  color: AppTheme.blue,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Message Admin',
-                      style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
-                    ),
-                    Text(
-                      'Send a report or question to the Go Bike admin.',
-                      style: TextStyle(fontSize: 12, color: muted),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-
-          // Message field
-          ListenableBuilder(
-            listenable: _ctrl,
-            builder: (context, _) {
-              final count = _ctrl.text.length;
-              final overLimit = count > _maxChars;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              // Sheet header
+              Row(
                 children: [
-                  TextField(
-                    controller: _ctrl,
-                    maxLines: 5,
-                    minLines: 4,
-                    maxLength: _maxChars,
-                    buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
-                    textInputAction: TextInputAction.newline,
-                    decoration: InputDecoration(
-                      hintText: 'Type your message here…',
-                      alignLabelWithHint: true,
-                      counterText: '',
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: AppTheme.blue.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.chat_bubble_rounded,
+                      color: AppTheme.blue,
+                      size: 22,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '$count / $_maxChars',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: overLimit ? AppTheme.errorRed : muted,
-                      fontWeight: overLimit ? FontWeight.w600 : FontWeight.w400,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Message Admin',
+                          style: TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          'Send a report or question to the Go Bike admin.',
+                          style: TextStyle(fontSize: 12, color: muted),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              );
-            },
-          ),
-          const SizedBox(height: 16),
+              ),
+              const SizedBox(height: 18),
 
-          // Send button
-          ElevatedButton(
-            onPressed: _sending ? null : _send,
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-            ),
-            child: _sending
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text(
-                    'Send Message',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                  ),
+              // Message field
+              ListenableBuilder(
+                listenable: _ctrl,
+                builder: (context, _) {
+                  final count = _ctrl.text.length;
+                  final overLimit = count > _maxChars;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      TextField(
+                        controller: _ctrl,
+                        maxLines: 5,
+                        minLines: 4,
+                        maxLength: _maxChars,
+                        maxLengthEnforcement: MaxLengthEnforcement.enforced,
+                        buildCounter: (
+                          _, {
+                          required currentLength,
+                          required isFocused,
+                          maxLength,
+                        }) => null,
+                        textInputAction: TextInputAction.newline,
+                        decoration: InputDecoration(
+                          hintText: 'Type your message here…',
+                          alignLabelWithHint: true,
+                          counterText: '',
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '$count / $_maxChars',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: overLimit ? AppTheme.errorRed : muted,
+                          fontWeight: overLimit
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Send button
+              ElevatedButton(
+                onPressed: _sending ? null : _send,
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                ),
+                child: _sending
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Send Message',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

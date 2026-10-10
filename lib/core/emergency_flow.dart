@@ -112,8 +112,8 @@ class EmergencyFlow {
         ),
         title: const Text('Alert sent'),
         content: const Text(
-          'The admin can now see you in red on the live map. '
-          'If you need help right now, you can also call 911.',
+          'The admin can now notice you in the map.'
+          'Do you want also call 911?',
         ),
         actions: [
           TextButton(
