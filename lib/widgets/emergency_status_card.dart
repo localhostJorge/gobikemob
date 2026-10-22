@@ -21,13 +21,13 @@ class EmergencyStatusCard extends StatelessWidget {
             AppTheme.orange,
             Icons.hourglass_top_rounded,
             'Emergency alert sent',
-            'Waiting for the admin to respond. Call 911 if it is urgent.',
+            'Waiting for the admin to see it. Call 911 if it is urgent.',
           ),
           EmergencyPhase.responding => (
             AppTheme.blue,
             Icons.support_agent_rounded,
-            'The admin is responding',
-            'Your alert was received. Stay safe and keep your phone with you.',
+            'The admin saw your alert',
+            'The admin is handling it. Stay safe, keep your phone with you, and call 911 if you need help right now.',
           ),
           _ => (
             AppTheme.successGreen,

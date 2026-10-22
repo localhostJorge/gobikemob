@@ -13,7 +13,8 @@ enum EmergencyPhase {
   /// The alert was sent and the admin has not answered yet.
   waiting,
 
-  /// The admin pressed "Responding" on the live map.
+  /// The admin pressed "Responding" on the live map: they have seen the alert
+  /// and are handling it (the admin manages from the office; they do not go to the GoBiker).
   responding,
 
   /// The admin pressed "Resolve". Stays until the GoBiker dismisses it.

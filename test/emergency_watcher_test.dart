@@ -122,7 +122,7 @@ void main() {
 
     watcher.applyServerStatus('responding');
     await tester.pump();
-    expect(find.text('The admin is responding'), findsOneWidget);
+    expect(find.text('The admin saw your alert'), findsOneWidget);
 
     watcher.applyServerStatus(null);
     await tester.pump();
@@ -143,7 +143,7 @@ void main() {
 
     showEmergencyAlert(EmergencyPhase.responding);
     await tester.pumpAndSettle();
-    expect(find.text('The admin is responding'), findsOneWidget);
+    expect(find.text('The admin saw your alert'), findsOneWidget);
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
 

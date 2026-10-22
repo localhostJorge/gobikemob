@@ -68,11 +68,11 @@ void main() {
 
     await tester.pumpWidget(const MaterialApp(home: DashboardScreen()));
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('The admin is responding'), findsNothing);
+    expect(find.text('The admin saw your alert'), findsNothing);
 
     EmergencyWatcher.instance.applyServerStatus('responding');
     await tester.pump();
 
-    expect(find.text('The admin is responding'), findsOneWidget);
+    expect(find.text('The admin saw your alert'), findsOneWidget);
   });
 }
