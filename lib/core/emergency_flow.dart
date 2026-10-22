@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../widgets/app_toast.dart';
 import '../widgets/confirm_modal.dart';
+import 'emergency_watcher.dart';
 import 'theme.dart';
 import 'tracking_service.dart';
 
@@ -45,6 +46,9 @@ class EmergencyFlow {
       if (!context.mounted) return;
 
       if (result.ok) {
+        // From now on the app follows the admin's response.
+        await EmergencyWatcher.instance.markSent();
+        if (!context.mounted) return;
         AppToast.show(
           context,
           'Emergency alert sent to the admin.',

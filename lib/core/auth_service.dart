@@ -18,6 +18,8 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
 import 'api_config.dart';
+import 'emergency_watcher.dart';
+import 'follow_up_alerts.dart';
 
 /// The logged-in person, as returned by the Laravel API.
 class AppUser {
@@ -438,6 +440,8 @@ class AuthService {
       await _request('POST', '/mobile/logout', auth: true); // result ignored
     }
     await _clearLocalSession();
+    await EmergencyWatcher.instance.reset(); // another account must not inherit it
+    FollowUpAlerts.instance.reset();
     try {
       await GoogleSignIn.instance.signOut();
     } catch (_) {}

@@ -10,6 +10,7 @@ import '../core/tracking_service.dart';
 import '../widgets/app_text_field.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/confirm_modal.dart';
+import '../widgets/emergency_status_card.dart';
 import 'add_patient_screen.dart';
 import 'global_state.dart';
 import 'view_patient_screen.dart';
@@ -262,6 +263,7 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   children: [
+                    const EmergencyStatusCard(),
                     _heroCard(),
                     const SizedBox(height: 20),
                     AppDropdownField(

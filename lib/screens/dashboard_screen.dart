@@ -4,12 +4,14 @@ import 'package:intl/intl.dart';
 
 import '../core/auth_service.dart';
 import '../core/emergency_flow.dart';
+import '../core/emergency_watcher.dart';
 import '../core/follow_up_alerts.dart';
 import '../core/greeting.dart';
 import '../core/theme.dart';
 import '../core/tracking_service.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/confirm_modal.dart';
+import '../widgets/emergency_status_card.dart';
 import '../widgets/fade_in_slide.dart';
 import '../widgets/loading_overlay.dart';
 import '../widgets/profile_panel.dart';
@@ -46,6 +48,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     WidgetsBinding.instance.addObserver(this);
     _loadSavedRonda();
     FollowUpAlerts.instance.refresh(); // admin decisions about patients
+    EmergencyWatcher.instance.load(); // an emergency the admin may have answered
   }
 
   @override
@@ -60,6 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (state == AppLifecycleState.resumed && mounted) {
       setState(() {});
       FollowUpAlerts.instance.refresh();
+      if (EmergencyWatcher.instance.isOpen) EmergencyWatcher.instance.check();
     }
   }
 
@@ -393,6 +397,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // The admin's answer to an emergency alert, if one was sent
+                      const EmergencyStatusCard(),
+
                       // 2) Today's assignment (primary)
                       FadeInSlide(
                         delay: const Duration(milliseconds: 80),

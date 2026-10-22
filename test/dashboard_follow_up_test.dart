@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:go_bike_app/core/emergency_watcher.dart';
 import 'package:go_bike_app/core/follow_up_alerts.dart';
 import 'package:go_bike_app/screens/dashboard_screen.dart';
 import 'package:go_bike_app/screens/global_state.dart';
@@ -55,5 +56,23 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
 
     expect(find.textContaining('from the admin'), findsNothing);
+  });
+
+  testWidgets('the dashboard shows where an emergency stands', (tester) async {
+    globalPatients = [];
+    tester.view.physicalSize = const Size(900, 2600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await EmergencyWatcher.instance.reset();
+    addTearDown(EmergencyWatcher.instance.reset);
+
+    await tester.pumpWidget(const MaterialApp(home: DashboardScreen()));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('The admin is responding'), findsNothing);
+
+    EmergencyWatcher.instance.applyServerStatus('responding');
+    await tester.pump();
+
+    expect(find.text('The admin is responding'), findsOneWidget);
   });
 }
