@@ -133,6 +133,39 @@ void main() {
     expect(find.text('Emergency resolved'), findsNothing);
   });
 
+  testWidgets('the phone vibrates for one second with every pop-up', (
+    tester,
+  ) async {
+    final original = vibratePhone;
+    var buzzes = 0;
+    vibratePhone = () async => buzzes++;
+    addTearDown(() => vibratePhone = original);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: appNavigatorKey,
+        home: const Scaffold(body: Text('Home')),
+      ),
+    );
+
+    showEmergencyAlert(EmergencyPhase.responding);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    showEmergencyAlert(EmergencyPhase.resolved);
+    await tester.pumpAndSettle();
+
+    expect(buzzes, 2); // once for Responding, once for Resolve
+    expect(emergencyVibration, const Duration(seconds: 1));
+
+    // Nothing to tell the GoBiker about: no pop-up, no vibration.
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    showEmergencyAlert(EmergencyPhase.waiting);
+    await tester.pumpAndSettle();
+    expect(buzzes, 2);
+  });
+
   testWidgets('the pop-up says what the admin did', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
