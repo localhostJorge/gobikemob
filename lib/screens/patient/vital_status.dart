@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'app_colors.dart';
 
 /// Result of classifying a vital sign: a label, a color and an optional
@@ -112,14 +113,13 @@ class Vitals {
     return const VitalStatus('Fever', _orange);
   }
 
-  /// Asia-Pacific BMI cutoffs, which suit Filipino adults better than the
-  /// standard WHO cutoffs.
-  static VitalStatus? bmi(double bmi, int age) {
-    if (!isAdult(age)) return null;
-    if (bmi < 18.5) return const VitalStatus('Underweight range', _blue);
-    if (bmi < 23) return const VitalStatus('Typical range', _green);
-    if (bmi < 25) return const VitalStatus('Overweight range', _amber);
-    return const VitalStatus('Obese range', _orange);
+  /// Blood sugar in mg/dL (optional: null when the patient was not tested).
+  /// Same ranges as the admin dashboard: typical 70-139.
+  static VitalStatus? bloodSugar(int? mgdl, int age) {
+    if (mgdl == null || !isAdult(age)) return null;
+    if (mgdl < 70) return const VitalStatus('Below typical range', _blue);
+    if (mgdl >= 140) return const VitalStatus('Above typical range', _orange);
+    return const VitalStatus('Typical range', _green);
   }
 }
 
@@ -158,8 +158,10 @@ class StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     if (status != null) return StatusChip(status: status!);
     if (!adult) {
-      return const Text('Ask a health worker',
-          style: TextStyle(fontSize: 11.5, color: AppColors.textMuted));
+      return const Text(
+        'Ask a health worker',
+        style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+      );
     }
     return const SizedBox.shrink();
   }

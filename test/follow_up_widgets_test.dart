@@ -18,8 +18,7 @@ Map<String, dynamic> _patient({Map<String, dynamic>? followUp}) => {
   'pulse': '70',
   'resp': '16',
   'temp': '36.5',
-  'height': '150',
-  'weight': '52',
+  'blood_sugar': '95',
   'barangay': 'Hacienda',
   'follow_up': followUp,
 };

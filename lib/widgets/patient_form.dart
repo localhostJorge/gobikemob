@@ -19,8 +19,7 @@ class PatientFormControllers {
   final pulse = TextEditingController();
   final resp = TextEditingController();
   final temp = TextEditingController();
-  final height = TextEditingController();
-  final weight = TextEditingController();
+  final bloodSugar = TextEditingController(); // mg/dL, optional
 
   List<TextEditingController> get _all => [
     name,
@@ -32,8 +31,7 @@ class PatientFormControllers {
     pulse,
     resp,
     temp,
-    height,
-    weight,
+    bloodSugar,
   ];
 
   void fill(Map<String, dynamic> p) {
@@ -46,8 +44,7 @@ class PatientFormControllers {
     pulse.text = p['pulse']?.toString() ?? '';
     resp.text = p['resp']?.toString() ?? '';
     temp.text = p['temp']?.toString() ?? '';
-    height.text = p['height']?.toString() ?? '';
-    weight.text = p['weight']?.toString() ?? '';
+    bloodSugar.text = p['blood_sugar']?.toString() ?? '';
   }
 
   Map<String, dynamic> toMap() => {
@@ -60,8 +57,7 @@ class PatientFormControllers {
     'pulse': pulse.text.trim(),
     'resp': resp.text.trim(),
     'temp': temp.text.trim(),
-    'height': height.text.trim(),
-    'weight': weight.text.trim(),
+    'blood_sugar': bloodSugar.text.trim(),
   };
 
   void dispose() {
@@ -76,6 +72,12 @@ String? _required(String? v) =>
 
 String _fmt(double v) =>
     v == v.roundToDouble() ? v.toInt().toString() : v.toString();
+
+/// Like [_range], but the field may be left empty (not every patient is tested).
+String? Function(String?) _optionalRange(double min, double max) {
+  final check = _range(min, max);
+  return (v) => (v ?? '').trim().isEmpty ? null : check(v);
+}
 
 String? Function(String?) _range(double min, double max) {
   return (v) {
@@ -262,43 +264,17 @@ class PatientForm extends StatelessWidget {
           validator: _range(30, 45),
         ),
         const SizedBox(height: 16),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: AppTextField(
-                label: 'Height (cm)',
-                hint: '165',
-                icon: Icons.height_rounded,
-                controller: c.height,
-                readOnly: readOnly,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                textInputAction: TextInputAction.next,
-                inputFormatters: _decimal,
-                maxLength: 5,
-                validator: _range(30, 250),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: AppTextField(
-                label: 'Weight (kg)',
-                hint: '60',
-                icon: Icons.monitor_weight_outlined,
-                controller: c.weight,
-                readOnly: readOnly,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                textInputAction: TextInputAction.done,
-                inputFormatters: _decimal,
-                maxLength: 5,
-                validator: _range(1, 300),
-              ),
-            ),
-          ],
+        AppTextField(
+          label: 'Blood sugar (mg/dL) - optional',
+          hint: '95',
+          icon: Icons.water_drop_outlined,
+          controller: c.bloodSugar,
+          readOnly: readOnly,
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.done,
+          inputFormatters: _digits,
+          maxLength: 3,
+          validator: _optionalRange(20, 600),
         ),
       ],
     );

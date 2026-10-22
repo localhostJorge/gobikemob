@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'vital_status.dart';
 
 /// One GoBiker check-up during a ronda.
@@ -22,8 +20,7 @@ class VisitRecord {
   final int pulse;
   final int respiration;
   final double temperature; // °C
-  final double heightCm;
-  final double weightKg;
+  final int? bloodSugar; // mg/dL, null when not tested
 
   /// GoBiker remarks. Patients can see these.
   final String remarks;
@@ -45,27 +42,22 @@ class VisitRecord {
     required this.pulse,
     required this.respiration,
     required this.temperature,
-    required this.heightCm,
-    required this.weightKg,
+    this.bloodSugar,
     this.remarks = '',
     this.updatedAt,
   });
 
   bool get isAdult => Vitals.isAdult(age);
 
-  double get bmi => weightKg / pow(heightCm / 100, 2);
-
   VitalStatus? get bpStatus => Vitals.bp(systolic, diastolic, age);
 
   VitalStatus? get pulseStatus => Vitals.pulse(pulse, age);
 
-  VitalStatus? get respirationStatus =>
-      Vitals.respiration(respiration, age);
+  VitalStatus? get respirationStatus => Vitals.respiration(respiration, age);
 
-  VitalStatus? get temperatureStatus =>
-      Vitals.temperature(temperature, age);
+  VitalStatus? get temperatureStatus => Vitals.temperature(temperature, age);
 
-  VitalStatus? get bmiStatus => Vitals.bmi(bmi, age);
+  VitalStatus? get bloodSugarStatus => Vitals.bloodSugar(bloodSugar, age);
 }
 
 const _months = [
@@ -83,11 +75,9 @@ const _months = [
   'Dec',
 ];
 
-String formatDate(DateTime d) =>
-    '${_months[d.month - 1]} ${d.day}, ${d.year}';
+String formatDate(DateTime d) => '${_months[d.month - 1]} ${d.day}, ${d.year}';
 
-String monthShort(DateTime d) =>
-    _months[d.month - 1].toUpperCase();
+String monthShort(DateTime d) => _months[d.month - 1].toUpperCase();
 
 String formatTime(DateTime d) {
   final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
@@ -115,8 +105,7 @@ final List<VisitRecord> sampleVisits = [
     pulse: 82,
     respiration: 18,
     temperature: 36.8,
-    heightCm: 165,
-    weightKg: 72,
+    bloodSugar: 118,
     remarks:
         'Advised to reduce salt intake and recheck BP in one week. '
         'Please visit the barangay health center if headaches continue.',
@@ -137,8 +126,7 @@ final List<VisitRecord> sampleVisits = [
     pulse: 76,
     respiration: 17,
     temperature: 36.6,
-    heightCm: 165,
-    weightKg: 71,
+    bloodSugar: 104,
     remarks: 'No complaints. Encouraged regular exercise.',
     updatedAt: DateTime(2026, 8, 16, 9, 15),
   ),
@@ -157,7 +145,6 @@ final List<VisitRecord> sampleVisits = [
     pulse: 74,
     respiration: 16,
     temperature: 36.5,
-    heightCm: 165,
-    weightKg: 70,
+    // Not tested on the first visit.
   ),
 ];

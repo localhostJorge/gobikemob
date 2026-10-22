@@ -99,8 +99,10 @@ class PatientService {
     'pulse': f['pulse'],
     'resp': f['resp'],
     'temp': f['temp'],
-    'height': f['height'],
-    'weight': f['weight'],
+    // Optional: an empty field is sent as null (also clears an old value).
+    'blood_sugar': '${f['blood_sugar'] ?? ''}'.trim().isEmpty
+        ? null
+        : f['blood_sugar'],
     if (barangay != null && barangay.isNotEmpty) 'barangay': barangay,
   };
 
@@ -127,8 +129,7 @@ class PatientService {
       'pulse': _s(j['pulse']),
       'resp': _s(j['resp']),
       'temp': _s(j['temp']),
-      'height': _s(j['height']),
-      'weight': _s(j['weight']),
+      'blood_sugar': _s(j['blood_sugar']),
       'barangay': _s(j['barangay']),
       // The admin's decision on whether to keep checking this person (or null).
       'follow_up': FollowUp.from(j['follow_up'])?.toMap(),

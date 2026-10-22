@@ -29,9 +29,10 @@ class MedicalHistoryScreen extends StatelessWidget {
         title: const Text(
           'Medical History',
           style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textDark),
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textDark,
+          ),
         ),
       ),
       body: SafeArea(
@@ -42,11 +43,14 @@ class MedicalHistoryScreen extends StatelessWidget {
                 children: [
                   _LatestCard(record: sorted.first),
                   const SizedBox(height: 22),
-                  const Text('Visit History',
-                      style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textDark)),
+                  const Text(
+                    'Visit History',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textDark,
+                    ),
+                  ),
                   const SizedBox(height: 10),
                   for (final v in sorted)
                     Padding(
@@ -63,16 +67,16 @@ class MedicalHistoryScreen extends StatelessWidget {
 }
 
 BoxDecoration _cardDecoration() => BoxDecoration(
-      color: AppColors.card,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.05),
-          blurRadius: 10,
-          offset: const Offset(0, 3),
-        ),
-      ],
-    );
+  color: AppColors.card,
+  borderRadius: BorderRadius.circular(16),
+  boxShadow: [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.05),
+      blurRadius: 10,
+      offset: const Offset(0, 3),
+    ),
+  ],
+);
 
 class _LatestCard extends StatelessWidget {
   final VisitRecord record;
@@ -88,19 +92,29 @@ class _LatestCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.monitor_heart_outlined,
-                  color: AppColors.red, size: 18),
+              const Icon(
+                Icons.monitor_heart_outlined,
+                color: AppColors.red,
+                size: 18,
+              ),
               const SizedBox(width: 6),
-              const Text('LATEST VITALS',
-                  style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
-                      color: AppColors.red)),
+              const Text(
+                'LATEST VITALS',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                  color: AppColors.red,
+                ),
+              ),
               const Spacer(),
-              Text(formatDate(record.date),
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textMuted)),
+              Text(
+                formatDate(record.date),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textMuted,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -112,7 +126,9 @@ class _LatestCard extends StatelessWidget {
                   label: 'Blood Pressure',
                   value: '${record.systolic}/${record.diastolic}',
                   footer: StatusBadge(
-                      status: record.bpStatus, adult: record.isAdult),
+                    status: record.bpStatus,
+                    adult: record.isAdult,
+                  ),
                 ),
               ),
               Expanded(
@@ -132,8 +148,10 @@ class _LatestCard extends StatelessWidget {
               ),
               Expanded(
                 child: _Stat(
-                  label: 'Weight',
-                  value: '${record.weightKg.toStringAsFixed(1)} kg',
+                  label: 'Blood sugar',
+                  value: record.bloodSugar == null
+                      ? 'Not tested'
+                      : '${record.bloodSugar} mg/dL',
                 ),
               ),
             ],
@@ -156,19 +174,20 @@ class _Stat extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style:
-                const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+        ),
         const SizedBox(height: 2),
-        Text(value,
-            style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textDark)),
-        if (footer != null) ...[
-          const SizedBox(height: 4),
-          footer!,
-        ],
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textDark,
+          ),
+        ),
+        if (footer != null) ...[const SizedBox(height: 4), footer!],
       ],
     );
   }
@@ -205,16 +224,22 @@ class _VisitCard extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      Text('${record.date.day}',
-                          style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.red)),
-                      Text(monthShort(record.date),
-                          style: const TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.red)),
+                      Text(
+                        '${record.date.day}',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.red,
+                        ),
+                      ),
+                      Text(
+                        monthShort(record.date),
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.red,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -223,32 +248,41 @@ class _VisitCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(record.place,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textDark)),
+                      Text(
+                        record.place,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textDark,
+                        ),
+                      ),
                       const SizedBox(height: 2),
                       Text(
-                          '${formatTime(record.date)} · ${record.gobikerName}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 12, color: AppColors.textMuted)),
+                        '${formatTime(record.date)} · ${record.gobikerName}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
                       const SizedBox(height: 6),
                       Text(
                         'BP ${record.systolic}/${record.diastolic} · '
                         'Pulse ${record.pulse}',
                         style: const TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textDark),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textDark,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       StatusBadge(
-                          status: record.bpStatus, adult: record.isAdult),
+                        status: record.bpStatus,
+                        adult: record.isAdult,
+                      ),
                     ],
                   ),
                 ),
@@ -273,14 +307,20 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.folder_open_rounded,
-                size: 56, color: AppColors.textMuted),
+            Icon(
+              Icons.folder_open_rounded,
+              size: 56,
+              color: AppColors.textMuted,
+            ),
             SizedBox(height: 14),
-            Text('No records yet',
-                style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textDark)),
+            Text(
+              'No records yet',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textDark,
+              ),
+            ),
             SizedBox(height: 6),
             Text(
               'Your health records from GoBiker visits will appear here.',

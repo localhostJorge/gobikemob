@@ -28,9 +28,10 @@ class VisitDetailsScreen extends StatelessWidget {
         title: const Text(
           'Visit Details',
           style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textDark),
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textDark,
+          ),
         ),
       ),
       body: SafeArea(
@@ -81,17 +82,11 @@ class VisitDetailsScreen extends StatelessWidget {
                   adult: record.isAdult,
                 ),
                 _VitalRow(
-                  label: 'Height',
-                  value: '${record.heightCm.toStringAsFixed(0)} cm',
-                ),
-                _VitalRow(
-                  label: 'Weight',
-                  value: '${record.weightKg.toStringAsFixed(1)} kg',
-                ),
-                _VitalRow(
-                  label: 'BMI',
-                  value: record.bmi.toStringAsFixed(1),
-                  status: record.bmiStatus,
+                  label: 'Blood sugar',
+                  value: record.bloodSugar == null
+                      ? 'Not tested'
+                      : '${record.bloodSugar} mg/dL',
+                  status: record.bloodSugarStatus,
                   adult: record.isAdult,
                   isLast: true,
                 ),
@@ -146,17 +141,26 @@ class VisitDetailsScreen extends StatelessWidget {
                 Text(
                   '${formatDate(record.date)} · ${formatTime(record.date)}',
                   style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textDark),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark,
+                  ),
                 ),
                 const SizedBox(height: 2),
-                Text(record.place,
-                    style: const TextStyle(
-                        fontSize: 12.5, color: AppColors.textMuted)),
-                Text('Recorded by ${record.gobikerName}',
-                    style: const TextStyle(
-                        fontSize: 12.5, color: AppColors.textMuted)),
+                Text(
+                  record.place,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                Text(
+                  'Recorded by ${record.gobikerName}',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textMuted,
+                  ),
+                ),
               ],
             ),
           ),
@@ -176,15 +180,21 @@ class VisitDetailsScreen extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.warning_amber_rounded,
-              color: AppColors.red, size: 22),
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: AppColors.red,
+            size: 22,
+          ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(message,
-                style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF9B1C1C))),
+            child: Text(
+              message,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF9B1C1C),
+              ),
+            ),
           ),
         ],
       ),
@@ -193,16 +203,16 @@ class VisitDetailsScreen extends StatelessWidget {
 }
 
 BoxDecoration _cardDecoration() => BoxDecoration(
-      color: AppColors.card,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.05),
-          blurRadius: 10,
-          offset: const Offset(0, 3),
-        ),
-      ],
-    );
+  color: AppColors.card,
+  borderRadius: BorderRadius.circular(16),
+  boxShadow: [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.05),
+      blurRadius: 10,
+      offset: const Offset(0, 3),
+    ),
+  ],
+);
 
 class _Section extends StatelessWidget {
   final String title;
@@ -219,11 +229,14 @@ class _Section extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textDark)),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textDark,
+            ),
+          ),
           const SizedBox(height: 10),
           ...children,
         ],
@@ -247,16 +260,23 @@ class _InfoRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 110,
-            child: Text(label,
-                style: const TextStyle(
-                    fontSize: 12.5, color: AppColors.textMuted)),
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12.5,
+                color: AppColors.textMuted,
+              ),
+            ),
           ),
           Expanded(
-            child: Text(value,
-                style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textDark)),
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textDark,
+              ),
+            ),
           ),
         ],
       ),
@@ -283,7 +303,7 @@ class _VitalRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasStatusArea = status != null || !adult;
-    // Height and weight have no status; don't show the minors hint for them.
+    // A reading that was not taken has no status; don't show the minors hint for it.
     final showHint = status != null || (!adult && _needsHint);
 
     return Container(
@@ -300,18 +320,25 @@ class _VitalRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(label,
-                    style: const TextStyle(
-                        fontSize: 13, color: AppColors.textMuted)),
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textMuted,
+                  ),
+                ),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(value,
-                      style: const TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textDark)),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textDark,
+                    ),
+                  ),
                   if (hasStatusArea && showHint) ...[
                     const SizedBox(height: 4),
                     StatusBadge(status: status, adult: adult),
@@ -322,15 +349,20 @@ class _VitalRow extends StatelessWidget {
           ),
           if (status?.note != null) ...[
             const SizedBox(height: 6),
-            Text(status!.note!,
-                style: const TextStyle(
-                    fontSize: 12, height: 1.35, color: AppColors.textMuted)),
+            Text(
+              status!.note!,
+              style: const TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: AppColors.textMuted,
+              ),
+            ),
           ],
         ],
       ),
     );
   }
 
-  // Height and weight rows never carry a status.
-  bool get _needsHint => label != 'Height' && label != 'Weight';
+  // A blood sugar that was not tested never carries a status.
+  bool get _needsHint => value != 'Not tested';
 }
