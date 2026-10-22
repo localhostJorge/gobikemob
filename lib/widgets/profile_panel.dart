@@ -117,7 +117,7 @@ class _ProfilePanelBody extends StatefulWidget {
 
 class _ProfilePanelBodyState extends State<_ProfilePanelBody> {
   String _roleLabel(AppUser user) {
-    if (user.isGoBiker) return 'Go Biker';
+    if (user.isGoBiker) return 'GoBiker';
     if (user.isResident) return 'Resident';
     return user.role;
   }

@@ -126,7 +126,7 @@ class SettingsTab extends StatelessWidget {
             _card([
               const _NavTile(
                 icon: Icons.info_outline_rounded,
-                title: 'GoBike',
+                title: 'GoBiker',
                 subtitle: 'Version 1.0.0',
               ),
             ]),

@@ -15,7 +15,7 @@
     </queries>
 
     <application
-        android:label="go_bike_app"
+        android:label="GoBiker"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">

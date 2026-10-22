@@ -23,7 +23,7 @@ class GoBikeApp extends StatelessWidget {
       builder: (context, _) {
         return MaterialApp(
           navigatorKey: appNavigatorKey,
-          title: 'Go Bike',
+          title: 'GoBiker',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,

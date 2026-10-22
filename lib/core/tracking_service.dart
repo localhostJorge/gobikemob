@@ -7,7 +7,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'auth_service.dart';
 import 'ronda_store.dart';
 
-/// Starts/stops a ronda on the server and sends the Go Biker's position
+/// Starts/stops a ronda on the server and sends the GoBiker's position
 /// every 10 seconds while the ronda is active. A foreground service keeps
 /// this running when the screen is locked or the app is in the background.
 class TrackingService {
@@ -277,7 +277,7 @@ class TrackingService {
       distanceFilter: 0,
       intervalDuration: const Duration(seconds: 5),
       foregroundNotificationConfig: const ForegroundNotificationConfig(
-        notificationTitle: 'Go Bike ronda in progress',
+        notificationTitle: 'GoBiker ronda in progress',
         notificationText: 'Sharing your live location to the Go Bike.',
         enableWakeLock: true,
         setOngoing: true,
