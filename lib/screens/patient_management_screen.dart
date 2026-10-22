@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../core/auth_service.dart';
+import '../core/follow_up.dart';
 import '../core/patient_service.dart';
 import '../core/theme.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/fade_in_slide.dart';
+import '../widgets/follow_up_banner.dart';
 import 'add_patient_screen.dart';
 import 'global_state.dart';
 import 'view_patient_screen.dart';
@@ -148,6 +150,19 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
 
     setState(() => globalPatients.insert(0, created));
     AppToast.show(context, 'Patient record saved.', type: ToastType.success);
+
+    // The person may be another GoBiker's patient already marked "stop":
+    // the app could not know before saving, so tell them now.
+    final followUp = FollowUp.from(created['follow_up']);
+    if (followUp != null && followUp.isStop) {
+      await Future<void>.delayed(const Duration(milliseconds: 2600));
+      if (!mounted) return;
+      AppToast.show(
+        context,
+        'The admin says ${created['name']} no longer needs regular check-ups.',
+        type: ToastType.info,
+      );
+    }
   }
 
   // ------------------------------------------------------------------- build
@@ -550,6 +565,11 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
                                   '${items[i]['time'] ?? ''} • Age ${items[i]['age'] ?? '-'}',
                                   style: TextStyle(fontSize: 12, color: muted),
                                 ),
+                                if (FollowUp.from(items[i]['follow_up'])
+                                    case final followUp?) ...[
+                                  const SizedBox(height: 6),
+                                  FollowUpChip(followUp: followUp),
+                                ],
                               ],
                             ),
                           ),

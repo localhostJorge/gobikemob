@@ -1,6 +1,7 @@
 import 'package:intl/intl.dart';
 
 import 'auth_service.dart';
+import 'follow_up.dart';
 
 typedef _ApiCall = ({
   bool ok,
@@ -129,6 +130,8 @@ class PatientService {
       'height': _s(j['height']),
       'weight': _s(j['weight']),
       'barangay': _s(j['barangay']),
+      // The admin's decision on whether to keep checking this person (or null).
+      'follow_up': FollowUp.from(j['follow_up'])?.toMap(),
     };
   }
 }

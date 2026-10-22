@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/follow_up.dart';
 import '../core/patient_service.dart';
 import '../core/theme.dart';
 import '../widgets/app_toast.dart';
@@ -7,6 +8,7 @@ import '../widgets/auth_widgets.dart';
 import '../widgets/confirm_modal.dart';
 import '../widgets/loading_overlay.dart';
 import '../widgets/patient_form.dart';
+import 'global_state.dart';
 
 class AddPatientScreen extends StatefulWidget {
   const AddPatientScreen({super.key, this.barangay});
@@ -40,20 +42,36 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
       return;
     }
 
+    final form = _c.toMap();
+    final known = FollowUp.forPerson(
+      globalPatients,
+      name: '${form['name']}',
+      contact: '${form['contact']}',
+    );
+    final stopped = known != null && known.isStop;
+
     final confirmed = await ConfirmModal.show(
       context: context,
-      icon: Icons.person_add_alt_1_rounded,
-      color: AppTheme.blue,
-      title: 'Save this patient record?',
-      description: "The record will be saved to the Go Bike patient log.",
-      confirmText: 'Save',
+      icon: stopped
+          ? Icons.info_outline_rounded
+          : Icons.person_add_alt_1_rounded,
+      color: stopped ? AppTheme.orange : AppTheme.blue,
+      title: stopped
+          ? 'No regular check-ups needed'
+          : 'Save this patient record?',
+      description: stopped
+          ? 'The admin decided ${form['name']} no longer needs to be checked '
+                'every ronda.${known.note != null ? ' “${known.note}”' : ''} '
+                'Save a new check-up anyway?'
+          : "The record will be saved to the Go Bike patient log.",
+      confirmText: stopped ? 'Save anyway' : 'Save',
       onConfirm: () {},
     );
     if (confirmed != true || !mounted) return;
 
     setState(() => _saving = true);
     final result = await PatientService.instance.create(
-      _c.toMap(),
+      form,
       barangay: widget.barangay,
     );
     if (!mounted) return;
