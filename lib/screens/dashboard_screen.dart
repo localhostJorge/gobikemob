@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+import '../core/announcements.dart';
 import '../core/auth_service.dart';
 import '../core/emergency_flow.dart';
 import '../core/emergency_watcher.dart';
@@ -17,6 +18,7 @@ import '../widgets/loading_overlay.dart';
 import '../widgets/profile_panel.dart';
 import '../widgets/slide_to_start.dart';
 import 'active_ronda_screen.dart';
+import 'announcements_screen.dart';
 import 'global_state.dart';
 import 'patient_management_screen.dart';
 import '../core/ronda_store.dart';
@@ -36,11 +38,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   bool _profileOpen = false;
   SavedRonda? _savedRonda; // a ronda that was left open (app was closed/killed)
 
-  // TODO(api): the schedule and announcement should come from the server.
+  // TODO(api): the schedule should come from the server.
   static const String _sampleSchedule = '8:00 AM - 12:00 PM';
-  static const String _sampleAnnouncementTitle = 'Ronda Schedule Update';
-  static const String _sampleAnnouncementBody =
-      "Tomorrow's Ronda will start at 7:30 AM instead of 8:00 AM.";
 
   @override
   void initState() {
@@ -48,7 +47,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     WidgetsBinding.instance.addObserver(this);
     _loadSavedRonda();
     FollowUpAlerts.instance.refresh(); // admin decisions about patients
-    EmergencyWatcher.instance.load(); // an emergency the admin may have answered
+    EmergencyWatcher.instance
+        .load(); // an emergency the admin may have answered
+    Announcements.instance.refresh(); // what the admin announced
   }
 
   @override
@@ -63,6 +64,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (state == AppLifecycleState.resumed && mounted) {
       setState(() {});
       FollowUpAlerts.instance.refresh();
+      Announcements.instance.refresh();
       if (EmergencyWatcher.instance.isOpen) EmergencyWatcher.instance.check();
     }
   }
@@ -528,43 +530,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _sectionTitle('ANNOUNCEMENTS', muted),
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: _cardDecoration(theme),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _iconBadge(
-                                    Icons.campaign_rounded,
-                                    AppTheme.orange,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          _sampleAnnouncementTitle,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          _sampleAnnouncementBody,
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            height: 1.4,
-                                            color: muted,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            ListenableBuilder(
+                              listenable: Announcements.instance,
+                              builder: (context, _) =>
+                                  _announcementsSection(theme, muted),
                             ),
                           ],
                         ),
@@ -933,6 +902,67 @@ class _DashboardScreenState extends State<DashboardScreen>
           ],
         ),
       ),
+    );
+  }
+
+  /// The admin's announcements: the newest one, a count of the rest, and a "New" tag.
+  Widget _announcementsSection(ThemeData theme, Color muted) {
+    final announcements = Announcements.instance;
+    final latest = announcements.latest;
+    final more = announcements.items.length - 1;
+    final unseen = announcements.unseenCount;
+
+    return InkWell(
+      onTap: _openAnnouncements,
+      borderRadius: BorderRadius.circular(16),
+      child: latest == null
+          ? Container(
+              padding: const EdgeInsets.all(16),
+              decoration: _cardDecoration(theme),
+              child: Row(
+                children: [
+                  _iconBadge(Icons.campaign_outlined, muted),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'No announcements right now. Messages from the admin will appear here.',
+                      style: TextStyle(fontSize: 13, height: 1.4, color: muted),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AnnouncementCard(
+                  announcement: latest,
+                  isNew: announcements.isNew(latest),
+                  maxLines: 3,
+                ),
+                if (more > 0)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                    child: Text(
+                      unseen > 1
+                          ? '$more more · $unseen new — tap to read all'
+                          : '$more more — tap to read all',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.blue,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+    );
+  }
+
+  void _openAnnouncements() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AnnouncementsScreen()),
     );
   }
 

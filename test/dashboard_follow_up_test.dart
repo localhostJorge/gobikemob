@@ -55,7 +55,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: DashboardScreen()));
     await tester.pump(const Duration(seconds: 2));
 
-    expect(find.textContaining('from the admin'), findsNothing);
+    expect(find.textContaining('updates from the admin'), findsNothing);
   });
 
   testWidgets('the dashboard shows where an emergency stands', (tester) async {

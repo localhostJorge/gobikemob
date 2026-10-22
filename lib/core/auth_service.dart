@@ -18,6 +18,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
 import 'api_config.dart';
+import 'announcements.dart';
 import 'emergency_watcher.dart';
 import 'follow_up_alerts.dart';
 
@@ -442,6 +443,7 @@ class AuthService {
     await _clearLocalSession();
     await EmergencyWatcher.instance.reset(); // another account must not inherit it
     FollowUpAlerts.instance.reset();
+    await Announcements.instance.reset();
     try {
       await GoogleSignIn.instance.signOut();
     } catch (_) {}
