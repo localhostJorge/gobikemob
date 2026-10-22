@@ -87,9 +87,12 @@ class FollowUpBanner extends StatelessWidget {
 
 /// A small tag for lists: "Stop checking" or "Keep checking".
 class FollowUpChip extends StatelessWidget {
-  const FollowUpChip({super.key, required this.followUp});
+  const FollowUpChip({super.key, required this.followUp, this.isNew = false});
 
   final FollowUp followUp;
+
+  /// The GoBiker has not seen this decision yet.
+  final bool isNew;
 
   @override
   Widget build(BuildContext context) {
@@ -100,13 +103,29 @@ class FollowUpChip extends StatelessWidget {
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Text(
-        followUp.label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isNew) ...[
+            Container(
+              width: 7,
+              height: 7,
+              decoration: const BoxDecoration(
+                color: AppTheme.errorRed,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 5),
+          ],
+          Text(
+            isNew ? 'New · ${followUp.label}' : followUp.label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/follow_up.dart';
+import '../core/follow_up_alerts.dart';
 import '../core/patient_service.dart';
 import '../core/theme.dart';
 import '../widgets/app_toast.dart';
@@ -24,6 +25,15 @@ class _ViewPatientScreenState extends State<ViewPatientScreen> {
   bool _editing = false;
   bool _busy = false;
   String _busyMessage = 'Saving...';
+
+  @override
+  void initState() {
+    super.initState();
+    // Opening the record means the admin's decision has been seen.
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => FollowUpAlerts.instance.markSeen(widget.patient),
+    );
+  }
 
   @override
   void dispose() {

@@ -15,6 +15,10 @@ class FollowUp {
 
   String get label => isStop ? 'Stop checking' : 'Keep checking';
 
+  /// Identifies this exact decision. It changes when the admin decides again.
+  String get signature =>
+      '$decision|${decidedAt?.toUtc().toIso8601String() ?? ''}';
+
   /// Reads the `follow_up` value of a patient map; null when there is no decision.
   static FollowUp? from(dynamic raw) {
     if (raw is FollowUp) return raw;
@@ -43,10 +47,10 @@ class FollowUp {
     required String name,
     required String contact,
   }) {
-    final key = _personKey(name, contact);
+    final key = personKey(name, contact);
     if (key == '|') return null;
     for (final patient in known) {
-      final patientKey = _personKey(
+      final patientKey = personKey(
         '${patient['name'] ?? ''}',
         '${patient['contact'] ?? ''}',
       );
@@ -57,7 +61,7 @@ class FollowUp {
     return null;
   }
 
-  // Same rule as the server: name ignoring case and spaces + contact number.
-  static String _personKey(String name, String contact) =>
+  /// Same rule as the server: name ignoring case and spaces + contact number.
+  static String personKey(String name, String contact) =>
       '${name.trim().toLowerCase()}|${contact.trim()}';
 }

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../core/auth_service.dart';
 import '../core/follow_up.dart';
+import '../core/follow_up_alerts.dart';
 import '../core/patient_service.dart';
 import '../core/theme.dart';
 import '../widgets/app_toast.dart';
@@ -56,6 +57,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
           ..clear()
           ..addAll(result.data!);
         _error = null;
+        FollowUpAlerts.instance.sync(globalPatients);
       } else {
         _error = result.error;
       }
@@ -115,6 +117,11 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
   // ----------------------------------------------------------------- actions
 
   Future<void> _openPatientViewer(Map<String, dynamic> patient) async {
+    // Looking at the record means the admin's decision has been seen.
+    await FollowUpAlerts.instance.markSeen(patient);
+    if (!mounted) return;
+    setState(() {});
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -568,7 +575,12 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
                                 if (FollowUp.from(items[i]['follow_up'])
                                     case final followUp?) ...[
                                   const SizedBox(height: 6),
-                                  FollowUpChip(followUp: followUp),
+                                  FollowUpChip(
+                                    followUp: followUp,
+                                    isNew: FollowUpAlerts.instance.isNew(
+                                      items[i],
+                                    ),
+                                  ),
                                 ],
                               ],
                             ),

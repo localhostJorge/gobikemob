@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../core/auth_service.dart';
 import '../core/emergency_flow.dart';
+import '../core/follow_up_alerts.dart';
 import '../core/greeting.dart';
 import '../core/theme.dart';
 import '../core/tracking_service.dart';
@@ -44,6 +45,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadSavedRonda();
+    FollowUpAlerts.instance.refresh(); // admin decisions about patients
   }
 
   @override
@@ -55,7 +57,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Refresh the greeting when the app comes back to the foreground.
-    if (state == AppLifecycleState.resumed && mounted) setState(() {});
+    if (state == AppLifecycleState.resumed && mounted) {
+      setState(() {});
+      FollowUpAlerts.instance.refresh();
+    }
   }
 
   // ------------------------------------------------------------------ actions
@@ -154,6 +159,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       MaterialPageRoute(builder: (context) => const PatientManagementScreen()),
     ).then((_) {
       if (mounted) setState(() {});
+      FollowUpAlerts.instance.refresh();
     });
   }
 
@@ -461,15 +467,24 @@ class _DashboardScreenState extends State<DashboardScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _sectionTitle('QUICK ACTIONS', muted),
+                            ListenableBuilder(
+                              listenable: FollowUpAlerts.instance,
+                              builder: (context, _) =>
+                                  _followUpNotice(theme, muted),
+                            ),
                             Row(
                               children: [
                                 Expanded(
-                                  child: _quickAction(
-                                    theme,
-                                    icon: Icons.people_alt_rounded,
-                                    color: AppTheme.blue,
-                                    label: 'Patients',
-                                    onTap: _openPatients,
+                                  child: ListenableBuilder(
+                                    listenable: FollowUpAlerts.instance,
+                                    builder: (context, _) => _quickAction(
+                                      theme,
+                                      icon: Icons.people_alt_rounded,
+                                      color: AppTheme.blue,
+                                      label: 'Patients',
+                                      badge: FollowUpAlerts.instance.count,
+                                      onTap: _openPatients,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -875,6 +890,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     required Color color,
     required String label,
     required VoidCallback onTap,
+    int badge = 0,
   }) {
     return InkWell(
       onTap: onTap,
@@ -884,14 +900,21 @@ class _DashboardScreenState extends State<DashboardScreen>
         decoration: _cardDecoration(theme),
         child: Column(
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: color, size: 26),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: color, size: 26),
+                ),
+                if (badge > 0)
+                  Positioned(top: -6, right: -8, child: _CountBadge(badge)),
+              ],
             ),
             const SizedBox(height: 10),
             Text(
@@ -901,6 +924,57 @@ class _DashboardScreenState extends State<DashboardScreen>
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// "Admin update": patients the admin decided about, until the GoBiker looks.
+  Widget _followUpNotice(ThemeData theme, Color muted) {
+    final count = FollowUpAlerts.instance.count;
+    if (count == 0) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: _openPatients,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppTheme.blue.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.blue.withValues(alpha: 0.35)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.campaign_rounded, color: AppTheme.blue),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      count == 1
+                          ? '1 update from the admin'
+                          : '$count updates from the admin',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'The admin decided whether to keep checking '
+                      '${count == 1 ? 'a patient' : 'some patients'}. Tap to see.',
+                      style: TextStyle(fontSize: 12, color: muted),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: muted),
+            ],
+          ),
         ),
       ),
     );
@@ -923,12 +997,16 @@ class _DashboardScreenState extends State<DashboardScreen>
             muted: muted,
             onTap: () {},
           ),
-          _NavItem(
-            icon: Icons.people_alt_rounded,
-            label: 'Patients',
-            selected: false,
-            muted: muted,
-            onTap: _openPatients,
+          ListenableBuilder(
+            listenable: FollowUpAlerts.instance,
+            builder: (context, _) => _NavItem(
+              icon: Icons.people_alt_rounded,
+              label: 'Patients',
+              selected: false,
+              muted: muted,
+              badge: FollowUpAlerts.instance.count,
+              onTap: _openPatients,
+            ),
           ),
           _NavItem(
             icon: Icons.person_rounded,
@@ -950,6 +1028,7 @@ class _NavItem extends StatelessWidget {
     required this.selected,
     required this.muted,
     required this.onTap,
+    this.badge = 0,
   });
 
   final IconData icon;
@@ -957,6 +1036,7 @@ class _NavItem extends StatelessWidget {
   final bool selected;
   final Color muted;
   final VoidCallback onTap;
+  final int badge;
 
   @override
   Widget build(BuildContext context) {
@@ -977,7 +1057,14 @@ class _NavItem extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 26, color: color),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(icon, size: 26, color: color),
+                  if (badge > 0)
+                    Positioned(top: -4, right: -10, child: _CountBadge(badge)),
+                ],
+              ),
               const SizedBox(height: 2),
               Text(
                 label,
@@ -1184,6 +1271,36 @@ class _MessageAdminSheetState extends State<_MessageAdminSheet> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Red bubble with a number, for "something new here".
+class _CountBadge extends StatelessWidget {
+  const _CountBadge(this.count);
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppTheme.errorRed,
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: Theme.of(context).cardColor, width: 1.5),
+      ),
+      child: Text(
+        count > 9 ? '9+' : '$count',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          height: 1,
         ),
       ),
     );
