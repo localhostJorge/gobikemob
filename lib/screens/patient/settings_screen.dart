@@ -137,9 +137,8 @@ class SettingsTab extends StatelessWidget {
                 builder: (context, snap) => _NavTile(
                   icon: Icons.info_outline_rounded,
                   title: 'RondaGo',
-                  // Same numbers testers see in App Tester, e.g. "1.0.1 (3)".
                   subtitle: snap.hasData
-                      ? 'Version ${snap.data!.version} (${snap.data!.buildNumber})'
+                      ? 'Version ${snap.data!.version}'
                       : 'Version',
                 ),
               ),

@@ -10,7 +10,10 @@
   3. Builds the APK against the hosted API.
   4. Uploads it to Firebase App Distribution for the tester group. Testers get the update
      in the Firebase App Tester app or by email.
-  5. Commits the new build number and tags the release (release-<version>-<build>).
+  5. Commits the new version and tags the release (release-<version>).
+
+  People only ever see the version (e.g. 1.0.3). The build number after the "+" in
+  pubspec.yaml is for Android alone and is never shown in notes, commits or the app.
 
 .EXAMPLE
   .\scripts\release.ps1
@@ -75,7 +78,7 @@ $build = [int]$match.Groups[2].Value + 1
 $version = "$versionName+$build"
 $pubspec = $pubspec.Remove($match.Index, $match.Length).Insert($match.Index, "version: $version")
 [IO.File]::WriteAllText($pubspecPath, $pubspec, (New-Object Text.UTF8Encoding $false))
-Write-Host "release: building RondaGo $version" -ForegroundColor Cyan
+Write-Host "release: building RondaGo $versionName" -ForegroundColor Cyan
 
 # ---- 2. build ---------------------------------------------------------------
 Invoke-Checked 'flutter build' { flutter build apk --release "--dart-define=API_BASE_URL=$ApiBaseUrl" }
@@ -88,10 +91,10 @@ if (-not $Notes) {
     $lastTag = (git tag --list 'release-*' --sort=-creatordate | Select-Object -First 1)
     $range = if ($lastTag) { "$lastTag..HEAD" } else { 'HEAD~10..HEAD' }
     $Notes = (git log $range --no-merges --format='- %s') -join "`n"
-    if (-not $Notes) { $Notes = "RondaGo $version" }
+    if (-not $Notes) { $Notes = "RondaGo $versionName" }
 }
 $notesFile = Join-Path $env:TEMP "rondago-release-notes-$build.txt"
-[IO.File]::WriteAllText($notesFile, "RondaGo $version`n`n$Notes", (New-Object Text.UTF8Encoding $false))
+[IO.File]::WriteAllText($notesFile, "RondaGo $versionName`n`n$Notes", (New-Object Text.UTF8Encoding $false))
 
 # ---- 4. upload --------------------------------------------------------------
 # The ~55 MB upload sometimes drops on a slow connection, so try a few times.
@@ -105,9 +108,11 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
 }
 
 # ---- 5. record the release --------------------------------------------------
-$tag = "release-$versionName-$build"
-Invoke-Checked 'git commit' { git add pubspec.yaml; git commit -q -m "chore(release): RondaGo $version" }
+# Same version released again (-KeepVersionName): keep the tags unique.
+$tag = "release-$versionName"
+if (git tag --list $tag) { $tag = "release-$versionName-$build" }
+Invoke-Checked 'git commit' { git add pubspec.yaml; git commit -q -m "chore(release): RondaGo $versionName" }
 Invoke-Checked 'git tag' { git tag $tag }
 
-Write-Host "release: RondaGo $version sent to '$TesterGroups' and tagged $tag." -ForegroundColor Green
+Write-Host "release: RondaGo $versionName sent to '$TesterGroups' and tagged $tag." -ForegroundColor Green
 Write-Host 'release: push when ready: git push; git push --tags'
