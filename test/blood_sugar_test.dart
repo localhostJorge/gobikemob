@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:go_bike_app/screens/patient/visit_details_screen.dart';
-import 'package:go_bike_app/screens/patient/visit_record.dart';
 import 'package:go_bike_app/screens/patient/vital_status.dart';
 import 'package:go_bike_app/widgets/patient_form.dart';
+
+import 'fixtures/sample_visits.dart';
 
 Widget _form(PatientFormControllers c, GlobalKey<FormState> key) => MaterialApp(
   home: Scaffold(

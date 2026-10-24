@@ -103,6 +103,10 @@ class PatientService {
     'blood_sugar': '${f['blood_sugar'] ?? ''}'.trim().isEmpty
         ? null
         : f['blood_sugar'],
+    // Optional; an empty field clears old remarks.
+    'remarks': '${f['remarks'] ?? ''}'.trim().isEmpty
+        ? null
+        : '${f['remarks']}'.trim(),
     if (barangay != null && barangay.isNotEmpty) 'barangay': barangay,
   };
 
@@ -130,6 +134,7 @@ class PatientService {
       'resp': _s(j['resp']),
       'temp': _s(j['temp']),
       'blood_sugar': _s(j['blood_sugar']),
+      'remarks': _s(j['remarks']),
       'barangay': _s(j['barangay']),
       // The admin's decision on whether to keep checking this person (or null).
       'follow_up': FollowUp.from(j['follow_up'])?.toMap(),

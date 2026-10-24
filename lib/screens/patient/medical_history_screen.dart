@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
 
+import '../../core/resident_visits.dart';
 import 'app_colors.dart';
 import 'visit_details_screen.dart';
 import 'visit_record.dart';
+import 'visits_status.dart';
 import 'vital_status.dart';
 
 /// Read-only list of the patient's GoBiker check-ups, newest first.
 class MedicalHistoryScreen extends StatelessWidget {
-  final List<VisitRecord> visits;
-
-  const MedicalHistoryScreen({super.key, required this.visits});
+  const MedicalHistoryScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final sorted = [...visits]..sort((a, b) => b.date.compareTo(a.date));
-
+    final store = ResidentVisits.instance;
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -36,32 +35,66 @@ class MedicalHistoryScreen extends StatelessWidget {
         ),
       ),
       body: SafeArea(
-        child: sorted.isEmpty
-            ? const _EmptyState()
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                children: [
-                  _LatestCard(record: sorted.first),
-                  const SizedBox(height: 22),
-                  const Text(
-                    'Visit History',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textDark,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  for (final v in sorted)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _VisitCard(record: v),
-                    ),
-                  const SizedBox(height: 6),
-                  const ScreeningNote(),
-                ],
-              ),
+        child: ListenableBuilder(
+          listenable: store,
+          builder: (context, _) {
+            if (!store.loaded && store.loading) return const VisitsLoading();
+            if (!store.loaded && store.error != null) {
+              return VisitsLoadError(
+                message: store.error!,
+                onRetry: store.load,
+              );
+            }
+            return RefreshIndicator(
+              color: AppColors.red,
+              onRefresh: store.load,
+              child: _list(store),
+            );
+          },
+        ),
       ),
+    );
+  }
+
+  Widget _list(ResidentVisits store) {
+    final sorted = [...store.visits]..sort((a, b) => b.date.compareTo(a.date));
+    final banner = store.error == null
+        ? null
+        : VisitsErrorBanner(message: store.error!, onRetry: store.load);
+
+    if (sorted.isEmpty) {
+      // Still scrollable, so pull-to-refresh works on the empty state too.
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        children: [?banner, const SizedBox(height: 60), const _EmptyState()],
+      );
+    }
+
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        ?banner,
+        _LatestCard(record: sorted.first),
+        const SizedBox(height: 22),
+        const Text(
+          'Visit History',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textDark,
+          ),
+        ),
+        const SizedBox(height: 10),
+        for (final v in sorted)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _VisitCard(record: v),
+          ),
+        const SizedBox(height: 6),
+        const ScreeningNote(),
+      ],
     );
   }
 }

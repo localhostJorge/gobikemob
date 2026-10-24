@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
 
+import '../../core/resident_visits.dart';
 import 'app_colors.dart';
 import 'patient_store.dart';
 import 'patient_ui.dart';
 import 'visit_details_screen.dart';
 import 'visit_record.dart';
+import 'visits_status.dart';
 
 enum _Filter { all, checkups, appointments, sos }
 
 extension on _Filter {
   String get label => switch (this) {
-        _Filter.all => 'All',
-        _Filter.checkups => 'Check-ups',
-        _Filter.appointments => 'Appointments',
-        _Filter.sos => 'SOS',
-      };
+    _Filter.all => 'All',
+    _Filter.checkups => 'Check-ups',
+    _Filter.appointments => 'Appointments',
+    _Filter.sos => 'SOS',
+  };
 }
 
 class _Item {
@@ -28,11 +30,9 @@ class _Item {
 }
 
 /// Everything that happened on the patient's account, newest first:
-/// check-ups (and updates), appointments and SOS requests.
+/// check-ups (and updates, from the server), appointments and SOS requests.
 class HistoryTab extends StatefulWidget {
-  final List<VisitRecord> visits;
-
-  const HistoryTab({super.key, required this.visits});
+  const HistoryTab({super.key});
 
   @override
   State<HistoryTab> createState() => _HistoryTabState();
@@ -45,7 +45,7 @@ class _HistoryTabState extends State<HistoryTab> {
     final items = <_Item>[
       for (final a in PatientStore.instance.activities)
         _Item(a.type, a.title, a.subtitle, a.time),
-      for (final v in widget.visits) ...[
+      for (final v in ResidentVisits.instance.visits) ...[
         _Item(
           ActivityType.checkup,
           'Check-up recorded',
@@ -68,12 +68,12 @@ class _HistoryTabState extends State<HistoryTab> {
   }
 
   bool _matches(_Item i) => switch (_filter) {
-        _Filter.all => true,
-        _Filter.checkups => i.type == ActivityType.checkup ||
-            i.type == ActivityType.checkupUpdated,
-        _Filter.appointments => i.type == ActivityType.appointment,
-        _Filter.sos => i.type == ActivityType.sos,
-      };
+    _Filter.all => true,
+    _Filter.checkups =>
+      i.type == ActivityType.checkup || i.type == ActivityType.checkupUpdated,
+    _Filter.appointments => i.type == ActivityType.appointment,
+    _Filter.sos => i.type == ActivityType.sos,
+  };
 
   String _dayLabel(DateTime d) {
     final now = DateTime.now();
@@ -87,30 +87,44 @@ class _HistoryTabState extends State<HistoryTab> {
 
   @override
   Widget build(BuildContext context) {
+    final visits = ResidentVisits.instance;
     return ListenableBuilder(
-      listenable: PatientStore.instance,
+      listenable: Listenable.merge([PatientStore.instance, visits]),
       builder: (context, _) {
         final items = _items().where(_matches).toList();
+        final firstLoad = !visits.loaded;
 
         final children = <Widget>[];
         String? lastLabel;
         for (final item in items) {
           final label = _dayLabel(item.time);
           if (label != lastLabel) {
-            children.add(Padding(
-              padding: EdgeInsets.fromLTRB(4, lastLabel == null ? 4 : 14, 4, 8),
-              child: Text(label,
+            children.add(
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  4,
+                  lastLabel == null ? 4 : 14,
+                  4,
+                  8,
+                ),
+                child: Text(
+                  label,
                   style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textMuted)),
-            ));
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ),
+            );
             lastLabel = label;
           }
-          children.add(Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _Tile(item: item),
-          ));
+          children.add(
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _Tile(item: item),
+            ),
+          );
         }
 
         return Column(
@@ -118,11 +132,14 @@ class _HistoryTabState extends State<HistoryTab> {
           children: [
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 16, 20, 10),
-              child: Text('History',
-                  style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textDark)),
+              child: Text(
+                'History',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textDark,
+                ),
+              ),
             ),
             SizedBox(
               height: 40,
@@ -159,11 +176,28 @@ class _HistoryTabState extends State<HistoryTab> {
             ),
             const SizedBox(height: 8),
             Expanded(
-              child: items.isEmpty
-                  ? const _Empty()
-                  : ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                      children: children,
+              child: firstLoad && visits.loading
+                  ? const VisitsLoading()
+                  : firstLoad && visits.error != null && items.isEmpty
+                  ? VisitsLoadError(
+                      message: visits.error!,
+                      onRetry: visits.load,
+                    )
+                  : RefreshIndicator(
+                      color: AppColors.red,
+                      onRefresh: visits.load,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                        children: [
+                          if (visits.error != null)
+                            VisitsErrorBanner(
+                              message: visits.error!,
+                              onRetry: visits.load,
+                            ),
+                          if (items.isEmpty) const _Empty() else ...children,
+                        ],
+                      ),
                     ),
             ),
           ],
@@ -174,14 +208,20 @@ class _HistoryTabState extends State<HistoryTab> {
 }
 
 ({IconData icon, Color color}) _style(ActivityType t) => switch (t) {
-      ActivityType.sos => (icon: Icons.emergency_rounded, color: AppColors.red),
-      ActivityType.appointment =>
-        (icon: Icons.calendar_month_rounded, color: AppColors.orange),
-      ActivityType.checkup =>
-        (icon: Icons.monitor_heart_outlined, color: AppColors.blue),
-      ActivityType.checkupUpdated =>
-        (icon: Icons.edit_note_rounded, color: AppColors.blue),
-    };
+  ActivityType.sos => (icon: Icons.emergency_rounded, color: AppColors.red),
+  ActivityType.appointment => (
+    icon: Icons.calendar_month_rounded,
+    color: AppColors.orange,
+  ),
+  ActivityType.checkup => (
+    icon: Icons.monitor_heart_outlined,
+    color: AppColors.blue,
+  ),
+  ActivityType.checkupUpdated => (
+    icon: Icons.edit_note_rounded,
+    color: AppColors.blue,
+  ),
+};
 
 class _Tile extends StatelessWidget {
   final _Item item;
@@ -201,11 +241,11 @@ class _Tile extends StatelessWidget {
           onTap: visit == null
               ? null
               : () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => VisitDetailsScreen(record: visit),
-                    ),
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => VisitDetailsScreen(record: visit),
                   ),
+                ),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
@@ -224,23 +264,34 @@ class _Tile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(item.title,
-                          style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textDark)),
+                      Text(
+                        item.title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textDark,
+                        ),
+                      ),
                       if (item.subtitle.isNotEmpty) ...[
                         const SizedBox(height: 2),
-                        Text(item.subtitle,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 12, color: AppColors.textMuted)),
+                        Text(
+                          item.subtitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
                       ],
                       const SizedBox(height: 4),
-                      Text(formatTime(item.time),
-                          style: const TextStyle(
-                              fontSize: 11.5, color: AppColors.textMuted)),
+                      Text(
+                        formatTime(item.time),
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -268,11 +319,14 @@ class _Empty extends StatelessWidget {
           children: [
             Icon(Icons.history_rounded, size: 56, color: AppColors.textMuted),
             SizedBox(height: 14),
-            Text('Nothing here yet',
-                style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textDark)),
+            Text(
+              'Nothing here yet',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textDark,
+              ),
+            ),
             SizedBox(height: 6),
             Text(
               'Check-ups, appointments and SOS requests will show up here.',

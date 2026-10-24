@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../auth_database.dart';
+import '../../core/auth_service.dart';
 
 enum ActivityType { sos, appointment, checkup, checkupUpdated }
 
@@ -24,26 +24,26 @@ class ActivityEntry {
   });
 
   Map<String, dynamic> toJson() => {
-        'type': type.name,
-        'title': title,
-        'subtitle': subtitle,
-        'time': time.toIso8601String(),
-      };
+    'type': type.name,
+    'title': title,
+    'subtitle': subtitle,
+    'time': time.toIso8601String(),
+  };
 
   factory ActivityEntry.fromJson(Map<String, dynamic> j) => ActivityEntry(
-        type: ActivityType.values.firstWhere(
-          (t) => t.name == j['type'],
-          orElse: () => ActivityType.sos,
-        ),
-        title: j['title'] as String? ?? '',
-        subtitle: j['subtitle'] as String? ?? '',
-        time: DateTime.tryParse(j['time'] as String? ?? '') ?? DateTime.now(),
-      );
+    type: ActivityType.values.firstWhere(
+      (t) => t.name == j['type'],
+      orElse: () => ActivityType.sos,
+    ),
+    title: j['title'] as String? ?? '',
+    subtitle: j['subtitle'] as String? ?? '',
+    time: DateTime.tryParse(j['time'] as String? ?? '') ?? DateTime.now(),
+  );
 }
 
-/// Holds everything the patient side needs to remember on this device:
-/// profile info, profile photo, notification preferences and activity log.
-/// Data is stored per logged-in user.
+/// Holds what the patient side shows: the profile (from the signed-in
+/// account) plus what is remembered on this device (photo, notification
+/// preferences, activity log), stored per user.
 class PatientStore extends ChangeNotifier {
   PatientStore._();
   static final PatientStore instance = PatientStore._();
@@ -79,8 +79,8 @@ class PatientStore extends ChangeNotifier {
   /// Call after login (the dashboard does this in initState).
   Future<void> load() async {
     final p = await _p();
-    _uid = AuthDatabase.instance.currentUserId ?? 0;
-    await _readProfile();
+    _uid = AuthService.instance.currentUser?.id ?? 0;
+    _readProfile();
 
     final photo = p.getString(_k('photo'));
     photoPath = (photo != null && File(photo).existsSync()) ? photo : null;
@@ -89,22 +89,25 @@ class PatientStore extends ChangeNotifier {
       _toggles[e.key] = p.getBool(_k('t_${e.key}')) ?? e.value;
     }
     activities = (p.getStringList(_k('activity')) ?? const <String>[])
-        .map((s) => ActivityEntry.fromJson(jsonDecode(s) as Map<String, dynamic>))
+        .map(
+          (s) => ActivityEntry.fromJson(jsonDecode(s) as Map<String, dynamic>),
+        )
         .toList();
     notifyListeners();
   }
 
-  Future<void> _readProfile() async {
-    final row = await AuthDatabase.instance.currentUserRow();
-    if (row == null) return;
-    fullName = row['full_name'] as String?;
-    email = row['email'] as String?;
-    mobile = row['mobile'] as String?;
-    barangay = row['barangay'] as String?;
+  void _readProfile() {
+    final user = AuthService.instance.currentUser;
+    if (user == null) return;
+    fullName = user.name;
+    email = user.email;
+    mobile = user.mobile;
+    barangay = user.barangay;
   }
 
-  Future<void> refreshProfile() async {
-    await _readProfile();
+  /// Call after the profile was saved on the server.
+  void refreshProfile() {
+    _readProfile();
     notifyListeners();
   }
 

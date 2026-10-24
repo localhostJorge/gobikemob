@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'app_colors.dart';
 import 'notification_settings_screen.dart';
@@ -25,8 +26,7 @@ class SettingsTab extends StatelessWidget {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Clear',
-                style: TextStyle(color: AppColors.red)),
+            child: const Text('Clear', style: TextStyle(color: AppColors.red)),
           ),
         ],
       ),
@@ -52,11 +52,14 @@ class SettingsTab extends StatelessWidget {
           children: [
             const Padding(
               padding: EdgeInsets.fromLTRB(4, 0, 4, 8),
-              child: Text('Settings',
-                  style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textDark)),
+              child: Text(
+                'Settings',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textDark,
+                ),
+              ),
             ),
             _label('Notifications'),
             _card([
@@ -79,17 +82,22 @@ class SettingsTab extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Hold time',
-                        style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textDark)),
+                    const Text(
+                      'Hold time',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textDark,
+                      ),
+                    ),
                     const SizedBox(height: 2),
                     const Text(
                       'How long you press and hold the SOS button before it '
                       'activates. Longer holds prevent accidental alerts.',
                       style: TextStyle(
-                          fontSize: 12, color: AppColors.textMuted),
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     SizedBox(
@@ -124,10 +132,16 @@ class SettingsTab extends StatelessWidget {
             ]),
             _label('About'),
             _card([
-              const _NavTile(
-                icon: Icons.info_outline_rounded,
-                title: 'RondaGo',
-                subtitle: 'Version 1.0.0',
+              FutureBuilder<PackageInfo>(
+                future: PackageInfo.fromPlatform(),
+                builder: (context, snap) => _NavTile(
+                  icon: Icons.info_outline_rounded,
+                  title: 'RondaGo',
+                  // Same numbers testers see in App Tester, e.g. "1.0.1 (3)".
+                  subtitle: snap.hasData
+                      ? 'Version ${snap.data!.version} (${snap.data!.buildNumber})'
+                      : 'Version',
+                ),
               ),
             ]),
           ],
@@ -137,18 +151,21 @@ class SettingsTab extends StatelessWidget {
   }
 
   Widget _label(String text) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 14, 4, 8),
-        child: Text(text,
-            style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textMuted)),
-      );
+    padding: const EdgeInsets.fromLTRB(4, 14, 4, 8),
+    child: Text(
+      text,
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w800,
+        color: AppColors.textMuted,
+      ),
+    ),
+  );
 
   Widget _card(List<Widget> children) => Container(
-        decoration: cardDecoration(),
-        child: Column(children: children),
-      );
+    decoration: cardDecoration(),
+    child: Column(children: children),
+  );
 }
 
 class _NavTile extends StatelessWidget {
@@ -177,14 +194,18 @@ class _NavTile extends StatelessWidget {
         ),
         child: Icon(icon, color: AppColors.red, size: 20),
       ),
-      title: Text(title,
-          style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textDark)),
-      subtitle: Text(subtitle,
-          style:
-              const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textDark,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+      ),
       trailing: onTap == null
           ? null
           : const Icon(Icons.chevron_right, color: AppColors.textMuted),

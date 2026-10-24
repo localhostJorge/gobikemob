@@ -21,6 +21,7 @@ import 'api_config.dart';
 import 'announcements.dart';
 import 'emergency_watcher.dart';
 import 'follow_up_alerts.dart';
+import 'resident_visits.dart';
 
 /// The logged-in person, as returned by the Laravel API.
 class AppUser {
@@ -293,6 +294,50 @@ class AuthService {
     return (ok: true, message: '');
   }
 
+  /// Updates a resident's name, mobile number and barangay.
+  Future<({bool ok, String message})> updateResidentProfile({
+    required String name,
+    required String mobile,
+    required String barangay,
+  }) async {
+    final res = await _request(
+      'PUT',
+      '/resident/profile',
+      body: {
+        'name': name.trim(),
+        'mobile': mobile.trim(),
+        'barangay': barangay,
+      },
+      auth: true,
+    );
+    if (!res.ok) return (ok: false, message: res.errorMessage);
+
+    final userJson = res.body['user'];
+    if (userJson is! Map<String, dynamic>) {
+      return (ok: false, message: 'Unexpected response from the server.');
+    }
+    _user = AppUser.fromJson(userJson);
+    return (ok: true, message: '');
+  }
+
+  /// Changes the password of any signed-in user. Other phones are signed out.
+  Future<({bool ok, String message})> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final res = await _request(
+      'PUT',
+      '/mobile/password',
+      body: {
+        'current_password': currentPassword,
+        'password': newPassword,
+        'password_confirmation': newPassword,
+      },
+      auth: true,
+    );
+    return (ok: res.ok, message: res.ok ? '' : res.errorMessage);
+  }
+
   Future<void> _clearLocalSession() async {
     _token = null;
     _user = null;
@@ -440,9 +485,11 @@ class AuthService {
       await _request('POST', '/mobile/logout', auth: true); // result ignored
     }
     await _clearLocalSession();
-    await EmergencyWatcher.instance.reset(); // another account must not inherit it
+    await EmergencyWatcher.instance
+        .reset(); // another account must not inherit it
     FollowUpAlerts.instance.reset();
     await Announcements.instance.reset();
+    ResidentVisits.instance.reset();
     try {
       await GoogleSignIn.instance.signOut();
     } catch (_) {}

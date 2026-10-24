@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/auth_service.dart';
+import '../../core/resident_visits.dart';
 import 'app_colors.dart';
 import 'emergency_request_screen.dart';
 import 'history_screen.dart';
@@ -11,7 +12,6 @@ import 'profile.dart';
 import 'profile_avatar.dart';
 import 'settings_screen.dart';
 import 'sos_button.dart';
-import 'visit_record.dart';
 
 class ResidentDashboardScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -30,16 +30,15 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   void initState() {
     super.initState();
     PatientStore.instance.load();
+    ResidentVisits.instance.load();
   }
 
   String get _patientName =>
-      (PatientStore.instance.fullName ?? widget.currentUser.name)
-          .toUpperCase();
+      (PatientStore.instance.fullName ?? widget.currentUser.name).toUpperCase();
 
-  String get _barangay => (PatientStore.instance.barangay ??
-          widget.currentUser.barangay ??
-          '')
-      .toUpperCase();
+  String get _barangay =>
+      (PatientStore.instance.barangay ?? widget.currentUser.barangay ?? '')
+          .toUpperCase();
 
   void _soon(String label) {
     ScaffoldMessenger.of(context)
@@ -56,7 +55,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           index: _tab,
           children: [
             _home(),
-            HistoryTab(visits: sampleVisits),
+            const HistoryTab(),
             const _Placeholder('Safety'),
             const SettingsTab(),
           ],
@@ -80,9 +79,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
             accent: AppColors.blue,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => MedicalHistoryScreen(visits: sampleVisits),
-              ),
+              MaterialPageRoute(builder: (_) => const MedicalHistoryScreen()),
             ),
           ),
           const SizedBox(height: 14),
@@ -204,13 +201,21 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w800),
         items: const [
           BottomNavigationBarItem(
-              icon: Icon(Icons.home_rounded), label: 'HOME'),
+            icon: Icon(Icons.home_rounded),
+            label: 'HOME',
+          ),
           BottomNavigationBarItem(
-              icon: Icon(Icons.history_rounded), label: 'HISTORY'),
+            icon: Icon(Icons.history_rounded),
+            label: 'HISTORY',
+          ),
           BottomNavigationBarItem(
-              icon: Icon(Icons.shield_outlined), label: 'SAFETY'),
+            icon: Icon(Icons.shield_outlined),
+            label: 'SAFETY',
+          ),
           BottomNavigationBarItem(
-              icon: Icon(Icons.settings_outlined), label: 'SETTINGS'),
+            icon: Icon(Icons.settings_outlined),
+            label: 'SETTINGS',
+          ),
         ],
       ),
     );
@@ -223,10 +228,13 @@ class _Placeholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Text(title,
-            style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textMuted)),
-      );
+    child: Text(
+      title,
+      style: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textMuted,
+      ),
+    ),
+  );
 }

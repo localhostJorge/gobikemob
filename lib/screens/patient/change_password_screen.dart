@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../auth_database.dart';
+import '../../core/auth_service.dart';
 import 'app_colors.dart';
 import 'patient_ui.dart';
 
@@ -12,8 +12,8 @@ class ChangePasswordScreen extends StatefulWidget {
 }
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
-  // Change this if your create-account screen uses a different minimum.
-  static const int _minLength = 6;
+  // Same minimum as the server (PUT /api/mobile/password).
+  static const int _minLength = 8;
 
   final _form = GlobalKey<FormState>();
   final _current = TextEditingController();
@@ -47,11 +47,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     if (p.length < _minLength) {
       return (label: 'Too short', color: AppColors.red);
     }
-    if (p.length >= 8 && hasLetter && hasDigit) {
+    if (p.length >= 10 && hasLetter && hasDigit) {
       return (label: 'Strong', color: const Color(0xFF2E9E5B));
     }
     return (
-      label: 'Okay - use 8+ characters with letters and numbers',
+      label: 'Okay - use 10+ characters with letters and numbers',
       color: AppColors.orange,
     );
   }
@@ -60,7 +60,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     if (!_form.currentState!.validate()) return;
 
     setState(() => _saving = true);
-    final error = await AuthDatabase.instance.changePassword(
+    final result = await AuthService.instance.changePassword(
       currentPassword: _current.text,
       newPassword: _new.text,
     );
@@ -69,8 +69,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
-    if (error != null) {
-      messenger.showSnackBar(SnackBar(content: Text(error)));
+    if (!result.ok) {
+      messenger.showSnackBar(SnackBar(content: Text(result.message)));
       return;
     }
     messenger.showSnackBar(
@@ -80,10 +80,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   }
 
   Widget _eye(bool shown, VoidCallback onTap) => IconButton(
-        icon: Icon(shown ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-            color: AppColors.textMuted),
-        onPressed: onTap,
-      );
+    icon: Icon(
+      shown ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+      color: AppColors.textMuted,
+    ),
+    onPressed: onTap,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -110,7 +112,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         'Enter your current password, then choose a new one '
                         'you don\'t use anywhere else.',
                         style: TextStyle(
-                            fontSize: 13, color: AppColors.textMuted),
+                          fontSize: 13,
+                          color: AppColors.textMuted,
+                        ),
                       ),
                       const SizedBox(height: 18),
                       TextFormField(
@@ -119,8 +123,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         decoration: inputDecoration(
                           'Current Password',
                           Icons.lock_outline,
-                          suffix: _eye(_showCurrent,
-                              () => setState(() => _showCurrent = !_showCurrent)),
+                          suffix: _eye(
+                            _showCurrent,
+                            () => setState(() => _showCurrent = !_showCurrent),
+                          ),
                         ),
                         validator: (v) => (v == null || v.isEmpty)
                             ? 'Enter your current password'
@@ -133,8 +139,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         decoration: inputDecoration(
                           'New Password',
                           Icons.lock_reset_outlined,
-                          suffix: _eye(_showNew,
-                              () => setState(() => _showNew = !_showNew)),
+                          suffix: _eye(
+                            _showNew,
+                            () => setState(() => _showNew = !_showNew),
+                          ),
                         ),
                         validator: (v) {
                           if (v == null || v.length < _minLength) {
@@ -149,11 +157,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       if (strength != null)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(6, 6, 0, 0),
-                          child: Text(strength.label,
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: strength.color)),
+                          child: Text(
+                            strength.label,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: strength.color,
+                            ),
+                          ),
                         ),
                       const SizedBox(height: 14),
                       TextFormField(
@@ -162,8 +173,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         decoration: inputDecoration(
                           'Confirm New Password',
                           Icons.check_circle_outline,
-                          suffix: _eye(_showConfirm,
-                              () => setState(() => _showConfirm = !_showConfirm)),
+                          suffix: _eye(
+                            _showConfirm,
+                            () => setState(() => _showConfirm = !_showConfirm),
+                          ),
                         ),
                         validator: (v) =>
                             v != _new.text ? 'Passwords do not match' : null,

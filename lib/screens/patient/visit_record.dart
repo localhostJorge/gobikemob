@@ -58,6 +58,40 @@ class VisitRecord {
   VitalStatus? get temperatureStatus => Vitals.temperature(temperature, age);
 
   VitalStatus? get bloodSugarStatus => Vitals.bloodSugar(bloodSugar, age);
+
+  /// One visit from GET /api/resident/visits.
+  factory VisitRecord.fromJson(Map<String, dynamic> j) {
+    final date =
+        DateTime.tryParse('${j['recorded_at'] ?? ''}')?.toLocal() ??
+        DateTime.now();
+    final updated = DateTime.tryParse('${j['updated_at'] ?? ''}')?.toLocal();
+    int asInt(dynamic v) => (v as num?)?.toInt() ?? int.tryParse('$v') ?? 0;
+    final gobiker = '${j['gobiker_name'] ?? ''}'.trim();
+
+    return VisitRecord(
+      id: '${j['id']}',
+      date: date,
+      place: '${j['barangay'] ?? ''}'.trim().isEmpty
+          ? 'Bugallon'
+          : '${j['barangay']}, Bugallon',
+      gobikerName: gobiker.isEmpty ? 'GoBiker' : 'GoBiker $gobiker',
+      patientName: '${j['name'] ?? ''}',
+      address: '${j['address'] ?? ''}',
+      contactNumber: '${j['contact'] ?? ''}',
+      age: asInt(j['age']),
+      systolic: asInt(j['sys']),
+      diastolic: asInt(j['dia']),
+      pulse: asInt(j['pulse']),
+      respiration: asInt(j['resp']),
+      temperature: (j['temp'] as num?)?.toDouble() ?? 0,
+      bloodSugar: (j['blood_sugar'] as num?)?.toInt(),
+      remarks: '${j['remarks'] ?? ''}',
+      // Saving a record also sets updated_at; only a later edit counts as an update.
+      updatedAt: updated != null && updated.difference(date).inMinutes >= 1
+          ? updated
+          : null,
+    );
+  }
 }
 
 const _months = [
@@ -85,66 +119,3 @@ String formatTime(DateTime d) {
 
   return '$h:$m ${d.hour >= 12 ? 'PM' : 'AM'}';
 }
-
-/// TEMPORARY sample data so the screens can be tested.
-///
-/// Later, replace this with records fetched from your Laravel API
-/// for the logged-in patient only.
-final List<VisitRecord> sampleVisits = [
-  VisitRecord(
-    id: 'v3',
-    date: DateTime(2026, 10, 3, 9, 30),
-    place: 'Poblacion, Bugallon',
-    gobikerName: 'GoBiker Maria Santos',
-    patientName: 'Juan Dela Cruz',
-    address: 'Purok 3, Poblacion, Bugallon',
-    contactNumber: '09123456789',
-    age: 45,
-    systolic: 138,
-    diastolic: 88,
-    pulse: 82,
-    respiration: 18,
-    temperature: 36.8,
-    bloodSugar: 118,
-    remarks:
-        'Advised to reduce salt intake and recheck BP in one week. '
-        'Please visit the barangay health center if headaches continue.',
-    updatedAt: DateTime(2026, 10, 4, 10, 30),
-  ),
-
-  VisitRecord(
-    id: 'v2',
-    date: DateTime(2026, 8, 15, 14, 10),
-    place: 'Poblacion, Bugallon',
-    gobikerName: 'GoBiker Pedro Reyes',
-    patientName: 'Juan Dela Cruz',
-    address: 'Purok 3, Poblacion, Bugallon',
-    contactNumber: '09123456789',
-    age: 45,
-    systolic: 126,
-    diastolic: 78,
-    pulse: 76,
-    respiration: 17,
-    temperature: 36.6,
-    bloodSugar: 104,
-    remarks: 'No complaints. Encouraged regular exercise.',
-    updatedAt: DateTime(2026, 8, 16, 9, 15),
-  ),
-
-  VisitRecord(
-    id: 'v1',
-    date: DateTime(2026, 6, 2, 8, 45),
-    place: 'Poblacion, Bugallon',
-    gobikerName: 'GoBiker Maria Santos',
-    patientName: 'Juan Dela Cruz',
-    address: 'Purok 3, Poblacion, Bugallon',
-    contactNumber: '09123456789',
-    age: 45,
-    systolic: 118,
-    diastolic: 76,
-    pulse: 74,
-    respiration: 16,
-    temperature: 36.5,
-    // Not tested on the first visit.
-  ),
-];

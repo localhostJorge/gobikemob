@@ -29,8 +29,12 @@ InputDecoration _decoration(
   required IconData icon,
   required bool focused,
   Widget? suffix,
+  String? helper,
 }) {
   return InputDecoration(
+    helperText: helper,
+    helperMaxLines: 2,
+    helperStyle: TextStyle(color: _hint(context), fontSize: 12, height: 1.3),
     hintText: hint,
     hintStyle: TextStyle(color: _hint(context), fontSize: 15),
     filled: true,
@@ -86,6 +90,8 @@ class AppTextField extends StatefulWidget {
     this.focusNode,
     this.enabled = true,
     this.readOnly = false,
+    this.maxLines = 1,
+    this.helper,
   });
 
   final String label;
@@ -104,6 +110,12 @@ class AppTextField extends StatefulWidget {
   final FocusNode? focusNode;
   final bool enabled;
   final bool readOnly;
+
+  /// More than 1 makes a multi-line field that grows up to this many lines.
+  final int maxLines;
+
+  /// Help shown under the field (hidden while it shows an error).
+  final String? helper;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -145,6 +157,8 @@ class _AppTextFieldState extends State<AppTextField> {
           autofillHints: widget.autofillHints,
           inputFormatters: widget.inputFormatters,
           maxLength: widget.maxLength,
+          minLines: widget.maxLines > 1 ? 3 : null,
+          maxLines: widget.maxLines,
           validator: widget.validator,
           onChanged: widget.onChanged,
           onFieldSubmitted: widget.onSubmitted,
@@ -157,6 +171,7 @@ class _AppTextFieldState extends State<AppTextField> {
             icon: widget.icon,
             focused: _focused,
             suffix: suffix,
+            helper: widget.helper,
           ),
         ),
       ),

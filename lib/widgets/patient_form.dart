@@ -20,6 +20,7 @@ class PatientFormControllers {
   final resp = TextEditingController();
   final temp = TextEditingController();
   final bloodSugar = TextEditingController(); // mg/dL, optional
+  final remarks = TextEditingController(); // advice for the patient, optional
 
   List<TextEditingController> get _all => [
     name,
@@ -32,6 +33,7 @@ class PatientFormControllers {
     resp,
     temp,
     bloodSugar,
+    remarks,
   ];
 
   void fill(Map<String, dynamic> p) {
@@ -45,6 +47,7 @@ class PatientFormControllers {
     resp.text = p['resp']?.toString() ?? '';
     temp.text = p['temp']?.toString() ?? '';
     bloodSugar.text = p['blood_sugar']?.toString() ?? '';
+    remarks.text = p['remarks']?.toString() ?? '';
   }
 
   Map<String, dynamic> toMap() => {
@@ -58,6 +61,7 @@ class PatientFormControllers {
     'resp': resp.text.trim(),
     'temp': temp.text.trim(),
     'blood_sugar': bloodSugar.text.trim(),
+    'remarks': remarks.text.trim(),
   };
 
   void dispose() {
@@ -271,10 +275,26 @@ class PatientForm extends StatelessWidget {
           controller: c.bloodSugar,
           readOnly: readOnly,
           keyboardType: TextInputType.number,
-          textInputAction: TextInputAction.done,
+          textInputAction: TextInputAction.next,
           inputFormatters: _digits,
           maxLength: 3,
           validator: _optionalRange(20, 600),
+        ),
+        const SizedBox(height: 28),
+        _SectionHeader('REMARKS', muted),
+        AppTextField(
+          label: 'Advice for the patient - optional',
+          hint: 'e.g. Less salt, recheck BP in one week.',
+          icon: Icons.notes_rounded,
+          controller: c.remarks,
+          readOnly: readOnly,
+          keyboardType: TextInputType.multiline,
+          textInputAction: TextInputAction.newline,
+          maxLines: 6,
+          maxLength: 1000,
+          helper: readOnly
+              ? null
+              : 'The patient can read this in their RondaGo app.',
         ),
       ],
     );

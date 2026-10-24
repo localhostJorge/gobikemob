@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../core/auth_service.dart';
-import '../auth_database.dart';
 import '../welcome_screen.dart';
 import 'app_colors.dart';
 import 'change_password_screen.dart';
@@ -29,17 +28,19 @@ class ProfileScreen extends StatelessWidget {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Log out',
-                style: TextStyle(color: AppColors.red)),
+            child: const Text(
+              'Log out',
+              style: TextStyle(color: AppColors.red),
+            ),
           ),
         ],
       ),
     );
     if (ok != true || !context.mounted) return;
 
-    AuthDatabase.instance.logout();
+    await AuthService.instance.logout();
     PatientStore.instance.clearSession();
-    // TODO: also clear your auth_service / global_state session here.
+    if (!context.mounted) return;
 
     Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const WelcomeScreen()),
@@ -74,28 +75,41 @@ class ProfileScreen extends StatelessWidget {
                     onCameraTap: () => changeProfilePhoto(context),
                   ),
                   const SizedBox(height: 14),
-                  Text(name,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textDark)),
+                  Text(
+                    name,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textDark,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text(phone,
-                      style: const TextStyle(
-                          fontSize: 13, color: AppColors.textMuted)),
+                  Text(
+                    phone,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
                   const SizedBox(height: 28),
-                  _row(Icons.person_outline, 'Edit Profile',
-                      () => _open(context, const EditProfileScreen())),
-                  const SizedBox(height: 10),
-                  _row(Icons.lock_outline, 'Change Password',
-                      () => _open(context, const ChangePasswordScreen())),
+                  _row(
+                    Icons.person_outline,
+                    'Edit Profile',
+                    () => _open(context, const EditProfileScreen()),
+                  ),
                   const SizedBox(height: 10),
                   _row(
-                      Icons.notifications_none_rounded,
-                      'Notification Settings',
-                      () =>
-                          _open(context, const NotificationSettingsScreen())),
+                    Icons.lock_outline,
+                    'Change Password',
+                    () => _open(context, const ChangePasswordScreen()),
+                  ),
+                  const SizedBox(height: 10),
+                  _row(
+                    Icons.notifications_none_rounded,
+                    'Notification Settings',
+                    () => _open(context, const NotificationSettingsScreen()),
+                  ),
                   const SizedBox(height: 28),
                   SizedBox(
                     width: double.infinity,
@@ -109,13 +123,19 @@ class ProfileScreen extends StatelessWidget {
                         child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.logout_rounded,
-                                color: AppColors.red, size: 20),
+                            Icon(
+                              Icons.logout_rounded,
+                              color: AppColors.red,
+                              size: 20,
+                            ),
                             SizedBox(width: 8),
-                            Text('Logout',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.red)),
+                            Text(
+                              'Logout',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.red,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -152,11 +172,14 @@ class ProfileScreen extends StatelessWidget {
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Text(label,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textDark)),
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textDark,
+                  ),
+                ),
               ),
               const Icon(Icons.chevron_right, color: AppColors.textMuted),
             ],
