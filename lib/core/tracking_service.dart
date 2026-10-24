@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'auth_service.dart';
+import 'distance_tracker.dart';
 import 'ronda_store.dart';
 
 /// Starts/stops a ronda on the server and sends the GoBiker's position
@@ -21,10 +22,9 @@ class TrackingService {
   StreamSubscription<Position>? _stream;
   bool _active = false;
   bool _sending = false;
-  Position? _lastPosition; // used to add up the distance
+  final DistanceTracker _distance = DistanceTracker(); // ignores GPS drift
   Position? _latest; // newest position from the location stream
   DateTime? _latestAt;
-  double _distanceMeters = 0;
   DateTime? _startedAt;
   String? rondaBarangay; // set by the Active Ronda screen
   int rondaPatients = 0; // set by the Active Ronda screen
@@ -78,7 +78,7 @@ class TrackingService {
   }
 
   /// Distance during the current (or last) ronda, from GPS.
-  double get distanceKm => _distanceMeters / 1000;
+  double get distanceKm => _distance.meters / 1000;
 
   /// Returns null on success, otherwise a message to show to the user.
   Future<String?> startRonda() async {
@@ -100,8 +100,7 @@ class TrackingService {
     );
     if (!start.ok) return start.message;
 
-    _distanceMeters = 0;
-    _lastPosition = null;
+    _distance.reset();
     _latest = first;
     _latestAt = DateTime.now();
     _active = true;
@@ -139,10 +138,11 @@ class TrackingService {
     }
 
     _startedAt = saved.startedAt;
-    _distanceMeters = saved.distanceMeters;
+    // Continue the saved distance; the gap while the app was closed is not counted.
+    _distance.reset(meters: saved.distanceMeters);
     rondaBarangay = saved.barangay;
     rondaPatients = saved.patientsCount;
-    _lastPosition = first; // don't count the gap while the app was closed
+    _track(first);
     _latest = first;
     _latestAt = DateTime.now();
     _active = true;
@@ -210,7 +210,7 @@ class TrackingService {
     await RondaStore.save(
       SavedRonda(
         startedAt: started,
-        distanceMeters: _distanceMeters,
+        distanceMeters: _distance.meters,
         patientsCount: rondaPatients,
         barangay: rondaBarangay,
       ),
@@ -292,20 +292,15 @@ class TrackingService {
   }
 
   void _track(Position p) {
-    final last = _lastPosition;
-    if (last == null) {
-      _lastPosition = p;
-      return;
-    }
-    final meters = Geolocator.distanceBetween(
-      last.latitude,
-      last.longitude,
-      p.latitude,
-      p.longitude,
+    _distance.add(
+      GpsFix(
+        latitude: p.latitude,
+        longitude: p.longitude,
+        accuracy: p.accuracy,
+        time: p.timestamp,
+        speed: p.speed,
+      ),
     );
-    if (meters < 3) return; // GPS jitter while standing still
-    if (meters < 2000) _distanceMeters += meters; // ignore impossible jumps
-    _lastPosition = p;
   }
 
   Future<void> _tick() async {
@@ -320,7 +315,8 @@ class TrackingService {
           DateTime.now().difference(at) < _freshFor;
 
       final Position p = isFresh ? latest : await _currentPosition();
-      _track(p);
+      // A fresh position was already counted when the stream delivered it.
+      if (!isFresh) _track(p);
       await _persist();
       await _send(p);
     } catch (e) {
