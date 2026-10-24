@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../core/announcements.dart';
+import '../core/appointments.dart';
 import '../core/auth_service.dart';
 import '../core/emergency_flow.dart';
 import '../core/emergency_watcher.dart';
@@ -19,6 +20,7 @@ import '../widgets/profile_panel.dart';
 import '../widgets/slide_to_start.dart';
 import 'active_ronda_screen.dart';
 import 'announcements_screen.dart';
+import 'appointments_screen.dart';
 import 'global_state.dart';
 import 'patient_management_screen.dart';
 import '../core/ronda_store.dart';
@@ -38,9 +40,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   bool _profileOpen = false;
   SavedRonda? _savedRonda; // a ronda that was left open (app was closed/killed)
 
-  // TODO(api): the schedule should come from the server.
-  static const String _sampleSchedule = '8:00 AM - 12:00 PM';
-
   @override
   void initState() {
     super.initState();
@@ -50,11 +49,25 @@ class _DashboardScreenState extends State<DashboardScreen>
     EmergencyWatcher.instance
         .load(); // an emergency the admin may have answered
     Announcements.instance.refresh(); // what the admin announced
+    GobikerAppointments.instance
+      ..addListener(_onAppointmentsChanged)
+      ..load(); // visit requests from residents
+    _refreshUser(); // the schedule may have changed
+  }
+
+  void _onAppointmentsChanged() {
+    if (mounted) setState(() {}); // the Appointments counter
+  }
+
+  Future<void> _refreshUser() async {
+    await AuthService.instance.refreshUser();
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    GobikerAppointments.instance.removeListener(_onAppointmentsChanged);
     super.dispose();
   }
 
@@ -65,6 +78,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       setState(() {});
       FollowUpAlerts.instance.refresh();
       Announcements.instance.refresh();
+      GobikerAppointments.instance.load();
+      _refreshUser();
       if (EmergencyWatcher.instance.isOpen) EmergencyWatcher.instance.check();
     }
   }
@@ -223,11 +238,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   void _onAppointments() {
-    // TODO(api): the Appointments screen is built in step 3C.
-    AppToast.show(
+    Navigator.push(
       context,
-      'Appointments are coming in the next update.',
-      type: ToastType.info,
+      MaterialPageRoute(builder: (_) => const AppointmentsScreen()),
     );
   }
 
@@ -446,7 +459,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     muted,
                                     icon: Icons.event_note_rounded,
                                     color: AppTheme.orange,
-                                    value: '0',
+                                    value:
+                                        '${GobikerAppointments.instance.openCount}',
                                     label: 'Appointments',
                                   ),
                                 ),
@@ -799,7 +813,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Schedule: $_sampleSchedule',
+                      'Schedule: ${AuthService.instance.currentUser?.schedule?.label ?? 'not set yet'}',
                       style: TextStyle(fontSize: 13, color: muted),
                     ),
                   ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/appointments.dart';
 import '../../core/resident_visits.dart';
 import 'app_colors.dart';
 import 'patient_store.dart';
@@ -45,6 +46,14 @@ class _HistoryTabState extends State<HistoryTab> {
     final items = <_Item>[
       for (final a in PatientStore.instance.activities)
         _Item(a.type, a.title, a.subtitle, a.time),
+      // Home-visit requests come from the server (status as of now).
+      for (final a in ResidentAppointments.instance.appointments)
+        _Item(
+          ActivityType.appointment,
+          'Home visit: ${a.statusLabel}',
+          '${formatDate(a.preferredDate)} · ${a.barangay}',
+          a.createdAt,
+        ),
       for (final v in ResidentVisits.instance.visits) ...[
         _Item(
           ActivityType.checkup,
@@ -89,7 +98,11 @@ class _HistoryTabState extends State<HistoryTab> {
   Widget build(BuildContext context) {
     final visits = ResidentVisits.instance;
     return ListenableBuilder(
-      listenable: Listenable.merge([PatientStore.instance, visits]),
+      listenable: Listenable.merge([
+        PatientStore.instance,
+        visits,
+        ResidentAppointments.instance,
+      ]),
       builder: (context, _) {
         final items = _items().where(_matches).toList();
         final firstLoad = !visits.loaded;

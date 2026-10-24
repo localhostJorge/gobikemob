@@ -124,6 +124,7 @@ class PatientService {
       'id': _s(j['id']),
       'date': DateFormat('MMMM d, yyyy').format(recorded),
       'time': DateFormat('hh:mm a').format(recorded),
+      'recorded_at': recorded.toIso8601String(),
       'name': _s(j['name']),
       'address': _s(j['address']),
       'contact': _s(j['contact']),

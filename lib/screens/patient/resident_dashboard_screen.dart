@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../core/appointments.dart';
 import '../../core/auth_service.dart';
 import '../../core/resident_visits.dart';
 import 'app_colors.dart';
+import 'appointment_screen.dart';
 import 'emergency_request_screen.dart';
 import 'history_screen.dart';
 import 'medical_history_screen.dart';
@@ -32,6 +34,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     super.initState();
     PatientStore.instance.load();
     ResidentVisits.instance.load();
+    ResidentAppointments.instance.load(); // shown in History
   }
 
   String get _patientName =>
@@ -86,10 +89,13 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           const SizedBox(height: 14),
           MenuCard(
             icon: Icons.calendar_month_rounded,
-            title: 'Appointment',
-            subtitle: 'Request an appointment',
+            title: 'Home Visit',
+            subtitle: 'Ask a GoBiker to check on you at home',
             accent: AppColors.red,
-            onTap: () => _soon('Appointments'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AppointmentScreen()),
+            ),
           ),
           const SizedBox(height: 14),
           MenuCard(
