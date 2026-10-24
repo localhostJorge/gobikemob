@@ -66,5 +66,15 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>RondaGo shares your location with the Go Bike admin while a ronda is active.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>RondaGo keeps sharing your location with the Go Bike admin during a ronda, even when the app is in the background.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>RondaGo uses the camera to attach a photo or video to an emergency request.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>RondaGo lets you attach a photo or video from your library to an emergency request or your profile.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>RondaGo records sound when you film a video for an emergency request.</string>
 </dict>
 </plist>
