@@ -228,7 +228,7 @@ class TrackingService {
       permission = await Geolocator.requestPermission();
     }
     if (permission == LocationPermission.denied) {
-      return 'Location permission is needed to share your position to the Go Bike during a ronda.';
+      return 'Location permission is needed to share your position with the Go Bike admin during a ronda.';
     }
     if (permission == LocationPermission.deniedForever) {
       return 'Location permission is blocked. Enable it for this app in your phone settings.';
@@ -277,8 +277,8 @@ class TrackingService {
       distanceFilter: 0,
       intervalDuration: const Duration(seconds: 5),
       foregroundNotificationConfig: const ForegroundNotificationConfig(
-        notificationTitle: 'GoBiker ronda in progress',
-        notificationText: 'Sharing your live location to the Go Bike.',
+        notificationTitle: 'RondaGo: ronda in progress',
+        notificationText: 'Sharing your live location with the Go Bike admin.',
         enableWakeLock: true,
         setOngoing: true,
       ),

@@ -60,7 +60,7 @@ class NotificationSettingsScreen extends StatelessWidget {
                   child: Text(
                     'Your choices are saved on this device. Alerts start '
                     'arriving once push notifications are connected to the '
-                    'GoBiker server.',
+                    'RondaGo server.',
                     style: TextStyle(
                         fontSize: 11.5, color: AppColors.textMuted),
                   ),

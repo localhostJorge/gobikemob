@@ -10,11 +10,11 @@ void main() async {
   await ThemeController.instance.load();
   // When the admin answers an emergency, tell the GoBiker on whatever screen they are on.
   EmergencyWatcher.instance.onAnnounce = showEmergencyAlert;
-  runApp(const GoBikeApp());
+  runApp(const RondaGoApp());
 }
 
-class GoBikeApp extends StatelessWidget {
-  const GoBikeApp({super.key});
+class RondaGoApp extends StatelessWidget {
+  const RondaGoApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +23,7 @@ class GoBikeApp extends StatelessWidget {
       builder: (context, _) {
         return MaterialApp(
           navigatorKey: appNavigatorKey,
-          title: 'GoBiker',
+          title: 'RondaGo',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,

@@ -10,13 +10,13 @@ class _Section {
   final String body;
 }
 
-const String _contactEmail = 'onegobike@gmail.com'; // TODO: replace
+const String _contactEmail = 'onegobike@gmail.com';
 const String _lastUpdated = 'October 4, 2026';
 
 const List<_Section> _termsSections = [
   _Section(
     'About Go Bike',
-    "Go Bike Project is a community health-check program. Volunteer cyclist responders (\"Go Bikers\") visit residents on a scheduled \"ronda\", and the Go Bike admin coordinates them through this app. Go Bike supports your local health services; it is not a hospital or a clinic.",
+    "Go Bike Project is a community health-check program. Volunteer cyclist responders (\"Go Bikers\") visit residents on a scheduled \"ronda\", and the Go Bike admin coordinates them through the RondaGo app. Go Bike supports your local health services; it is not a hospital or a clinic.",
   ),
   _Section(
     'Your account',

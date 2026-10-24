@@ -229,7 +229,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Join GoBiker',
+                        'Join RondaGo',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 14, color: muted),
                       ),

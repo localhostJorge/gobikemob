@@ -11,7 +11,9 @@ import 'package:go_bike_app/main.dart';
 
 void main() {
   testWidgets('app boots', (WidgetTester tester) async {
-    await tester.pumpWidget(const GoBikeApp());
+    await tester.pumpWidget(const RondaGoApp());
+    // Let the splash screen's minimum wait (1.8 s) finish so no timer is left pending.
+    await tester.pump(const Duration(seconds: 2));
     expect(tester.takeException(), isNull);
   });
 }

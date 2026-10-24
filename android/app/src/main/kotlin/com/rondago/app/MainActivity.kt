@@ -1,4 +1,4 @@
-package com.example.go_bike_app
+package com.rondago.app
 
 import io.flutter.embedding.android.FlutterActivity
 

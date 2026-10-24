@@ -15,7 +15,7 @@
     </queries>
 
     <application
-        android:label="GoBiker"
+        android:label="RondaGo"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
