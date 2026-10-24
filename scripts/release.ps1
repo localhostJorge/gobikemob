@@ -87,8 +87,14 @@ $notesFile = Join-Path $env:TEMP "rondago-release-notes-$build.txt"
 [IO.File]::WriteAllText($notesFile, "RondaGo $version`n`n$Notes", (New-Object Text.UTF8Encoding $false))
 
 # ---- 4. upload --------------------------------------------------------------
-Invoke-Checked 'Firebase upload' {
+# The ~55 MB upload sometimes drops on a slow connection, so try a few times.
+$attempts = 3
+for ($attempt = 1; $attempt -le $attempts; $attempt++) {
     firebase appdistribution:distribute $apk --app $FirebaseAppId --groups $TesterGroups --release-notes-file $notesFile
+    if ($LASTEXITCODE -eq 0) { break }
+    if ($attempt -eq $attempts) { Fail "Firebase upload failed $attempts times (exit code $LASTEXITCODE)." }
+    Write-Host "release: upload failed, retrying ($($attempt + 1)/$attempts)..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 10
 }
 
 # ---- 5. record the release --------------------------------------------------
