@@ -4,8 +4,9 @@
 
 .DESCRIPTION
   1. Checks that the work is committed and the release key is present.
-  2. Bumps the build number in pubspec.yaml (1.0.0+5 -> 1.0.0+6). Android only installs an
-     update when this number goes up.
+  2. Bumps the version in pubspec.yaml (1.0.2+4 -> 1.0.3+5): the last digit of the name testers
+     see, and the build number. Android only installs an update when the build number goes up.
+     Pass -KeepVersionName to raise only the build number.
   3. Builds the APK against the hosted API.
   4. Uploads it to Firebase App Distribution for the tester group. Testers get the update
      in the Firebase App Tester app or by email.
@@ -18,6 +19,8 @@
 param(
     # What changed, shown to testers. Defaults to the commit subjects since the last release.
     [string]$Notes = '',
+    # Raise only the build number and keep the version name (e.g. after changing it by hand).
+    [switch]$KeepVersionName,
     # Release even if there are uncommitted changes (they will not be in the release commit).
     [switch]$AllowDirty
 )
@@ -57,13 +60,17 @@ if (-not $AllowDirty) {
     if ($dirty) { Fail 'there are uncommitted changes. Commit them first, or pass -AllowDirty.' }
 }
 
-# ---- 1. bump the build number ---------------------------------------------
+# ---- 1. bump the version ---------------------------------------------------
 $pubspecPath = Join-Path $root 'pubspec.yaml'
 $pubspec = [IO.File]::ReadAllText($pubspecPath)
 $match = [regex]::Match($pubspec, '(?m)^version:\s*(\d+\.\d+\.\d+)\+(\d+)')
 if (-not $match.Success) { Fail 'could not read "version: x.y.z+n" from pubspec.yaml.' }
 
 $versionName = $match.Groups[1].Value
+if (-not $KeepVersionName) {
+    $parts = $versionName.Split('.')
+    $versionName = '{0}.{1}.{2}' -f $parts[0], $parts[1], ([int]$parts[2] + 1)
+}
 $build = [int]$match.Groups[2].Value + 1
 $version = "$versionName+$build"
 $pubspec = $pubspec.Remove($match.Index, $match.Length).Insert($match.Index, "version: $version")
