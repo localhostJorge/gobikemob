@@ -10,6 +10,7 @@ import 'menu.dart';
 import 'patient_store.dart';
 import 'profile.dart';
 import 'profile_avatar.dart';
+import 'safety_tab.dart';
 import 'settings_screen.dart';
 import 'sos_button.dart';
 
@@ -56,7 +57,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           children: [
             _home(),
             const HistoryTab(),
-            const _Placeholder('Safety'),
+            SafetyTab(active: _tab == 2),
             const SettingsTab(),
           ],
         ),
@@ -220,21 +221,4 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       ),
     );
   }
-}
-
-class _Placeholder extends StatelessWidget {
-  final String title;
-  const _Placeholder(this.title);
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Text(
-      title,
-      style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textMuted,
-      ),
-    ),
-  );
 }

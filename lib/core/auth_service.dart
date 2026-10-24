@@ -21,6 +21,7 @@ import 'api_config.dart';
 import 'announcements.dart';
 import 'emergency_watcher.dart';
 import 'follow_up_alerts.dart';
+import 'resident_sos.dart';
 import 'resident_visits.dart';
 
 /// The logged-in person, as returned by the Laravel API.
@@ -480,6 +481,59 @@ class AuthService {
     );
   }
 
+  /// Authenticated file upload (multipart/form-data). [files] maps a field
+  /// name to a file path on the phone. Videos are large, so the wait is long.
+  Future<({bool ok, int status, String message, Map<String, dynamic> body})>
+  uploadAuthed(
+    String path, {
+    Map<String, String> fields = const {},
+    required Map<String, String> files,
+  }) async {
+    final request =
+        http.MultipartRequest('POST', Uri.parse('$kApiBaseUrl$path'))
+          ..headers.addAll({
+            'Accept': 'application/json',
+            if (_token != null) 'Authorization': 'Bearer $_token',
+          })
+          ..fields.addAll(fields);
+
+    try {
+      for (final entry in files.entries) {
+        request.files.add(
+          await http.MultipartFile.fromPath(entry.key, entry.value),
+        );
+      }
+      final streamed = await request.send().timeout(const Duration(minutes: 3));
+      final res = await http.Response.fromStream(streamed);
+      Map<String, dynamic> json = {};
+      try {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map<String, dynamic>) json = decoded;
+      } catch (_) {}
+      final api = _ApiResponse(res.statusCode, json);
+      return (
+        ok: api.ok,
+        status: api.status,
+        message: api.ok ? '' : api.errorMessage,
+        body: json,
+      );
+    } on TimeoutException {
+      return (
+        ok: false,
+        status: 0,
+        message: 'The upload took too long. Please try again.',
+        body: const <String, dynamic>{},
+      );
+    } catch (_) {
+      return (
+        ok: false,
+        status: 0,
+        message: "Can't reach the server. Check your connection.",
+        body: const <String, dynamic>{},
+      );
+    }
+  }
+
   Future<void> logout() async {
     if (_token != null) {
       await _request('POST', '/mobile/logout', auth: true); // result ignored
@@ -490,6 +544,7 @@ class AuthService {
     FollowUpAlerts.instance.reset();
     await Announcements.instance.reset();
     ResidentVisits.instance.reset();
+    ResidentSos.instance.reset();
     try {
       await GoogleSignIn.instance.signOut();
     } catch (_) {}

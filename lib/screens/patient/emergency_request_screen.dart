@@ -2,8 +2,12 @@ import 'dart:io';
 import 'dart:ui' show PathMetric;
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart' show Position;
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
+
+import '../../core/auth_service.dart';
+import '../../core/resident_sos.dart';
 import 'patient_store.dart';
 
 import 'app_colors.dart';
@@ -58,6 +62,27 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   XFile? _video;
   VideoPlayerController? _videoCtrl;
   bool _sending = false;
+
+  /// Started when the screen opens, so the position is usually ready on Send.
+  late final Future<Position?> _position = ResidentSos.quickPosition();
+
+  // The server accepts videos up to 50 MB.
+  static const int _maxVideoBytes = 50 * 1024 * 1024;
+
+  @override
+  void initState() {
+    super.initState();
+    _position; // start looking for the phone's position now
+    // Most emergencies are at home: start from the resident's own barangay.
+    final home = AuthService.instance.currentUser?.barangay;
+    for (final entry in kLocations.entries) {
+      if (entry.value.contains(home)) {
+        _municipality = entry.key;
+        _barangay = home;
+        break;
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -119,16 +144,32 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   // ---------- media ----------
 
   Future<void> _pickImage() async {
-    final file = await _picker.pickImage(source: ImageSource.camera);
+    // Smaller photos upload faster on mobile data (and stay under 5 MB).
+    final file = await _picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 1920,
+      imageQuality: 75,
+    );
     if (file != null) setState(() => _image = file);
   }
 
   Future<void> _pickVideo() async {
     final file = await _picker.pickVideo(
       source: ImageSource.camera,
-      maxDuration: const Duration(seconds: 30),
+      maxDuration: const Duration(seconds: 20),
     );
     if (file == null) return;
+    if (await file.length() > _maxVideoBytes) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'That video is too large. Please record a shorter one.',
+          ),
+        ),
+      );
+      return;
+    }
 
     final controller = VideoPlayerController.file(File(file.path));
     try {
@@ -136,9 +177,9 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
     } catch (_) {
       await controller.dispose();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not load the video')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not load the video')));
       return;
     }
 
@@ -173,30 +214,75 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
         _landmark.text.trim().isEmpty) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(
-          content: Text('Please select municipality, barangay and landmark'),
-        ));
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Please select municipality, barangay and landmark'),
+          ),
+        );
       return;
     }
 
     setState(() => _sending = true);
+    final messenger = ScaffoldMessenger.of(context);
 
-    // TODO: upload media + send request to your backend with:
-    // user id, timestamp, _municipality, _barangay, _landmark.text,
-    // _description.text, _image?.path, _video?.path
-    await Future.delayed(const Duration(seconds: 1));
+    // 1) The request itself: this is what alerts the admin.
+    final position = await _position.timeout(
+      const Duration(seconds: 3),
+      onTimeout: () => null,
+    );
+    final result = await ResidentSos.instance.send(
+      municipality: _municipality!,
+      barangay: _barangay!,
+      landmark: _landmark.text,
+      description: _description.text,
+      position: position,
+    );
+    if (!mounted) return;
+    if (result.error != null) {
+      setState(() => _sending = false);
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 8),
+            content: Text(
+              'Your SOS was NOT sent: ${result.error}\n'
+              'If this is life-threatening, call 911 now.',
+            ),
+            action: SnackBarAction(label: 'Try again', onPressed: _send),
+          ),
+        );
+      return;
+    }
 
-        await PatientStore.instance.log(
+    await PatientStore.instance.log(
       ActivityType.sos,
       'SOS emergency request sent',
       '$_barangay, $_municipality · ${_landmark.text.trim()}',
     );
 
+    // 2) The photo / video. The SOS is already delivered if this fails.
+    final mediaError = await ResidentSos.instance.uploadMedia(
+      result.sos!.id,
+      imagePath: _image?.path,
+      videoPath: _video?.path,
+    );
+
     if (!mounted) return;
     setState(() => _sending = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Emergency request sent')),
-    );
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          duration: Duration(seconds: mediaError == null ? 4 : 8),
+          content: Text(
+            mediaError == null
+                ? 'Emergency request sent. The admin has been alerted.'
+                : 'Emergency request sent and the admin has been alerted, '
+                      'but the photo/video could not be uploaded: $mediaError',
+          ),
+        ),
+      );
     Navigator.pop(context);
   }
 
@@ -218,9 +304,10 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
         title: const Text(
           'Request Details',
           style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textDark),
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textDark,
+          ),
         ),
       ),
       body: SafeArea(
@@ -273,8 +360,9 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                     TextField(
                       controller: _description,
                       maxLines: 4,
-                      decoration:
-                          _inputDecoration('Briefly describe the emergency...'),
+                      decoration: _inputDecoration(
+                        'Briefly describe the emergency...',
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -331,7 +419,9 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                       child: Text(
                         'Visual information helps responders prepare better.',
                         style: TextStyle(
-                            fontSize: 11.5, color: AppColors.textMuted),
+                          fontSize: 11.5,
+                          color: AppColors.textMuted,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 18),
@@ -350,25 +440,31 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.red,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor:
-                        AppColors.red.withValues(alpha: 0.5),
+                    disabledBackgroundColor: AppColors.red.withValues(
+                      alpha: 0.5,
+                    ),
                     elevation: 4,
                     shadowColor: AppColors.red.withValues(alpha: 0.4),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   icon: _sending
                       ? const SizedBox(
                           width: 18,
                           height: 18,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
                       : const Icon(Icons.send_outlined, size: 18),
                   label: Text(
                     _sending ? 'SENDING...' : 'SEND EMERGENCY REQUEST',
                     style: const TextStyle(
-                        fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
               ),
@@ -405,8 +501,11 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                       color: Colors.black45,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.play_arrow_rounded,
-                        color: Colors.white, size: 30),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 30,
+                    ),
                   ),
                 ),
             ],
@@ -418,14 +517,15 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
 
   InputDecoration _inputDecoration(String hint, {IconData? prefix}) {
     OutlineInputBorder border(Color color) => OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: color),
-        );
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: color),
+    );
     return InputDecoration(
       hintText: hint,
       hintStyle: const TextStyle(color: Colors.black38),
-      prefixIcon:
-          prefix == null ? null : Icon(prefix, color: AppColors.textMuted),
+      prefixIcon: prefix == null
+          ? null
+          : Icon(prefix, color: AppColors.textMuted),
       filled: true,
       fillColor: Colors.white,
       border: border(Colors.grey.shade300),
@@ -435,13 +535,16 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   }
 
   Widget _fieldLabel(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(text,
-            style: const TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textMuted)),
-      );
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(
+      text,
+      style: const TextStyle(
+        fontSize: 12.5,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textMuted,
+      ),
+    ),
+  );
 
   Widget _titleRow() {
     return Row(
@@ -454,26 +557,35 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
             shape: BoxShape.circle,
             border: Border.all(color: AppColors.red.withValues(alpha: 0.25)),
           ),
-          child: const Icon(Icons.medical_services_outlined,
-              color: AppColors.red, size: 32),
+          child: const Icon(
+            Icons.medical_services_outlined,
+            color: AppColors.red,
+            size: 32,
+          ),
         ),
         const SizedBox(width: 14),
         const Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Emergency Request',
-                  style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textDark)),
+              Text(
+                'Emergency Request',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textDark,
+                ),
+              ),
               SizedBox(height: 2),
-              Text('REQUEST IMMEDIATE ASSISTANCE',
-                  style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.4,
-                      color: AppColors.red)),
+              Text(
+                'REQUEST IMMEDIATE ASSISTANCE',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.4,
+                  color: AppColors.red,
+                ),
+              ),
             ],
           ),
         ),
@@ -482,11 +594,14 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   }
 
   Widget _sectionHeader(String title) {
-    return Text(title,
-        style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textDark));
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w800,
+        color: AppColors.textDark,
+      ),
+    );
   }
 
   Widget _warning() {
@@ -556,8 +671,10 @@ class _PickerField extends StatelessWidget {
                 ),
               ),
             ),
-            const Icon(Icons.keyboard_arrow_down_rounded,
-                color: AppColors.textMuted),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: AppColors.textMuted,
+            ),
           ],
         ),
       ),
@@ -589,8 +706,10 @@ class _OptionSheetState extends State<_OptionSheet> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final maxHeight =
-        (media.size.height * 0.8 - media.viewInsets.bottom).clamp(240.0, 700.0);
+    final maxHeight = (media.size.height * 0.8 - media.viewInsets.bottom).clamp(
+      240.0,
+      700.0,
+    );
 
     final filtered = widget.options
         .where((o) => o.toLowerCase().contains(_query.trim().toLowerCase()))
@@ -616,11 +735,14 @@ class _OptionSheetState extends State<_OptionSheet> {
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: Text(widget.title,
-                    style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textDark)),
+                child: Text(
+                  widget.title,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark,
+                  ),
+                ),
               ),
             ),
             if (widget.searchable)
@@ -646,8 +768,10 @@ class _OptionSheetState extends State<_OptionSheet> {
               child: filtered.isEmpty
                   ? const Padding(
                       padding: EdgeInsets.all(32),
-                      child: Text('No results found',
-                          style: TextStyle(color: AppColors.textMuted)),
+                      child: Text(
+                        'No results found',
+                        style: TextStyle(color: AppColors.textMuted),
+                      ),
                     )
                   : ListView.builder(
                       shrinkWrap: true,
@@ -668,8 +792,10 @@ class _OptionSheetState extends State<_OptionSheet> {
                             ),
                           ),
                           trailing: isSelected
-                              ? const Icon(Icons.check_rounded,
-                                  color: AppColors.red)
+                              ? const Icon(
+                                  Icons.check_rounded,
+                                  color: AppColors.red,
+                                )
                               : null,
                           onTap: () => Navigator.pop(context, item),
                         );
@@ -739,8 +865,9 @@ class _UploadTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: CustomPaint(
-        painter:
-            _DashedRRectPainter(color: AppColors.red.withValues(alpha: 0.6)),
+        painter: _DashedRRectPainter(
+          color: AppColors.red.withValues(alpha: 0.6),
+        ),
         child: Container(
           height: 96,
           width: double.infinity,
@@ -753,11 +880,14 @@ class _UploadTile extends StatelessWidget {
             children: [
               Icon(icon, color: AppColors.red, size: 26),
               const SizedBox(height: 8),
-              Text(label,
-                  style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.red)),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.red,
+                ),
+              ),
             ],
           ),
         ),
@@ -777,8 +907,9 @@ class _DashedRRectPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     final path = Path()
-      ..addRRect(RRect.fromRectAndRadius(
-          Offset.zero & size, const Radius.circular(14)));
+      ..addRRect(
+        RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(14)),
+      );
     for (final PathMetric m in path.computeMetrics()) {
       double d = 0;
       while (d < m.length) {
