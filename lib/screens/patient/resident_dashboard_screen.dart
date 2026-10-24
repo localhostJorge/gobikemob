@@ -9,6 +9,7 @@ import 'emergency_request_screen.dart';
 import 'history_screen.dart';
 import 'medical_history_screen.dart';
 import 'menu.dart';
+import 'mobile_number_prompt.dart';
 import 'patient_store.dart';
 import 'profile.dart';
 import 'profile_avatar.dart';
@@ -44,12 +45,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       (PatientStore.instance.barangay ?? widget.currentUser.barangay ?? '')
           .toUpperCase();
 
-  void _soon(String label) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('$label coming soon')));
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -76,6 +71,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         children: [
           _header(),
           const SizedBox(height: 20),
+          const MobileNumberPrompt(),
           MenuCard(
             icon: Icons.medical_services_rounded,
             title: 'View Medical History',
@@ -96,14 +92,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               context,
               MaterialPageRoute(builder: (_) => const AppointmentScreen()),
             ),
-          ),
-          const SizedBox(height: 14),
-          MenuCard(
-            icon: Icons.local_hospital_rounded,
-            title: 'Health Services',
-            subtitle: 'Explore available health services',
-            accent: AppColors.orange,
-            onTap: () => _soon('Health services'),
           ),
           const SizedBox(height: 28),
           ListenableBuilder(

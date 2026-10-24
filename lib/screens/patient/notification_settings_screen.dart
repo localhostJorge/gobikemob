@@ -35,11 +35,6 @@ class NotificationSettingsScreen extends StatelessWidget {
                     title: 'Check-up results',
                     subtitle: 'When a GoBiker records or updates your check-up',
                   ),
-                  _Toggle(
-                    keyName: 'announcements',
-                    title: 'Health announcements',
-                    subtitle: 'Barangay advisories and health activities',
-                  ),
                 ]),
                 const SizedBox(height: 16),
                 _group('Alert style', const [
@@ -58,11 +53,13 @@ class NotificationSettingsScreen extends StatelessWidget {
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 4),
                   child: Text(
-                    'Your choices are saved on this device. Alerts start '
-                    'arriving once push notifications are connected to the '
-                    'RondaGo server.',
+                    'Notifications arrive even when RondaGo is closed. If none '
+                    'arrive, check that notifications are allowed for RondaGo '
+                    "in your phone's settings.",
                     style: TextStyle(
-                        fontSize: 11.5, color: AppColors.textMuted),
+                      fontSize: 11.5,
+                      color: AppColors.textMuted,
+                    ),
                   ),
                 ),
               ],
@@ -79,11 +76,14 @@ class NotificationSettingsScreen extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-          child: Text(title,
-              style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textMuted)),
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textMuted,
+            ),
+          ),
         ),
         Container(
           decoration: cardDecoration(),
@@ -110,16 +110,27 @@ class _Toggle extends StatelessWidget {
     final store = PatientStore.instance;
     return SwitchListTile(
       value: store.toggle(keyName),
-      onChanged: (v) => store.setToggle(keyName, v),
+      onChanged: (v) async {
+        final error = await store.setToggle(keyName, v);
+        if (error != null && context.mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(SnackBar(content: Text("Couldn't save: $error")));
+        }
+      },
       activeTrackColor: AppColors.red,
-      title: Text(title,
-          style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textDark)),
-      subtitle: Text(subtitle,
-          style:
-              const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textDark,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+      ),
     );
   }
 }

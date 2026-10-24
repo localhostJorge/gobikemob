@@ -16,8 +16,9 @@ class SettingsTab extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('Clear activity history?'),
         content: const Text(
-          'This removes your SOS and appointment entries from History on '
-          'this device. Your medical check-up records are not affected.',
+          'This removes the SOS entries saved on this phone from History. '
+          'Your check-ups, home visits and the SOS list in the Safety tab '
+          'come from the server and stay.',
         ),
         actions: [
           TextButton(
@@ -126,7 +127,7 @@ class SettingsTab extends StatelessWidget {
               _NavTile(
                 icon: Icons.delete_sweep_outlined,
                 title: 'Clear activity history',
-                subtitle: 'Remove SOS and appointment entries from History',
+                subtitle: 'Remove SOS entries saved on this phone',
                 onTap: () => _clearHistory(context),
               ),
             ]),

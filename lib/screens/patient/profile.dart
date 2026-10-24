@@ -101,7 +101,9 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: 10),
                   _row(
                     Icons.lock_outline,
-                    'Change Password',
+                    AuthService.instance.currentUser?.hasPassword == false
+                        ? 'Set a Password'
+                        : 'Change Password',
                     () => _open(context, const ChangePasswordScreen()),
                   ),
                   const SizedBox(height: 10),

@@ -48,11 +48,12 @@ class PatientStore extends ChangeNotifier {
   PatientStore._();
   static final PatientStore instance = PatientStore._();
 
+  /// The resident's push notification switches (saved on the server too,
+  /// which decides what to send).
   static const Map<String, bool> toggleDefaults = {
     'sos_updates': true,
     'appointments': true,
     'checkups': true,
-    'announcements': false,
     'sound': true,
     'vibration': true,
   };
@@ -85,8 +86,10 @@ class PatientStore extends ChangeNotifier {
     final photo = p.getString(_k('photo'));
     photoPath = (photo != null && File(photo).existsSync()) ? photo : null;
     sosHoldSeconds = p.getInt(_k('sos_hold')) ?? 2;
+    // The server's copy wins: it is what decides which notifications are sent.
+    final server = AuthService.instance.currentUser?.notificationPrefs ?? {};
     for (final e in toggleDefaults.entries) {
-      _toggles[e.key] = p.getBool(_k('t_${e.key}')) ?? e.value;
+      _toggles[e.key] = server[e.key] ?? p.getBool(_k('t_${e.key}')) ?? e.value;
     }
     activities = (p.getStringList(_k('activity')) ?? const <String>[])
         .map(
@@ -113,11 +116,25 @@ class PatientStore extends ChangeNotifier {
 
   // ---------- settings ----------
 
-  Future<void> setToggle(String key, bool value) async {
+  /// Returns null when saved, otherwise an error (the switch flips back).
+  Future<String?> setToggle(String key, bool value) async {
     final p = await _p();
+    final before = toggle(key);
     _toggles[key] = value;
-    await p.setBool(_k('t_$key'), value);
     notifyListeners();
+
+    final res = await AuthService.instance.callAuthed(
+      'PUT',
+      '/mobile/notification-preferences',
+      body: {key: value},
+    );
+    if (!res.ok) {
+      _toggles[key] = before;
+      notifyListeners();
+      return res.message;
+    }
+    await p.setBool(_k('t_$key'), value);
+    return null;
   }
 
   Future<void> setSosHold(int seconds) async {

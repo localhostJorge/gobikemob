@@ -22,6 +22,7 @@ import 'announcements.dart';
 import 'appointments.dart';
 import 'emergency_watcher.dart';
 import 'follow_up_alerts.dart';
+import 'push_service.dart';
 import 'resident_sos.dart';
 import 'resident_visits.dart';
 
@@ -68,6 +69,8 @@ class AppUser {
     this.mobile,
     this.barangay,
     this.schedule,
+    this.hasPassword = true,
+    this.notificationPrefs = const {},
   });
 
   final int id;
@@ -80,6 +83,14 @@ class AppUser {
   /// GoBikers only; null when the admin has not set one.
   final RondaSchedule? schedule;
 
+  /// False for a Google sign-in account that never set its own password.
+  final bool hasPassword;
+
+  /// The resident's notification switches as saved on the server.
+  final Map<String, bool> notificationPrefs;
+
+  bool get hasMobile => (mobile ?? '').trim().isNotEmpty;
+
   factory AppUser.fromJson(Map<String, dynamic> json) => AppUser(
     id: (json['id'] as num?)?.toInt() ?? 0,
     name: (json['name'] ?? '').toString(),
@@ -88,6 +99,12 @@ class AppUser {
     mobile: json['mobile']?.toString(),
     barangay: json['barangay']?.toString(),
     schedule: RondaSchedule.fromJson(json['schedule']),
+    hasPassword: json['has_password'] != false,
+    notificationPrefs: {
+      if (json['notification_prefs'] is Map)
+        for (final e in (json['notification_prefs'] as Map).entries)
+          '${e.key}': e.value == true,
+    },
   );
 
   String get firstName {
@@ -276,6 +293,7 @@ class AuthService {
       debugPrint('[session] could not save the token: $e');
     }
 
+    unawaited(PushService.instance.registerDevice());
     return AuthResult.success(
       user: user,
       message: res.body['message']?.toString(),
@@ -369,12 +387,15 @@ class AuthService {
       'PUT',
       '/mobile/password',
       body: {
-        'current_password': currentPassword,
+        // A Google account setting its first password has no current one.
+        if (currentPassword.isNotEmpty) 'current_password': currentPassword,
         'password': newPassword,
         'password_confirmation': newPassword,
       },
       auth: true,
     );
+    final u = res.body['user'];
+    if (res.ok && u is Map<String, dynamic>) _user = AppUser.fromJson(u);
     return (ok: res.ok, message: res.ok ? '' : res.errorMessage);
   }
 
@@ -418,6 +439,7 @@ class AuthService {
       final u = res.body['user'];
       if (u is Map<String, dynamic>) {
         _user = AppUser.fromJson(u);
+        unawaited(PushService.instance.registerDevice());
         return _user;
       }
     }
@@ -583,6 +605,7 @@ class AuthService {
   }
 
   Future<void> logout() async {
+    await PushService.instance.unregisterDevice(); // while still signed in
     if (_token != null) {
       await _request('POST', '/mobile/logout', auth: true); // result ignored
     }

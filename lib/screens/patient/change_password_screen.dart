@@ -25,6 +25,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _showConfirm = false;
   bool _saving = false;
 
+  /// A Google sign-in account sets its first password: no current one.
+  final bool _setting = AuthService.instance.currentUser?.hasPassword == false;
+
   @override
   void initState() {
     super.initState();
@@ -61,7 +64,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
     setState(() => _saving = true);
     final result = await AuthService.instance.changePassword(
-      currentPassword: _current.text,
+      currentPassword: _setting ? '' : _current.text,
       newPassword: _new.text,
     );
     if (!mounted) return;
@@ -93,7 +96,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: patientAppBar(context, 'Change Password'),
+      appBar: patientAppBar(
+        context,
+        _setting ? 'Set a Password' : 'Change Password',
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -108,31 +114,37 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Enter your current password, then choose a new one '
-                        'you don\'t use anywhere else.',
-                        style: TextStyle(
+                      Text(
+                        _setting
+                            ? 'You signed up with Google. Set a password to '
+                                  'also log in with your email.'
+                            : 'Enter your current password, then choose a new '
+                                  'one you don\'t use anywhere else.',
+                        style: const TextStyle(
                           fontSize: 13,
                           color: AppColors.textMuted,
                         ),
                       ),
                       const SizedBox(height: 18),
-                      TextFormField(
-                        controller: _current,
-                        obscureText: !_showCurrent,
-                        decoration: inputDecoration(
-                          'Current Password',
-                          Icons.lock_outline,
-                          suffix: _eye(
-                            _showCurrent,
-                            () => setState(() => _showCurrent = !_showCurrent),
+                      if (!_setting) ...[
+                        TextFormField(
+                          controller: _current,
+                          obscureText: !_showCurrent,
+                          decoration: inputDecoration(
+                            'Current Password',
+                            Icons.lock_outline,
+                            suffix: _eye(
+                              _showCurrent,
+                              () =>
+                                  setState(() => _showCurrent = !_showCurrent),
+                            ),
                           ),
+                          validator: (v) => (v == null || v.isEmpty)
+                              ? 'Enter your current password'
+                              : null,
                         ),
-                        validator: (v) => (v == null || v.isEmpty)
-                            ? 'Enter your current password'
-                            : null,
-                      ),
-                      const SizedBox(height: 14),
+                        const SizedBox(height: 14),
+                      ],
                       TextFormField(
                         controller: _new,
                         obscureText: !_showNew,
@@ -148,7 +160,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           if (v == null || v.length < _minLength) {
                             return 'Use at least $_minLength characters';
                           }
-                          if (v == _current.text) {
+                          if (!_setting && v == _current.text) {
                             return 'New password must be different';
                           }
                           return null;

@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import 'core/app_navigator.dart';
 import 'core/emergency_watcher.dart';
+import 'core/push_service.dart';
 import 'core/theme.dart';
 import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ThemeController.instance.load();
+  await PushService.instance.init(); // push notifications (works without them too)
   // When the admin answers an emergency, tell the GoBiker on whatever screen they are on.
   EmergencyWatcher.instance.onAnnounce = showEmergencyAlert;
   runApp(const RondaGoApp());
