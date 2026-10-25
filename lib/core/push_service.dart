@@ -118,7 +118,10 @@ class PushService {
   }
 
   void _onForeground(RemoteMessage message) {
-    _refresh(message.data['type']);
+    final type = message.data['type'];
+    _refresh(type);
+    // SOS changes: the resident home vibrates and shows its own notice.
+    if (type == 'sos') return;
     final n = message.notification;
     final context = appNavigatorKey.currentState?.overlay?.context;
     if (n == null || context == null) return;

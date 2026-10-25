@@ -18,6 +18,7 @@ class SosEntry {
     this.hasVideo = false,
     this.respondedAt,
     this.resolvedAt,
+    this.resolvedByResident = false,
   });
 
   final int id;
@@ -34,6 +35,9 @@ class SosEntry {
   final DateTime createdAt;
   final DateTime? respondedAt;
   final DateTime? resolvedAt;
+
+  /// The resident closed it themselves (no longer needed help).
+  final bool resolvedByResident;
 
   bool get isOpen => status != 'resolved';
 
@@ -52,6 +56,7 @@ class SosEntry {
       createdAt: date(j['created_at']) ?? DateTime.now(),
       respondedAt: date(j['responded_at']),
       resolvedAt: date(j['resolved_at']),
+      resolvedByResident: j['resolved_by_resident'] == true,
     );
   }
 }
@@ -68,6 +73,10 @@ class ResidentSos extends ChangeNotifier {
 
   bool get hasOpenRequest => requests.any((r) => r.isOpen);
 
+  /// Called when a request the app already knew changes status (e.g. the
+  /// admin marked it "responding"), so the app can vibrate and say so.
+  void Function(SosEntry sos)? onStatusChanged;
+
   Future<void> load() async {
     if (loading) return;
     loading = true;
@@ -77,11 +86,16 @@ class ResidentSos extends ChangeNotifier {
     final res = await AuthService.instance.callAuthed('GET', '/resident/sos');
     final raw = res.body['sos'];
     if (res.ok && raw is List) {
+      final before = {for (final r in requests) r.id: r.status};
       requests = raw
           .whereType<Map>()
           .map((m) => SosEntry.fromJson(Map<String, dynamic>.from(m)))
           .toList();
       loaded = true;
+      for (final r in requests) {
+        final old = before[r.id];
+        if (old != null && old != r.status) onStatusChanged?.call(r);
+      }
     } else {
       error = res.ok ? 'Unexpected response from the server.' : res.message;
     }
@@ -137,6 +151,25 @@ class ResidentSos extends ChangeNotifier {
     final res = await AuthService.instance.uploadAuthed(
       '/resident/sos/$id/media',
       files: {'image': ?imagePath, 'video': ?videoPath},
+    );
+    if (!res.ok) return res.message;
+
+    final raw = res.body['sos'];
+    if (raw is Map) {
+      final sos = SosEntry.fromJson(Map<String, dynamic>.from(raw));
+      requests = [for (final r in requests) r.id == sos.id ? sos : r];
+      notifyListeners();
+    }
+    return null;
+  }
+
+  /// The resident no longer needs help. Returns null on success, otherwise
+  /// an error message. The list is updated from the answer, so this does not
+  /// count as the admin changing the status (no vibration).
+  Future<String?> resolve(int id) async {
+    final res = await AuthService.instance.callAuthed(
+      'POST',
+      '/resident/sos/$id/resolve',
     );
     if (!res.ok) return res.message;
 

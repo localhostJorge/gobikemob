@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../core/appointments.dart';
+import '../../core/app_navigator.dart' show vibratePhone;
 import '../../core/auth_service.dart';
+import '../../core/resident_sos.dart';
 import '../../core/resident_visits.dart';
 import 'app_colors.dart';
 import 'appointment_screen.dart';
@@ -36,6 +38,34 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     PatientStore.instance.load();
     ResidentVisits.instance.load();
     ResidentAppointments.instance.load(); // shown in History
+    ResidentSos.instance.onStatusChanged = _onSosChanged;
+  }
+
+  @override
+  void dispose() {
+    if (ResidentSos.instance.onStatusChanged == _onSosChanged) {
+      ResidentSos.instance.onStatusChanged = null;
+    }
+    super.dispose();
+  }
+
+  /// The admin answered the SOS while the app is open: vibrate and say so.
+  void _onSosChanged(SosEntry sos) {
+    if (sos.status != 'responding' && sos.status != 'resolved') return;
+    if (PatientStore.instance.toggle('vibration')) vibratePhone();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 6),
+          content: Text(
+            sos.status == 'responding'
+                ? 'Someone is Responding to your SOS.'
+                : 'Your SOS request was resolved.',
+          ),
+        ),
+      );
   }
 
   String get _patientName =>
@@ -111,6 +141,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               );
             },
           ),
+          // An open SOS shows right here, under the button.
+          HomeSosStatus(active: _tab == 0),
         ],
       ),
     );

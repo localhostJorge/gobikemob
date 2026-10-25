@@ -16,7 +16,7 @@ const _green = Color(0xFF2E9E5B);
   SosEntry sos,
 ) => switch (sos.status) {
   'responding' => (
-    label: 'Help is responding',
+    label: 'Someone is Responding',
     icon: Icons.directions_run_rounded,
     color: AppColors.orange,
     help: 'The Go Bike admin is handling your request.',
@@ -25,7 +25,9 @@ const _green = Color(0xFF2E9E5B);
     label: 'Resolved',
     icon: Icons.check_circle_rounded,
     color: _green,
-    help: 'The admin marked this request as resolved.',
+    help: sos.resolvedByResident
+        ? 'You marked this request as resolved.'
+        : 'The admin marked this request as resolved.',
   ),
   _ => (
     label: 'Waiting for response',
@@ -125,7 +127,7 @@ class _SafetyTabState extends State<SafetyTab> {
               if (_store.error != null)
                 _ErrorNote(message: _store.error!, onRetry: _store.load),
               for (final sos in open) ...[
-                _OpenRequestCard(sos: sos),
+                SosRequestCard(sos: sos),
                 const SizedBox(height: 12),
               ],
               _NationalCard(
@@ -218,12 +220,124 @@ class _StatusChip extends StatelessWidget {
 }
 
 /// A request that is still open: shown first, with what it means.
-class _OpenRequestCard extends StatelessWidget {
-  const _OpenRequestCard({required this.sos});
-  final SosEntry sos;
+/// The resident's open SOS requests on the Home tab, right under the SOS
+/// button, so they see the status without opening the Safety tab. Refreshes
+/// every 20 seconds while Home is on screen and a request is still open.
+class HomeSosStatus extends StatefulWidget {
+  const HomeSosStatus({super.key, required this.active});
+
+  /// True while the Home tab is on screen.
+  final bool active;
+
+  @override
+  State<HomeSosStatus> createState() => _HomeSosStatusState();
+}
+
+class _HomeSosStatusState extends State<HomeSosStatus> {
+  static const _pollEvery = Duration(seconds: 20);
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.active) _activate();
+  }
+
+  @override
+  void didUpdateWidget(HomeSosStatus old) {
+    super.didUpdateWidget(old);
+    if (widget.active && !old.active) _activate();
+    if (!widget.active && old.active) _timer?.cancel();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _activate() {
+    ResidentSos.instance.load();
+    _timer?.cancel();
+    _timer = Timer.periodic(_pollEvery, (_) {
+      if (ResidentSos.instance.hasOpenRequest) ResidentSos.instance.load();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: ResidentSos.instance,
+      builder: (context, _) {
+        final open = ResidentSos.instance.requests.where((r) => r.isOpen);
+        return Column(
+          children: [
+            for (final sos in open) ...[
+              const SizedBox(height: 20),
+              SosRequestCard(sos: sos),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// One open SOS request with its status and what it means.
+class SosRequestCard extends StatefulWidget {
+  const SosRequestCard({super.key, required this.sos});
+  final SosEntry sos;
+
+  @override
+  State<SosRequestCard> createState() => _SosRequestCardState();
+}
+
+class _SosRequestCardState extends State<SosRequestCard> {
+  bool _resolving = false;
+
+  /// The resident no longer needs help: close the request after a check.
+  Future<void> _resolve() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mark as resolved?'),
+        content: const Text(
+          'Do this only if you no longer need help. The admin will see that '
+          'you closed this request.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('I still need help'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Yes, resolved',
+              style: TextStyle(color: _green, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    setState(() => _resolving = true);
+    final error = await ResidentSos.instance.resolve(widget.sos.id);
+    if (!mounted) return;
+    setState(() => _resolving = false);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(error ?? 'SOS request resolved. Glad you are okay.'),
+        ),
+      );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sos = widget.sos;
     final s = _statusStyle(sos);
     return Semantics(
       liveRegion: true,
@@ -274,6 +388,34 @@ class _OpenRequestCard extends StatelessWidget {
                 color: s.color,
               ),
             ),
+            if (sos.isOpen) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: _resolving ? null : _resolve,
+                  icon: _resolving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.check_circle_outline_rounded),
+                  label: Text(
+                    _resolving ? 'Resolving…' : 'Mark as resolved',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _green,
+                    side: const BorderSide(color: _green),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

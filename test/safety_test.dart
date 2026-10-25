@@ -69,4 +69,58 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('an answered SOS says "Someone is Responding"', (tester) async {
+    final sos = SosEntry.fromJson({
+      'id': 1,
+      'status': 'responding',
+      'municipality': 'Bugallon',
+      'barangay': 'Salomague Sur',
+      'landmark': 'bahay',
+      'created_at': '2026-10-25T03:57:00+00:00',
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: SosRequestCard(sos: sos)),
+      ),
+    );
+
+    expect(find.text('Someone is Responding'), findsOneWidget);
+    expect(find.textContaining('Salomague Sur, Bugallon'), findsOneWidget);
+  });
+
+  testWidgets('an open SOS can be marked resolved; a resolved one cannot', (
+    tester,
+  ) async {
+    SosEntry sos(String status) => SosEntry.fromJson({
+      'id': 2,
+      'status': status,
+      'municipality': 'Bugallon',
+      'barangay': 'Poblacion',
+      'landmark': 'Chapel',
+      'created_at': '2026-10-25T03:57:00+00:00',
+      'resolved_by_resident': status == 'resolved',
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: SosRequestCard(sos: sos('sent'))),
+      ),
+    );
+    expect(find.text('Mark as resolved'), findsOneWidget);
+
+    await tester.tap(find.text('Mark as resolved'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mark as resolved?'), findsOneWidget); // asks first
+    await tester.tap(find.text('I still need help'));
+    await tester.pumpAndSettle();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: SosRequestCard(sos: sos('resolved'))),
+      ),
+    );
+    expect(find.text('Mark as resolved'), findsNothing);
+    expect(find.text('You marked this request as resolved.'), findsOneWidget);
+  });
 }
