@@ -8,7 +8,6 @@ import 'package:video_player/video_player.dart';
 
 import '../../core/auth_service.dart';
 import '../../core/resident_sos.dart';
-import 'patient_store.dart';
 
 import 'app_colors.dart';
 
@@ -254,12 +253,6 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
         );
       return;
     }
-
-    await PatientStore.instance.log(
-      ActivityType.sos,
-      'SOS emergency request sent',
-      '$_barangay, $_municipality · ${_landmark.text.trim()}',
-    );
 
     // 2) The photo / video. The SOS is already delivered if this fails.
     final mediaError = await ResidentSos.instance.uploadMedia(

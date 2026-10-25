@@ -12,7 +12,7 @@ import 'visit_record.dart' show formatDate, formatTime;
 const _green = Color(0xFF2E9E5B);
 
 /// Status of an SOS as text, icon and colour (never colour alone).
-({String label, IconData icon, Color color, String help}) _statusStyle(
+({String label, IconData icon, Color color, String help}) sosStatusStyle(
   SosEntry sos,
 ) => switch (sos.status) {
   'responding' => (
@@ -103,8 +103,8 @@ class _SafetyTabState extends State<SafetyTab> {
     return ListenableBuilder(
       listenable: _store,
       builder: (context, _) {
+        // Past requests are in History; here only what still needs attention.
         final open = _store.requests.where((r) => r.isOpen).toList();
-        final past = _store.requests.where((r) => !r.isOpen).toList();
 
         return RefreshIndicator(
           color: AppColors.red,
@@ -118,7 +118,7 @@ class _SafetyTabState extends State<SafetyTab> {
                 child: Text(
                   'Safety',
                   style: TextStyle(
-                    fontSize: 22,
+                    fontSize: 24,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textDark,
                   ),
@@ -134,32 +134,20 @@ class _SafetyTabState extends State<SafetyTab> {
                 onCall: () => _call(kNationalEmergency.numbers.first),
               ),
               const SizedBox(height: 22),
-              const _SectionLabel('EMERGENCY HOTLINES'),
+              const _SectionLabel('Emergency hotlines'),
               for (final h in kEmergencyHotlines)
                 _HotlineCard(hotline: h, onCall: _call),
               const SizedBox(height: 14),
-              const _SectionLabel('UTILITIES'),
+              const _SectionLabel('Power and water'),
               for (final h in kUtilityHotlines)
                 _HotlineCard(hotline: h, onCall: _call),
-              const SizedBox(height: 14),
-              const _SectionLabel('YOUR PAST SOS REQUESTS'),
-              if (!_store.loaded && _store.loading)
-                const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(
-                    child: CircularProgressIndicator(color: AppColors.red),
-                  ),
-                )
-              else if (past.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(4, 0, 4, 8),
-                  child: Text(
-                    'Requests you send with the SOS button will be listed here.',
-                    style: TextStyle(fontSize: 13, color: AppColors.textMuted),
-                  ),
-                )
-              else
-                for (final sos in past) _PastRequestTile(sos: sos),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(4, 8, 4, 0),
+                child: Text(
+                  'Your past SOS requests are in History.',
+                  style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+                ),
+              ),
             ],
           ),
         );
@@ -178,10 +166,9 @@ class _SectionLabel extends StatelessWidget {
     child: Text(
       text,
       style: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 0.8,
-        color: AppColors.textMuted,
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textDark,
       ),
     ),
   );
@@ -193,7 +180,7 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = _statusStyle(sos);
+    final s = sosStatusStyle(sos);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
@@ -338,7 +325,7 @@ class _SosRequestCardState extends State<SosRequestCard> {
   @override
   Widget build(BuildContext context) {
     final sos = widget.sos;
-    final s = _statusStyle(sos);
+    final s = sosStatusStyle(sos);
     return Semantics(
       liveRegion: true,
       container: true,
@@ -421,49 +408,6 @@ class _SosRequestCardState extends State<SosRequestCard> {
       ),
     );
   }
-}
-
-class _PastRequestTile extends StatelessWidget {
-  const _PastRequestTile({required this.sos});
-  final SosEntry sos;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 10),
-    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-    decoration: cardDecoration(14),
-    child: Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${sos.barangay} · ${sos.landmark}',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                '${formatDate(sos.createdAt)}, ${formatTime(sos.createdAt)}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textMuted,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 10),
-        _StatusChip(sos),
-      ],
-    ),
-  );
 }
 
 class _NationalCard extends StatelessWidget {

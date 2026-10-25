@@ -85,7 +85,7 @@ class PatientStore extends ChangeNotifier {
 
     final photo = p.getString(_k('photo'));
     photoPath = (photo != null && File(photo).existsSync()) ? photo : null;
-    sosHoldSeconds = p.getInt(_k('sos_hold')) ?? 2;
+    sosHoldSeconds = (p.getInt(_k('sos_hold')) ?? 2).clamp(1, 3);
     // The server's copy wins: it is what decides which notifications are sent.
     final server = AuthService.instance.currentUser?.notificationPrefs ?? {};
     for (final e in toggleDefaults.entries) {

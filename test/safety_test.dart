@@ -65,7 +65,7 @@ void main() {
     expect(find.text('Rural Health Unit · Temporary number'), findsOneWidget);
     expect(find.text('CENPELCO'), findsOneWidget);
     expect(
-      find.text('Requests you send with the SOS button will be listed here.'),
+      find.text('Your past SOS requests are in History.'),
       findsOneWidget,
     );
   });

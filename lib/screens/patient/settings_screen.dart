@@ -10,37 +10,6 @@ import 'patient_ui.dart';
 class SettingsTab extends StatelessWidget {
   const SettingsTab({super.key});
 
-  Future<void> _clearHistory(BuildContext context) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Clear activity history?'),
-        content: const Text(
-          'This removes the SOS entries saved on this phone from History. '
-          'Your check-ups, home visits and the SOS list in the Safety tab '
-          'come from the server and stay.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Clear', style: TextStyle(color: AppColors.red)),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) return;
-
-    await PatientStore.instance.clearActivities();
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Activity history cleared')));
-  }
-
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -93,8 +62,8 @@ class SettingsTab extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     const Text(
-                      'How long you press and hold the SOS button before it '
-                      'activates. Longer holds prevent accidental alerts.',
+                      'How long you hold the SOS button before it sends. '
+                      'A longer hold avoids sending one by accident.',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textMuted,
@@ -106,9 +75,9 @@ class SettingsTab extends StatelessWidget {
                       child: SegmentedButton<int>(
                         showSelectedIcon: false,
                         segments: const [
+                          ButtonSegment(value: 1, label: Text('1 sec')),
                           ButtonSegment(value: 2, label: Text('2 sec')),
                           ButtonSegment(value: 3, label: Text('3 sec')),
-                          ButtonSegment(value: 5, label: Text('5 sec')),
                         ],
                         selected: {store.sosHoldSeconds},
                         onSelectionChanged: (s) => store.setSosHold(s.first),
@@ -120,15 +89,6 @@ class SettingsTab extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
-            ]),
-            _label('Data'),
-            _card([
-              _NavTile(
-                icon: Icons.delete_sweep_outlined,
-                title: 'Clear activity history',
-                subtitle: 'Remove SOS entries saved on this phone',
-                onTap: () => _clearHistory(context),
               ),
             ]),
             _label('About'),
