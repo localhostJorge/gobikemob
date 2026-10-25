@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'ui_kit.dart';
 
 /// Result of classifying a vital sign: a label, a color and an optional
 /// patient-friendly note.
@@ -18,12 +19,13 @@ class VitalStatus {
 /// Blood pressure follows the 2017 ACC/AHA adult guideline.
 /// These are SCREENING labels only, not diagnoses.
 class Vitals {
-  static const _green = Color(0xFF2E9E5B);
-  static const _amber = Color(0xFFD99A00);
-  static const _orange = Color(0xFFF2711C);
-  static const _red = Color(0xFFE53935);
+  // Readable shades: these are used as text on a light chip (4.5:1+).
+  static const _green = AppColors.greenText;
+  static const _amber = Color(0xFFB45309);
+  static const _orange = AppColors.orangeText;
+  static const _red = AppColors.redText;
   static const _darkRed = Color(0xFF8E0000);
-  static const _blue = Color(0xFF3B5BDB);
+  static const _blue = AppColors.blue;
 
   /// Thresholds below are for adults only.
   static bool isAdult(int age) => age >= 18;
@@ -132,14 +134,13 @@ class StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: status.color.withValues(alpha: 0.12),
+        color: status.color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         status.label,
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w800,
+        style: T.meta.copyWith(
+          fontWeight: FontWeight.w700,
           color: status.color,
         ),
       ),
@@ -158,10 +159,7 @@ class StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     if (status != null) return StatusChip(status: status!);
     if (!adult) {
-      return const Text(
-        'Ask a health worker',
-        style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
-      );
+      return const Text('Ask a health worker', style: T.meta);
     }
     return const SizedBox.shrink();
   }
@@ -178,7 +176,7 @@ class ScreeningNote extends StatelessWidget {
         'These labels are screening readings, not a diagnosis. '
         'Please consult a health worker about your results.',
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+        style: T.meta,
       ),
     );
   }

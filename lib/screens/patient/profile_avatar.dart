@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'app_colors.dart';
 import 'patient_store.dart';
+import 'ui_kit.dart';
 
 /// Circular profile picture. Shows the patient's photo if they added one,
 /// otherwise a person icon. With [showCamera] a small camera badge appears
@@ -60,12 +61,15 @@ class ProfileAvatar extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF3A3B3C),
+                    color: AppColors.textDark,
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2),
                   ),
-                  child: const Icon(Icons.photo_camera,
-                      size: 16, color: Colors.white),
+                  child: const Icon(
+                    Icons.photo_camera,
+                    size: 16,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -83,33 +87,37 @@ Future<void> changeProfilePhoto(BuildContext context) async {
   final choice = await showModalBottomSheet<String>(
     context: context,
     backgroundColor: Colors.white,
+    showDragHandle: true,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(Rd.sheet)),
     ),
     builder: (ctx) => SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(height: 8),
           ListTile(
             leading: const Icon(Icons.photo_camera_outlined),
-            title: const Text('Take a photo'),
+            title: const Text('Take a photo', style: T.body),
             onTap: () => Navigator.pop(ctx, 'camera'),
           ),
           ListTile(
             leading: const Icon(Icons.photo_library_outlined),
-            title: const Text('Choose from gallery'),
+            title: const Text('Choose from gallery', style: T.body),
             onTap: () => Navigator.pop(ctx, 'gallery'),
           ),
           if (store.photoPath != null)
             ListTile(
-              leading:
-                  const Icon(Icons.delete_outline, color: AppColors.red),
-              title: const Text('Remove photo',
-                  style: TextStyle(color: AppColors.red)),
+              leading: const Icon(
+                Icons.delete_outline_rounded,
+                color: AppColors.redText,
+              ),
+              title: Text(
+                'Remove photo',
+                style: T.body.copyWith(color: AppColors.redText),
+              ),
               onTap: () => Navigator.pop(ctx, 'remove'),
             ),
-          const SizedBox(height: 8),
+          const SizedBox(height: Sp.sm),
         ],
       ),
     ),

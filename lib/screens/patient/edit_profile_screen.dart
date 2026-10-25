@@ -102,7 +102,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: patientAppBar(context, 'Edit Profile'),
+      appBar: patientAppBar(context, 'Edit profile'),
       body: SafeArea(
         child: Column(
           children: [
@@ -110,7 +110,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               child: SingleChildScrollView(
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                padding: const EdgeInsets.fromLTRB(
+                  Sp.gutter,
+                  Sp.sm,
+                  Sp.gutter,
+                  Sp.lg,
+                ),
                 child: Form(
                   key: _form,
                   autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -123,33 +128,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           onCameraTap: () => changeProfilePhoto(context),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: Sp.sm),
                       const Text(
                         'Tap the camera to change your photo',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textMuted,
-                        ),
+                        style: T.meta,
                       ),
-                      const SizedBox(height: 22),
+                      const SizedBox(height: Sp.xl),
                       TextFormField(
                         controller: _name,
                         textCapitalization: TextCapitalization.words,
                         decoration: inputDecoration(
-                          'Full Name',
+                          'Full name',
                           Icons.person_outline,
                         ),
                         validator: (v) => (v == null || v.trim().length < 2)
                             ? 'Enter your full name'
                             : null,
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: Sp.lg),
                       // Read-only: the email is the login and can't be changed here.
                       TextFormField(
                         controller: _email,
                         readOnly: true,
                         enableInteractiveSelection: true,
-                        style: const TextStyle(color: AppColors.textMuted),
+                        style: T.body.copyWith(color: AppColors.textMuted),
                         decoration:
                             inputDecoration(
                               'Email',
@@ -164,12 +166,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               helperText: "Your email is your login and can't be changed.",
                             ),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: Sp.lg),
                       TextFormField(
                         controller: _mobile,
                         keyboardType: TextInputType.phone,
                         decoration: inputDecoration(
-                          'Mobile Number',
+                          'Mobile number',
                           Icons.phone_outlined,
                         ),
                         validator: (v) =>
@@ -177,7 +179,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             ? null
                             : 'Use 11 digits starting with 09',
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: Sp.lg),
                       DropdownButtonFormField<String>(
                         initialValue: _barangay,
                         isExpanded: true,
@@ -198,10 +200,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               ),
             ),
+            // The one main action, always in the same spot.
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: primaryButton(
-                label: 'SAVE CHANGES',
+              padding: const EdgeInsets.fromLTRB(
+                Sp.gutter,
+                Sp.xs,
+                Sp.gutter,
+                Sp.lg,
+              ),
+              child: PrimaryButton(
+                label: 'Save changes',
                 loading: _saving,
                 onPressed: _dirty ? _save : null,
               ),

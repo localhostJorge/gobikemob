@@ -48,14 +48,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final hasLetter = RegExp(r'[A-Za-z]').hasMatch(p);
     final hasDigit = RegExp(r'\d').hasMatch(p);
     if (p.length < _minLength) {
-      return (label: 'Too short', color: AppColors.red);
+      return (label: 'Too short', color: AppColors.redText);
     }
     if (p.length >= 10 && hasLetter && hasDigit) {
-      return (label: 'Strong', color: const Color(0xFF2E9E5B));
+      return (label: 'Strong', color: AppColors.greenText);
     }
     return (
       label: 'Okay - use 10+ characters with letters and numbers',
-      color: AppColors.orange,
+      color: AppColors.orangeText,
     );
   }
 
@@ -98,7 +98,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       backgroundColor: AppColors.background,
       appBar: patientAppBar(
         context,
-        _setting ? 'Set a Password' : 'Change Password',
+        _setting ? 'Set a password' : 'Change password',
       ),
       body: SafeArea(
         child: Column(
@@ -107,7 +107,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               child: SingleChildScrollView(
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                padding: const EdgeInsets.fromLTRB(
+                  Sp.gutter,
+                  Sp.sm,
+                  Sp.gutter,
+                  Sp.lg,
+                ),
                 child: Form(
                   key: _form,
                   autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -131,7 +136,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           controller: _current,
                           obscureText: !_showCurrent,
                           decoration: inputDecoration(
-                            'Current Password',
+                            'Current password',
                             Icons.lock_outline,
                             suffix: _eye(
                               _showCurrent,
@@ -143,13 +148,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                               ? 'Enter your current password'
                               : null,
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: Sp.lg),
                       ],
                       TextFormField(
                         controller: _new,
                         obscureText: !_showNew,
                         decoration: inputDecoration(
-                          'New Password',
+                          'New password',
                           Icons.lock_reset_outlined,
                           suffix: _eye(
                             _showNew,
@@ -171,19 +176,18 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           padding: const EdgeInsets.fromLTRB(6, 6, 0, 0),
                           child: Text(
                             strength.label,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                            style: T.meta.copyWith(
+                              fontWeight: FontWeight.w700,
                               color: strength.color,
                             ),
                           ),
                         ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: Sp.lg),
                       TextFormField(
                         controller: _confirm,
                         obscureText: !_showConfirm,
                         decoration: inputDecoration(
-                          'Confirm New Password',
+                          'Confirm new password',
                           Icons.check_circle_outline,
                           suffix: _eye(
                             _showConfirm,
@@ -199,9 +203,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: primaryButton(
-                label: 'UPDATE PASSWORD',
+              padding: const EdgeInsets.fromLTRB(
+                Sp.gutter,
+                Sp.xs,
+                Sp.gutter,
+                Sp.lg,
+              ),
+              child: PrimaryButton(
+                label: _setting ? 'Set password' : 'Update password',
                 loading: _saving,
                 onPressed: _save,
               ),

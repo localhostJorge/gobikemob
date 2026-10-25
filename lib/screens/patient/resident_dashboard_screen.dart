@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../core/appointments.dart';
 import '../../core/app_navigator.dart' show vibratePhone;
+import '../../core/appointments.dart';
 import '../../core/auth_service.dart';
 import '../../core/resident_sos.dart';
 import '../../core/resident_visits.dart';
@@ -16,7 +16,9 @@ import 'profile.dart';
 import 'profile_avatar.dart';
 import 'safety_tab.dart';
 import 'settings_screen.dart';
+import 'skeletons.dart';
 import 'sos_button.dart';
+import 'ui_kit.dart';
 import 'visit_record.dart' show formatDate;
 
 class ResidentDashboardScreen extends StatefulWidget {
@@ -87,6 +89,12 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     return (b == null || b.isEmpty) ? null : '$b, Bugallon';
   }
 
+  Future<void> _refreshHome() => Future.wait([
+    ResidentVisits.instance.load(),
+    ResidentAppointments.instance.load(),
+    ResidentSos.instance.load(),
+  ]);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -107,50 +115,45 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   }
 
   Widget _home() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _header(),
-          const SizedBox(height: 28),
-          // The one thing that must be easy to find: first, and biggest.
-          Center(
-            child: ListenableBuilder(
-              listenable: PatientStore.instance,
-              builder: (context, _) {
-                final hold = PatientStore.instance.sosHoldSeconds;
-                return SosButton(
-                  // New key so the button restarts when the hold time changes.
-                  key: ValueKey(hold),
-                  holdDuration: Duration(seconds: hold),
-                  onActivated: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const EmergencyRequestScreen(),
+    return RefreshIndicator(
+      color: AppColors.red,
+      onRefresh: _refreshHome,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(Sp.gutter, Sp.lg, Sp.gutter, Sp.xxl),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _header(),
+            const SizedBox(height: Sp.xl + Sp.sm),
+            // The one thing that must be easy to find: first, and biggest.
+            Center(
+              child: ListenableBuilder(
+                listenable: PatientStore.instance,
+                builder: (context, _) {
+                  final hold = PatientStore.instance.sosHoldSeconds;
+                  return SosButton(
+                    // New key so the button restarts when the hold time changes.
+                    key: ValueKey(hold),
+                    holdDuration: Duration(seconds: hold),
+                    onActivated: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const EmergencyRequestScreen(),
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
-          ),
-          // An open SOS shows right here, under the button.
-          HomeSosStatus(active: _tab == 0),
-          const SizedBox(height: 28),
-          const MobileNumberPrompt(),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(4, 0, 4, 10),
-            child: Text(
-              'Your health',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
+                  );
+                },
               ),
             ),
-          ),
-          const _HealthList(),
-        ],
+            // An open SOS shows right here, under the button.
+            HomeSosStatus(active: _tab == 0),
+            const SizedBox(height: Sp.xl + Sp.sm),
+            const MobileNumberPrompt(),
+            const SectionHeader('Your health'),
+            const _HealthList(),
+          ],
+        ),
       ),
     );
   }
@@ -167,17 +170,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '$_greeting, $_firstName',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      height: 1.2,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textDark,
-                    ),
-                  ),
+                  Text('$_greeting, $_firstName', style: T.title),
                   if (place != null) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: Sp.xs),
                     Row(
                       children: [
                         const Icon(
@@ -185,15 +180,12 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                           size: 16,
                           color: AppColors.textMuted,
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: Sp.xs),
                         Flexible(
                           child: Text(
                             place,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textMuted,
-                            ),
+                            style: T.secondary,
                           ),
                         ),
                       ],
@@ -202,7 +194,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: Sp.md),
             Semantics(
               button: true,
               label: 'Your profile',
@@ -231,7 +223,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFECE7E7))),
+        border: Border(top: BorderSide(color: AppColors.line)),
       ),
       child: BottomNavigationBar(
         currentIndex: _tab,
@@ -239,11 +231,12 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
         elevation: 0,
-        selectedItemColor: AppColors.red,
+        selectedItemColor: AppColors.redText,
         unselectedItemColor: AppColors.textMuted,
         selectedFontSize: 12,
         unselectedFontSize: 12,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700),
+        selectedLabelStyle: T.meta.copyWith(fontWeight: FontWeight.w700),
+        unselectedLabelStyle: T.meta,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
@@ -252,7 +245,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.history_rounded),
-            activeIcon: Icon(Icons.history_rounded),
             label: 'History',
           ),
           BottomNavigationBarItem(
@@ -284,26 +276,29 @@ class _HealthList extends StatelessWidget {
         ResidentAppointments.instance,
       ]),
       builder: (context, _) {
-        final visits = ResidentVisits.instance.visits;
-        final last = visits.isEmpty
-            ? null
-            : visits.reduce((a, b) => a.date.isAfter(b.date) ? a : b);
-        final visit = ResidentAppointments.instance.current;
+        final visits = ResidentVisits.instance;
+        final appointments = ResidentAppointments.instance;
+        // Skeleton only until both have answered once; refreshes keep the rows.
+        final loading =
+            (!visits.loaded && visits.loading) ||
+            (!appointments.loaded && appointments.loading);
 
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFECE7E7)),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
+        final last = visits.visits.isEmpty
+            ? null
+            : visits.visits.reduce((a, b) => a.date.isAfter(b.date) ? a : b);
+        final visit = appointments.current;
+
+        return LoadSwitcher(
+          loading: loading,
+          skeleton: const HealthListSkeleton(),
+          child: CardGroup(
+            dividerIndent: 52,
             children: [
-              _HealthRow(
+              NavRow(
                 icon: Icons.favorite_border_rounded,
                 color: AppColors.blue,
                 title: 'Medical history',
-                detail: last == null
+                subtitle: last == null
                     ? 'No check-ups yet'
                     : 'Last check-up ${formatDate(last.date)} · '
                           'BP ${last.systolic}/${last.diastolic}',
@@ -314,12 +309,11 @@ class _HealthList extends StatelessWidget {
                   ),
                 ),
               ),
-              const Divider(height: 1, indent: 52, color: Color(0xFFF0ECEC)),
-              _HealthRow(
+              NavRow(
                 icon: Icons.home_outlined,
-                color: AppColors.orange,
+                color: AppColors.orangeText,
                 title: 'Home visit',
-                detail: visit == null
+                subtitle: visit == null
                     ? 'Ask a GoBiker to check on you at home'
                     : '${visit.statusLabel} · ${formatDate(visit.preferredDate)}',
                 onTap: () => Navigator.push(
@@ -331,69 +325,6 @@ class _HealthList extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _HealthRow extends StatelessWidget {
-  const _HealthRow({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.detail,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String detail;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 64),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
-          child: Row(
-            children: [
-              Icon(icon, size: 22, color: color),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      detail,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.35,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.textMuted,
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

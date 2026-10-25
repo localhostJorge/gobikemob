@@ -4,10 +4,9 @@ import '../../core/appointments.dart';
 import '../../core/auth_service.dart';
 import 'app_colors.dart';
 import 'emergency_request_screen.dart' show kLocations;
-import 'patient_ui.dart';
+import 'skeletons.dart';
+import 'ui_kit.dart';
 import 'visit_record.dart' show formatDate;
-
-const _green = Color(0xFF2E9E5B);
 
 ({IconData icon, Color color, String help}) _statusStyle(
   Appointment a,
@@ -20,7 +19,7 @@ const _green = Color(0xFF2E9E5B);
   ),
   'completed' => (
     icon: Icons.check_circle_rounded,
-    color: _green,
+    color: AppColors.greenText,
     help: 'Your visit is done. The check-up is in your Medical History.',
   ),
   'declined' => (
@@ -35,7 +34,7 @@ const _green = Color(0xFF2E9E5B);
   ),
   _ => (
     icon: Icons.schedule_rounded,
-    color: AppColors.orange,
+    color: AppColors.orangeText,
     help: 'Waiting for a GoBiker in your barangay to accept it.',
   ),
 };
@@ -51,6 +50,9 @@ class AppointmentScreen extends StatefulWidget {
 
 class _AppointmentScreenState extends State<AppointmentScreen> {
   final _store = ResidentAppointments.instance;
+  final _formKey = GlobalKey<_RequestFormState>();
+  final _sending = ValueNotifier<bool>(false);
+  bool _cancelling = false;
 
   @override
   void initState() {
@@ -58,34 +60,29 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
     _store.load();
   }
 
+  @override
+  void dispose() {
+    _sending.dispose();
+    super.dispose();
+  }
+
   Future<void> _cancel(Appointment a) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Cancel this visit?'),
-        content: Text(
-          a.gobikerName == null
-              ? 'Your request will be withdrawn.'
-              : '${a.gobikerName} will be told not to come.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep it'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Cancel visit',
-              style: TextStyle(color: AppColors.red),
-            ),
-          ),
-        ],
-      ),
+    final ok = await showConfirm(
+      context,
+      title: 'Cancel this visit?',
+      message: a.gobikerName == null
+          ? 'Your request will be withdrawn.'
+          : '${a.gobikerName} will be told not to come.',
+      confirmLabel: 'Cancel visit',
+      cancelLabel: 'Keep it',
+      destructive: true,
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
+
+    setState(() => _cancelling = true);
     final error = await _store.cancel(a.id);
     if (!mounted) return;
+    setState(() => _cancelling = false);
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -97,51 +94,87 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: patientAppBar(context, 'Home Visit'),
+      appBar: patientAppBar(context, 'Home visit'),
       body: SafeArea(
         child: ListenableBuilder(
           listenable: _store,
           builder: (context, _) {
-            if (!_store.loaded && _store.loading) {
-              return const Center(
-                child: CircularProgressIndicator(color: AppColors.red),
-              );
-            }
-            if (!_store.loaded && _store.error != null) {
-              return _LoadError(message: _store.error!, onRetry: _store.load);
+            final firstLoad = !_store.loaded;
+            if (firstLoad && !_store.loading && _store.error != null) {
+              return ErrorState(message: _store.error!, onRetry: _store.load);
             }
 
             final current = _store.current;
             final past = _store.appointments.where((a) => !a.isOpen).toList();
 
-            return RefreshIndicator(
-              color: AppColors.red,
-              onRefresh: _store.load,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            return LoadSwitcher(
+              loading: firstLoad && _store.loading,
+              skeleton: const Padding(
+                padding: EdgeInsets.fromLTRB(
+                  Sp.gutter,
+                  Sp.sm,
+                  Sp.gutter,
+                  Sp.xl,
+                ),
+                child: VisitCardSkeleton(),
+              ),
+              child: Column(
                 children: [
-                  if (current != null)
-                    _StatusCard(
-                      appointment: current,
-                      onCancel: () => _cancel(current),
-                    )
-                  else
-                    const _RequestForm(),
-                  if (past.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    const Text(
-                      'PAST REQUESTS',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
-                        color: AppColors.textMuted,
+                  Expanded(
+                    child: RefreshIndicator(
+                      color: AppColors.red,
+                      onRefresh: _store.load,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(
+                          Sp.gutter,
+                          Sp.sm,
+                          Sp.gutter,
+                          Sp.xl,
+                        ),
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        children: [
+                          if (current != null)
+                            _StatusCard(
+                              appointment: current,
+                              cancelling: _cancelling,
+                              onCancel: () => _cancel(current),
+                            )
+                          else
+                            _RequestForm(key: _formKey, sending: _sending),
+                          if (past.isNotEmpty) ...[
+                            const SizedBox(height: Sp.xl),
+                            const SectionHeader('Past requests'),
+                            CardGroup(
+                              dividerIndent: 52,
+                              children: [
+                                for (final a in past) _PastRow(appointment: a),
+                              ],
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    for (final a in past) _PastTile(appointment: a),
-                  ],
+                  ),
+                  // The one main action, always in the same spot.
+                  if (current == null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        Sp.gutter,
+                        Sp.xs,
+                        Sp.gutter,
+                        Sp.lg,
+                      ),
+                      child: ValueListenableBuilder<bool>(
+                        valueListenable: _sending,
+                        builder: (context, sending, _) => PrimaryButton(
+                          label: 'Request visit',
+                          loading: sending,
+                          onPressed: () => _formKey.currentState?.submit(),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             );
@@ -153,8 +186,13 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
 }
 
 class _StatusCard extends StatelessWidget {
-  const _StatusCard({required this.appointment, required this.onCancel});
+  const _StatusCard({
+    required this.appointment,
+    required this.cancelling,
+    required this.onCancel,
+  });
   final Appointment appointment;
+  final bool cancelling;
   final VoidCallback onCancel;
 
   @override
@@ -164,139 +202,90 @@ class _StatusCard extends StatelessWidget {
     return Semantics(
       container: true,
       liveRegion: true,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: cardDecoration().copyWith(
-          border: Border.all(color: s.color.withValues(alpha: 0.5), width: 1.5),
-        ),
+      child: AppCard(
+        borderColor: s.color.withValues(alpha: 0.5),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(s.icon, color: s.color),
-                const SizedBox(width: 8),
+                Icon(s.icon, color: s.color, size: 22),
+                const SizedBox(width: Sp.sm),
                 Expanded(
                   child: Text(
                     a.statusLabel,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: s.color,
-                    ),
+                    style: T.heading.copyWith(color: s.color),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              s.help,
-              style: const TextStyle(
-                fontSize: 13.5,
-                height: 1.4,
-                color: AppColors.textDark,
-              ),
+            const SizedBox(height: Sp.sm),
+            Text(s.help, style: T.body),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: Sp.lg),
+              child: Divider(height: 1, color: AppColors.divider),
             ),
-            const Divider(height: 24),
-            _row(
+            _FactRow(
               Icons.event_rounded,
               '${formatDate(a.preferredDate)} · ${a.windowLabel}',
             ),
-            _row(Icons.home_outlined, '${a.address}, ${a.barangay}'),
-            _row(Icons.notes_rounded, a.reason),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton(
-                onPressed: onCancel,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.red,
-                  side: const BorderSide(color: AppColors.red),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  'Cancel visit',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ),
+            _FactRow(Icons.home_outlined, '${a.address}, ${a.barangay}'),
+            _FactRow(Icons.notes_rounded, a.reason),
+            const SizedBox(height: Sp.lg),
+            SecondaryButton(
+              label: 'Cancel visit',
+              destructive: true,
+              loading: cancelling,
+              onPressed: onCancel,
             ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _row(IconData icon, String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 6),
+class _FactRow extends StatelessWidget {
+  const _FactRow(this.icon, this.text);
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: Sp.sm),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 18, color: AppColors.textMuted),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(fontSize: 13.5, color: AppColors.textDark),
-          ),
-        ),
+        const SizedBox(width: Sp.md),
+        Expanded(child: Text(text, style: T.body)),
       ],
     ),
   );
 }
 
-class _PastTile extends StatelessWidget {
-  const _PastTile({required this.appointment});
+class _PastRow extends StatelessWidget {
+  const _PastRow({required this.appointment});
   final Appointment appointment;
 
   @override
   Widget build(BuildContext context) {
     final a = appointment;
     final s = _statusStyle(a);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: cardDecoration(14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(s.icon, color: s.color, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${a.statusLabel} · ${formatDate(a.preferredDate)}',
-                  style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  a.status == 'declined' ? s.help : a.reason,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return NavRow(
+      icon: s.icon,
+      color: s.color,
+      title: '${a.statusLabel} · ${formatDate(a.preferredDate)}',
+      subtitle: a.status == 'declined' ? s.help : a.reason,
     );
   }
 }
 
 class _RequestForm extends StatefulWidget {
-  const _RequestForm();
+  const _RequestForm({super.key, required this.sending});
+
+  /// The screen's button shows this while the request is being sent.
+  final ValueNotifier<bool> sending;
 
   @override
   State<_RequestForm> createState() => _RequestFormState();
@@ -308,8 +297,8 @@ class _RequestFormState extends State<_RequestForm> {
   final _reason = TextEditingController();
   late String? _barangay = _homeBarangay();
   DateTime? _date;
+  bool _dateMissing = false;
   String _window = 'morning';
-  bool _sending = false;
 
   static List<String> get _barangays => kLocations['Bugallon'] ?? const [];
 
@@ -334,15 +323,21 @@ class _RequestFormState extends State<_RequestForm> {
       lastDate: today.add(const Duration(days: 30)),
       helpText: 'Preferred visit date',
     );
-    if (picked != null) setState(() => _date = picked);
+    if (picked != null) {
+      setState(() {
+        _date = picked;
+        _dateMissing = false;
+      });
+    }
   }
 
-  Future<void> _submit() async {
+  /// Called by the screen's "Request visit" button.
+  Future<void> submit() async {
     final valid = _form.currentState!.validate();
-    if (_date == null) setState(() {}); // show the date error
+    setState(() => _dateMissing = _date == null);
     if (!valid || _date == null) return;
 
-    setState(() => _sending = true);
+    widget.sending.value = true;
     final error = await ResidentAppointments.instance.request(
       barangay: _barangay!,
       address: _address.text,
@@ -350,8 +345,8 @@ class _RequestFormState extends State<_RequestForm> {
       window: _window,
       reason: _reason.text,
     );
+    widget.sending.value = false;
     if (!mounted) return;
-    setState(() => _sending = false);
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -371,26 +366,15 @@ class _RequestFormState extends State<_RequestForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Request a home check-up',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textDark,
-            ),
-          ),
-          const SizedBox(height: 4),
+          const Text('Request a home check-up', style: T.title),
+          const SizedBox(height: Sp.sm),
           const Text(
             'A GoBiker in your barangay will visit to check your blood '
             'pressure, pulse, temperature and more. For emergencies, use the '
             'SOS button instead.',
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.4,
-              color: AppColors.textMuted,
-            ),
+            style: T.secondary,
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: Sp.xl),
           DropdownButtonFormField<String>(
             initialValue: _barangay,
             isExpanded: true,
@@ -402,7 +386,7 @@ class _RequestFormState extends State<_RequestForm> {
             onChanged: (v) => setState(() => _barangay = v),
             validator: (v) => v == null ? 'Select your barangay' : null,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: Sp.lg),
           TextFormField(
             controller: _address,
             textCapitalization: TextCapitalization.sentences,
@@ -415,23 +399,13 @@ class _RequestFormState extends State<_RequestForm> {
                 ? 'Tell the GoBiker where to find you'
                 : null,
           ),
-          const SizedBox(height: 14),
-          _DateField(
-            date: _date,
-            onTap: _pickDate,
-            showError: _date == null && _form.currentState != null,
-          ),
-          const SizedBox(height: 14),
-          const Text(
-            'Time of day',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textDark,
-            ),
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(height: Sp.lg),
+          _DateField(date: _date, onTap: _pickDate, showError: _dateMissing),
+          const SizedBox(height: Sp.lg),
+          const Text('Time of day', style: T.label),
+          const SizedBox(height: Sp.sm),
           SegmentedButton<String>(
+            showSelectedIcon: false,
             segments: const [
               ButtonSegment(
                 value: 'morning',
@@ -448,11 +422,14 @@ class _RequestFormState extends State<_RequestForm> {
             onSelectionChanged: (s) => setState(() => _window = s.first),
             style: SegmentedButton.styleFrom(
               minimumSize: const Size(0, 48),
-              selectedBackgroundColor: AppColors.redSoft,
-              selectedForegroundColor: AppColors.red,
+              textStyle: T.label.copyWith(fontFamily: kFontFamily),
+              side: const BorderSide(color: AppColors.line),
+              selectedBackgroundColor: AppColors.textDark,
+              selectedForegroundColor: Colors.white,
+              foregroundColor: AppColors.textDark,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: Sp.lg),
           TextFormField(
             controller: _reason,
             minLines: 3,
@@ -466,12 +443,6 @@ class _RequestFormState extends State<_RequestForm> {
             validator: (v) => (v == null || v.trim().length < 3)
                 ? 'Tell the GoBiker why you need a visit'
                 : null,
-          ),
-          const SizedBox(height: 8),
-          primaryButton(
-            label: 'REQUEST VISIT',
-            loading: _sending,
-            onPressed: _submit,
           ),
         ],
       ),
@@ -498,7 +469,7 @@ class _DateField extends StatelessWidget {
     excludeSemantics: true,
     child: InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(Rd.control),
       child: InputDecorator(
         decoration: inputDecoration(
           'Preferred date',
@@ -506,49 +477,10 @@ class _DateField extends StatelessWidget {
         ).copyWith(errorText: showError ? 'Choose a date' : null),
         child: Text(
           date == null ? 'Choose a date' : formatDate(date!),
-          style: TextStyle(
-            fontSize: 15,
-            color: date == null ? AppColors.textMuted : AppColors.textDark,
-          ),
+          style: date == null
+              ? T.body.copyWith(color: AppColors.textMuted)
+              : T.body,
         ),
-      ),
-    ),
-  );
-}
-
-class _LoadError extends StatelessWidget {
-  const _LoadError({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.cloud_off_rounded,
-            size: 52,
-            color: AppColors.textMuted,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.textMuted),
-          ),
-          const SizedBox(height: 14),
-          OutlinedButton(
-            onPressed: onRetry,
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(48, 48),
-              foregroundColor: AppColors.red,
-            ),
-            child: const Text('Try again'),
-          ),
-        ],
       ),
     ),
   );

@@ -4,7 +4,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'app_colors.dart';
 import 'notification_settings_screen.dart';
 import 'patient_store.dart';
-import 'patient_ui.dart';
+import 'skeletons.dart';
+import 'ui_kit.dart';
 
 /// Content of the Settings tab in the resident dashboard.
 class SettingsTab extends StatelessWidget {
@@ -17,158 +18,101 @@ class SettingsTab extends StatelessWidget {
       builder: (context, _) {
         final store = PatientStore.instance;
 
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(4, 0, 4, 8),
-              child: Text(
-                'Settings',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
+            const TabHeader('Settings'),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  Sp.gutter,
+                  Sp.sm,
+                  Sp.gutter,
+                  Sp.xl,
                 ),
-              ),
-            ),
-            _label('Notifications'),
-            _card([
-              _NavTile(
-                icon: Icons.notifications_none_rounded,
-                title: 'Notification Settings',
-                subtitle: 'Choose which alerts you receive',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const NotificationSettingsScreen(),
-                  ),
-                ),
-              ),
-            ]),
-            _label('Emergency SOS'),
-            _card([
-              Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Hold time',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text(
-                      'How long you hold the SOS button before it sends. '
-                      'A longer hold avoids sending one by accident.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: SegmentedButton<int>(
-                        showSelectedIcon: false,
-                        segments: const [
-                          ButtonSegment(value: 1, label: Text('1 sec')),
-                          ButtonSegment(value: 2, label: Text('2 sec')),
-                          ButtonSegment(value: 3, label: Text('3 sec')),
-                        ],
-                        selected: {store.sosHoldSeconds},
-                        onSelectionChanged: (s) => store.setSosHold(s.first),
-                        style: SegmentedButton.styleFrom(
-                          selectedBackgroundColor: AppColors.redSoft,
-                          selectedForegroundColor: AppColors.red,
+                children: [
+                  const SectionHeader('Notifications'),
+                  CardGroup(
+                    children: [
+                      NavRow(
+                        icon: Icons.notifications_none_rounded,
+                        title: 'Notification settings',
+                        subtitle: 'Choose which alerts you receive',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const NotificationSettingsScreen(),
+                          ),
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: Sp.xl),
+                  const SectionHeader('Emergency SOS'),
+                  AppCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Hold time', style: T.rowTitle),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'How long you hold the SOS button before it sends. '
+                          'A longer hold avoids sending one by accident.',
+                          style: T.secondary,
+                        ),
+                        const SizedBox(height: Sp.lg),
+                        SizedBox(
+                          width: double.infinity,
+                          child: SegmentedButton<int>(
+                            showSelectedIcon: false,
+                            segments: const [
+                              ButtonSegment(value: 1, label: Text('1 sec')),
+                              ButtonSegment(value: 2, label: Text('2 sec')),
+                              ButtonSegment(value: 3, label: Text('3 sec')),
+                            ],
+                            selected: {store.sosHoldSeconds},
+                            onSelectionChanged: (s) =>
+                                store.setSosHold(s.first),
+                            style: SegmentedButton.styleFrom(
+                              minimumSize: const Size(0, 48),
+                              textStyle: T.label.copyWith(
+                                fontFamily: kFontFamily,
+                              ),
+                              side: const BorderSide(color: AppColors.line),
+                              selectedBackgroundColor: AppColors.textDark,
+                              selectedForegroundColor: Colors.white,
+                              foregroundColor: AppColors.textDark,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: Sp.xl),
+                  const SectionHeader('About'),
+                  CardGroup(
+                    children: [
+                      FutureBuilder<PackageInfo>(
+                        future: PackageInfo.fromPlatform(),
+                        builder: (context, snap) => NavRow(
+                          icon: Icons.info_outline_rounded,
+                          title: 'RondaGo',
+                          subtitle: snap.hasData
+                              ? 'Version ${snap.data!.version}'
+                              : null,
+                          subtitleWidget: snap.hasData
+                              ? null
+                              : const LineSkeleton(width: 80),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ]),
-            _label('About'),
-            _card([
-              FutureBuilder<PackageInfo>(
-                future: PackageInfo.fromPlatform(),
-                builder: (context, snap) => _NavTile(
-                  icon: Icons.info_outline_rounded,
-                  title: 'RondaGo',
-                  subtitle: snap.hasData
-                      ? 'Version ${snap.data!.version}'
-                      : 'Version',
-                ),
-              ),
-            ]),
+            ),
           ],
         );
       },
-    );
-  }
-
-  Widget _label(String text) => Padding(
-    padding: const EdgeInsets.fromLTRB(4, 14, 4, 8),
-    child: Text(
-      text,
-      style: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w800,
-        color: AppColors.textMuted,
-      ),
-    ),
-  );
-
-  Widget _card(List<Widget> children) => Container(
-    decoration: cardDecoration(),
-    child: Column(children: children),
-  );
-}
-
-class _NavTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback? onTap;
-
-  const _NavTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      onTap: onTap,
-      leading: Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: AppColors.redSoft,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: AppColors.red, size: 20),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-          color: AppColors.textDark,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-      ),
-      trailing: onTap == null
-          ? null
-          : const Icon(Icons.chevron_right, color: AppColors.textMuted),
     );
   }
 }

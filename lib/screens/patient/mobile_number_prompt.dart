@@ -5,7 +5,7 @@ import '../../core/resident_visits.dart';
 import 'app_colors.dart';
 import 'edit_profile_screen.dart';
 import 'patient_store.dart';
-import 'patient_ui.dart';
+import 'ui_kit.dart';
 
 /// Shown on the resident's home until they add a mobile number. Check-ups are
 /// matched to a resident by name and mobile number, so without one their
@@ -30,59 +30,23 @@ class MobileNumberPrompt extends StatelessWidget {
           return const SizedBox.shrink();
         }
         return Padding(
-          padding: const EdgeInsets.only(bottom: 14),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: cardDecoration().copyWith(
-              border: Border.all(
-                color: AppColors.orange.withValues(alpha: 0.6),
-              ),
-            ),
+          padding: const EdgeInsets.only(bottom: Sp.xl),
+          child: AppCard(
+            borderColor: AppColors.orangeText.withValues(alpha: 0.5),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
-                  children: [
-                    Icon(Icons.phone_android_rounded, color: AppColors.orange),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Add your mobile number',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textDark,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
+                const Text('Add your mobile number', style: T.rowTitle),
+                const SizedBox(height: Sp.xs),
                 const Text(
                   'GoBikers record check-ups with your name and mobile number. '
                   'Add yours so your check-ups appear in your Medical History.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    height: 1.4,
-                    color: AppColors.textDark,
-                  ),
+                  style: T.secondary,
                 ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 48,
-                  child: FilledButton(
-                    onPressed: () => _open(context),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.orange,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Add mobile number',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                  ),
+                const SizedBox(height: Sp.md),
+                SecondaryButton(
+                  label: 'Add mobile number',
+                  onPressed: () => _open(context),
                 ),
               ],
             ),

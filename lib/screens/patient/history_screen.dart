@@ -7,9 +7,10 @@ import '../../core/resident_visits.dart';
 import 'app_colors.dart';
 import 'patient_store.dart';
 import 'safety_tab.dart' show sosStatusStyle;
+import 'skeletons.dart';
+import 'ui_kit.dart';
 import 'visit_details_screen.dart';
 import 'visit_record.dart';
-import 'visits_status.dart';
 
 enum _Filter { all, checkups, visits, sos }
 
@@ -77,7 +78,7 @@ class _HistoryTabState extends State<HistoryTab> {
           subtitle: 'For ${formatDate(a.preferredDate)} · ${a.barangay}',
           time: a.createdAt,
           status: a.statusLabel,
-          statusColor: a.isOpen ? AppColors.orange : AppColors.textMuted,
+          statusColor: a.isOpen ? AppColors.orangeText : AppColors.textMuted,
         ),
       for (final v in _visits.visits) ...[
         _Item(
@@ -121,34 +122,17 @@ class _HistoryTabState extends State<HistoryTab> {
   ]);
 
   Future<void> _clear() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Clear history?'),
-        content: const Text(
+    final ok = await showConfirm(
+      context,
+      title: 'Clear history?',
+      message:
           'This removes finished SOS requests and closed home visits from '
           'your history.\n\nYour check-ups stay, because they are your '
           'medical record. Requests that are still open also stay.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Clear',
-              style: TextStyle(
-                color: AppColors.red,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
+      confirmLabel: 'Clear',
+      destructive: true,
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
 
     setState(() => _clearing = true);
     final res = await AuthService.instance.callAuthed(
@@ -207,55 +191,72 @@ class _HistoryTabState extends State<HistoryTab> {
           }
         }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'History',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
-                      ),
-                    ),
+        Widget body;
+        if (firstLoad && _visits.error != null && items.isEmpty) {
+          body = ErrorState(message: _visits.error!, onRetry: _refresh);
+        } else {
+          body = RefreshIndicator(
+            color: AppColors.red,
+            onRefresh: _refresh,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                Sp.gutter,
+                Sp.sm,
+                Sp.gutter,
+                Sp.xl,
+              ),
+              children: [
+                if (_visits.error != null)
+                  InlineNotice(
+                    message: "Couldn't refresh. Showing what was saved.",
+                    onAction: _refresh,
                   ),
-                  if (_hasClearable)
-                    TextButton.icon(
-                      onPressed: _clearing ? null : _clear,
-                      icon: _clearing
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.delete_outline_rounded, size: 20),
-                      label: const Text('Clear'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.textMuted,
-                        minimumSize: const Size(48, 48),
-                        textStyle: const TextStyle(
-                          fontSize: 14,
+                if (items.isEmpty)
+                  _Empty(filter: _filter)
+                else
+                  for (final (label, dayItems) in days) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, Sp.md, 4, Sp.sm),
+                      child: Text(
+                        label,
+                        style: T.secondary.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
-                ],
-              ),
+                    CardGroup(
+                      dividerIndent: 52,
+                      children: [for (final i in dayItems) _Row(item: i)],
+                    ),
+                  ],
+              ],
+            ),
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TabHeader(
+              'History',
+              trailing: _hasClearable
+                  ? QuietButton(
+                      label: 'Clear',
+                      icon: Icons.delete_outline_rounded,
+                      onPressed: _clearing ? null : _clear,
+                    )
+                  : null,
             ),
             SizedBox(
               height: 48,
               child: ListView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: Sp.gutter),
                 children: [
                   for (final f in _Filter.values)
                     Padding(
-                      padding: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.only(right: Sp.sm),
                       child: ChoiceChip(
                         label: Text(f.label),
                         selected: _filter == f,
@@ -265,11 +266,9 @@ class _HistoryTabState extends State<HistoryTab> {
                         side: BorderSide(
                           color: _filter == f
                               ? AppColors.textDark
-                              : Colors.grey.shade300,
+                              : AppColors.line,
                         ),
-                        labelStyle: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
+                        labelStyle: T.label.copyWith(
                           color: _filter == f
                               ? Colors.white
                               : AppColors.textDark,
@@ -281,73 +280,15 @@ class _HistoryTabState extends State<HistoryTab> {
               ),
             ),
             Expanded(
-              child: firstLoad && _visits.loading
-                  ? const VisitsLoading()
-                  : firstLoad && _visits.error != null && items.isEmpty
-                  ? VisitsLoadError(message: _visits.error!, onRetry: _refresh)
-                  : RefreshIndicator(
-                      color: AppColors.red,
-                      onRefresh: _refresh,
-                      child: ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                        children: [
-                          if (_visits.error != null)
-                            VisitsErrorBanner(
-                              message: _visits.error!,
-                              onRetry: _refresh,
-                            ),
-                          if (items.isEmpty)
-                            _Empty(filter: _filter)
-                          else
-                            for (final (label, dayItems) in days) ...[
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
-                                child: Text(
-                                  label,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textMuted,
-                                  ),
-                                ),
-                              ),
-                              _DayCard(items: dayItems),
-                            ],
-                        ],
-                      ),
-                    ),
+              child: LoadSwitcher(
+                loading: firstLoad && _visits.loading,
+                skeleton: const HistorySkeleton(),
+                child: body,
+              ),
             ),
           ],
         );
       },
-    );
-  }
-}
-
-/// The entries of one day in a single card, separated by thin lines.
-class _DayCard extends StatelessWidget {
-  const _DayCard({required this.items});
-  final List<_Item> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFECE7E7)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0)
-              const Divider(height: 1, indent: 52, color: Color(0xFFF0ECEC)),
-            _Row(item: items[i]),
-          ],
-        ],
-      ),
     );
   }
 }
@@ -357,8 +298,8 @@ class _Row extends StatelessWidget {
   final _Item item;
 
   ({IconData icon, Color color}) get _look => switch (item.kind) {
-    _Kind.sos => (icon: Icons.sos_rounded, color: AppColors.red),
-    _Kind.visit => (icon: Icons.home_outlined, color: AppColors.orange),
+    _Kind.sos => (icon: Icons.sos_rounded, color: AppColors.redText),
+    _Kind.visit => (icon: Icons.home_outlined, color: AppColors.orangeText),
     _Kind.checkup => (
       icon: Icons.favorite_border_rounded,
       color: AppColors.blue,
@@ -381,7 +322,7 @@ class _Row extends StatelessWidget {
               ),
             ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+        padding: const EdgeInsets.fromLTRB(Sp.lg, 14, Sp.md, 14),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -394,32 +335,19 @@ class _Row extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textDark,
-                    ),
-                  ),
+                  Text(item.title, style: T.rowTitle),
                   const SizedBox(height: 2),
                   Text(
                     item.subtitle,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      height: 1.35,
-                      color: AppColors.textMuted,
-                    ),
+                    style: T.secondary,
                   ),
                   if (item.status != null) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: Sp.xs),
                     Text(
                       item.status!,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                      style: T.label.copyWith(
                         color: item.statusColor ?? AppColors.textMuted,
                       ),
                     ),
@@ -427,11 +355,8 @@ class _Row extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Text(
-              formatTime(item.time),
-              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-            ),
+            const SizedBox(width: Sp.sm),
+            Text(formatTime(item.time), style: T.meta),
             if (visit != null)
               const Padding(
                 padding: EdgeInsets.only(left: 2),
@@ -453,33 +378,13 @@ class _Empty extends StatelessWidget {
   final _Filter filter;
 
   @override
-  Widget build(BuildContext context) {
-    final text = switch (filter) {
+  Widget build(BuildContext context) => EmptyState(
+    title: 'Nothing here yet',
+    message: switch (filter) {
       _Filter.checkups => 'Check-ups a GoBiker records for you will show here.',
       _Filter.visits => 'Home visits you request will show here.',
       _Filter.sos => 'SOS requests you send will show here.',
       _Filter.all => 'Check-ups, home visits and SOS requests will show here.',
-    };
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 64, 24, 24),
-      child: Column(
-        children: [
-          const Text(
-            'Nothing here yet',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textDark,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            text,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 14, color: AppColors.textMuted),
-          ),
-        ],
-      ),
-    );
-  }
+    },
+  );
 }

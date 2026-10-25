@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app_colors.dart';
+import 'ui_kit.dart';
 
 /// Hold-to-activate SOS button. The ring around it fills while the user
 /// holds; letting go early cancels, so a stray tap never sends an SOS.
@@ -136,29 +137,15 @@ class _SosButtonState extends State<SosButton> with TickerProviderStateMixin {
                             shape: BoxShape.circle,
                           ),
                           alignment: Alignment.center,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                'SOS',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 40,
-                                  height: 1,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                holding ? 'Keep holding' : 'Press and hold',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
+                          child: const Text(
+                            'SOS',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 40,
+                              height: 1,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.5,
+                            ),
                           ),
                         ),
                       ),
@@ -169,10 +156,17 @@ class _SosButtonState extends State<SosButton> with TickerProviderStateMixin {
             ),
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          'Hold for $_seconds to send an SOS',
-          style: const TextStyle(fontSize: 14, color: AppColors.textMuted),
+        const SizedBox(height: Sp.xs),
+        AnimatedBuilder(
+          animation: _hold,
+          builder: (context, _) => Text(
+            _hold.value > 0
+                ? 'Keep holding…'
+                : 'Hold for $_seconds to send an SOS',
+            style: _hold.value > 0
+                ? T.label.copyWith(color: AppColors.redText)
+                : T.secondary,
+          ),
         ),
       ],
     );

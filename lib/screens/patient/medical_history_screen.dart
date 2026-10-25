@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../core/resident_visits.dart';
 import 'app_colors.dart';
+import 'skeletons.dart';
+import 'ui_kit.dart';
 import 'visit_details_screen.dart';
 import 'visit_record.dart';
-import 'visits_status.dart';
 import 'vital_status.dart';
 
 /// Read-only list of the patient's GoBiker check-ups, newest first.
@@ -16,39 +17,23 @@ class MedicalHistoryScreen extends StatelessWidget {
     final store = ResidentVisits.instance;
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textDark),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Medical History',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textDark,
-          ),
-        ),
-      ),
+      appBar: patientAppBar(context, 'Medical history'),
       body: SafeArea(
         child: ListenableBuilder(
           listenable: store,
           builder: (context, _) {
-            if (!store.loaded && store.loading) return const VisitsLoading();
-            if (!store.loaded && store.error != null) {
-              return VisitsLoadError(
-                message: store.error!,
-                onRetry: store.load,
-              );
+            final firstLoad = !store.loaded;
+            if (firstLoad && !store.loading && store.error != null) {
+              return ErrorState(message: store.error!, onRetry: store.load);
             }
-            return RefreshIndicator(
-              color: AppColors.red,
-              onRefresh: store.load,
-              child: _list(store),
+            return LoadSwitcher(
+              loading: firstLoad && store.loading,
+              skeleton: const MedicalHistorySkeleton(),
+              child: RefreshIndicator(
+                color: AppColors.red,
+                onRefresh: store.load,
+                child: _list(store),
+              ),
             );
           },
         ),
@@ -58,106 +43,85 @@ class MedicalHistoryScreen extends StatelessWidget {
 
   Widget _list(ResidentVisits store) {
     final sorted = [...store.visits]..sort((a, b) => b.date.compareTo(a.date));
-    final banner = store.error == null
+    const padding = EdgeInsets.fromLTRB(Sp.gutter, Sp.sm, Sp.gutter, Sp.xl);
+
+    final notice = store.error == null
         ? null
-        : VisitsErrorBanner(message: store.error!, onRetry: store.load);
+        : InlineNotice(
+            message: "Couldn't refresh. Showing what was saved.",
+            onAction: store.load,
+          );
 
     if (sorted.isEmpty) {
       // Still scrollable, so pull-to-refresh works on the empty state too.
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        children: [?banner, const SizedBox(height: 60), const _EmptyState()],
+        padding: padding,
+        children: [
+          ?notice,
+          const EmptyState(
+            title: 'No records yet',
+            message:
+                'Your health records from GoBiker visits will appear here.',
+          ),
+        ],
       );
     }
 
+    final earlier = sorted.skip(1).toList();
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: padding,
       children: [
-        ?banner,
+        ?notice,
         _LatestCard(record: sorted.first),
-        const SizedBox(height: 22),
-        const Text(
-          'Visit History',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textDark,
+        if (earlier.isNotEmpty) ...[
+          const SizedBox(height: Sp.xl),
+          const SectionHeader('Earlier visits'),
+          CardGroup(
+            dividerIndent: Sp.lg,
+            children: [for (final v in earlier) _VisitRow(record: v)],
           ),
-        ),
-        const SizedBox(height: 10),
-        for (final v in sorted)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _VisitCard(record: v),
-          ),
-        const SizedBox(height: 6),
+        ],
+        const SizedBox(height: Sp.xl),
         const ScreeningNote(),
       ],
     );
   }
 }
 
-BoxDecoration _cardDecoration() => BoxDecoration(
-  color: AppColors.card,
-  borderRadius: BorderRadius.circular(16),
-  boxShadow: [
-    BoxShadow(
-      color: Colors.black.withValues(alpha: 0.05),
-      blurRadius: 10,
-      offset: const Offset(0, 3),
-    ),
-  ],
-);
-
+/// The most recent check-up, opened to its vitals.
 class _LatestCard extends StatelessWidget {
   final VisitRecord record;
   const _LatestCard({required this.record});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: _cardDecoration(),
+    return AppCard(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => VisitDetailsScreen(record: record)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.monitor_heart_outlined,
-                color: AppColors.red,
-                size: 18,
-              ),
-              const SizedBox(width: 6),
-              const Text(
-                'LATEST VITALS',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.5,
-                  color: AppColors.red,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                formatDate(record.date),
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textMuted,
-                ),
-              ),
+              const Expanded(child: Text('Latest check-up', style: T.rowTitle)),
+              Text(formatDate(record.date), style: T.meta),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: Sp.xs),
+          Text('${record.place} · ${record.gobikerName}', style: T.secondary),
+          const SizedBox(height: Sp.lg),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: _Stat(
-                  label: 'Blood Pressure',
+                  label: 'Blood pressure',
                   value: '${record.systolic}/${record.diastolic}',
+                  unit: 'mmHg',
                   footer: StatusBadge(
                     status: record.bpStatus,
                     adult: record.isAdult,
@@ -165,29 +129,44 @@ class _LatestCard extends StatelessWidget {
                 ),
               ),
               Expanded(
-                child: _Stat(label: 'Pulse', value: '${record.pulse} bpm'),
+                child: _Stat(
+                  label: 'Pulse',
+                  value: '${record.pulse}',
+                  unit: 'bpm',
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: Sp.lg),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: _Stat(
                   label: 'Temperature',
-                  value: '${record.temperature.toStringAsFixed(1)} °C',
+                  value: record.temperature.toStringAsFixed(1),
+                  unit: '°C',
                 ),
               ),
               Expanded(
-                child: _Stat(
-                  label: 'Blood sugar',
-                  value: record.bloodSugar == null
-                      ? 'Not tested'
-                      : '${record.bloodSugar} mg/dL',
-                ),
+                child: record.bloodSugar == null
+                    ? const _Stat(
+                        label: 'Blood sugar',
+                        value: '—',
+                        unit: 'Not tested',
+                      )
+                    : _Stat(
+                        label: 'Blood sugar',
+                        value: '${record.bloodSugar}',
+                        unit: 'mg/dL',
+                      ),
               ),
             ],
+          ),
+          const SizedBox(height: Sp.md),
+          const Align(
+            alignment: Alignment.centerRight,
+            child: Text('See all details', style: T.meta),
           ),
         ],
       ),
@@ -195,171 +174,79 @@ class _LatestCard extends StatelessWidget {
   }
 }
 
+/// One reading: a big value with its unit beside it.
 class _Stat extends StatelessWidget {
   final String label;
   final String value;
+  final String unit;
   final Widget? footer;
 
-  const _Stat({required this.label, required this.value, this.footer});
+  const _Stat({
+    required this.label,
+    required this.value,
+    required this.unit,
+    this.footer,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-        ),
+        Text(label, style: T.secondary),
         const SizedBox(height: 2),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textDark,
+        Text.rich(
+          TextSpan(
+            text: value,
+            style: T.title,
+            children: [TextSpan(text: ' $unit', style: T.secondary)],
           ),
         ),
-        if (footer != null) ...[const SizedBox(height: 4), footer!],
+        if (footer != null) ...[const SizedBox(height: Sp.xs), footer!],
       ],
     );
   }
 }
 
-class _VisitCard extends StatelessWidget {
+class _VisitRow extends StatelessWidget {
   final VisitRecord record;
-  const _VisitCard({required this.record});
+  const _VisitRow({required this.record});
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: Ink(
-        decoration: _cardDecoration(),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => VisitDetailsScreen(record: record),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                Container(
-                  width: 52,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.redSoft,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        '${record.date.day}',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.red,
-                        ),
-                      ),
-                      Text(
-                        monthShort(record.date),
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.red,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        record.place,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textDark,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${formatTime(record.date)} · ${record.gobikerName}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'BP ${record.systolic}/${record.diastolic} · '
-                        'Pulse ${record.pulse}',
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textDark,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      StatusBadge(
-                        status: record.bpStatus,
-                        adult: record.isAdult,
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right, color: AppColors.textMuted),
-              ],
-            ),
-          ),
-        ),
+    return InkWell(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => VisitDetailsScreen(record: record)),
       ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
       child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        padding: const EdgeInsets.fromLTRB(Sp.lg, 14, Sp.md, 14),
+        child: Row(
           children: [
-            Icon(
-              Icons.folder_open_rounded,
-              size: 56,
-              color: AppColors.textMuted,
-            ),
-            SizedBox(height: 14),
-            Text(
-              'No records yet',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(formatDate(record.date), style: T.rowTitle),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${record.place} · ${record.gobikerName}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: T.secondary,
+                  ),
+                  const SizedBox(height: Sp.sm),
+                  Text(
+                    'BP ${record.systolic}/${record.diastolic} · '
+                    'Pulse ${record.pulse}',
+                    style: T.label,
+                  ),
+                  const SizedBox(height: Sp.xs),
+                  StatusBadge(status: record.bpStatus, adult: record.isAdult),
+                ],
               ),
             ),
-            SizedBox(height: 6),
-            Text(
-              'Your health records from GoBiker visits will appear here.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
-            ),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
           ],
         ),
       ),

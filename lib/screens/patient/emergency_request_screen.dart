@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:ui' show PathMetric;
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart' show Position;
@@ -10,6 +9,7 @@ import '../../core/auth_service.dart';
 import '../../core/resident_sos.dart';
 
 import 'app_colors.dart';
+import 'ui_kit.dart';
 
 /// Municipality -> list of barangays.
 /// To support another municipality later, just add another entry here.
@@ -129,7 +129,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
       useSafeArea: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(Rd.sheet)),
       ),
       builder: (_) => _OptionSheet(
         title: title,
@@ -285,24 +285,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.red),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Request Details',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textDark,
-          ),
-        ),
-      ),
+      appBar: patientAppBar(context, 'SOS request'),
       body: SafeArea(
         child: Column(
           children: [
@@ -310,14 +293,24 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
               child: SingleChildScrollView(
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                padding: const EdgeInsets.fromLTRB(
+                  Sp.gutter,
+                  Sp.sm,
+                  Sp.gutter,
+                  Sp.lg,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _titleRow(),
-                    const SizedBox(height: 22),
-                    _sectionHeader('Incident Location'),
-                    const SizedBox(height: 12),
+                    const Text('Tell us what happened', style: T.title),
+                    const SizedBox(height: Sp.xs),
+                    const Text(
+                      'The Go Bike admin sees this as soon as you send it.',
+                      style: T.secondary,
+                    ),
+                    const SizedBox(height: Sp.xl),
+                    _sectionHeader('Where are you?'),
+                    const SizedBox(height: Sp.md),
                     _fieldLabel('Municipality'),
                     _PickerField(
                       value: _municipality,
@@ -326,7 +319,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                       onTap: _chooseMunicipality,
                     ),
                     if (_municipality != null) ...[
-                      const SizedBox(height: 14),
+                      const SizedBox(height: Sp.lg),
                       _fieldLabel('Barangay'),
                       _PickerField(
                         value: _barangay,
@@ -336,7 +329,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                       ),
                     ],
                     if (_barangay != null) ...[
-                      const SizedBox(height: 14),
+                      const SizedBox(height: Sp.lg),
                       _fieldLabel('Landmark'),
                       TextField(
                         controller: _landmark,
@@ -347,17 +340,18 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                         ),
                       ),
                     ],
-                    const SizedBox(height: 22),
-                    _sectionHeader('Incident Description'),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: Sp.xl),
+                    _sectionHeader('What happened?'),
+                    const SizedBox(height: Sp.md),
                     TextField(
                       controller: _description,
                       maxLines: 4,
+                      textCapitalization: TextCapitalization.sentences,
                       decoration: _inputDecoration(
-                        'Briefly describe the emergency...',
+                        'Briefly describe the emergency (optional)',
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: Sp.lg),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -367,13 +361,14 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                               _UploadTile(
                                 icon: Icons.add_a_photo_outlined,
                                 label: _image == null
-                                    ? 'UPLOAD IMAGE'
-                                    : 'CHANGE IMAGE',
+                                    ? 'Add photo'
+                                    : 'Change photo',
                                 onTap: _pickImage,
                               ),
                               if (_image != null) ...[
-                                const SizedBox(height: 10),
+                                const SizedBox(height: Sp.sm),
                                 _PreviewBox(
+                                  label: 'photo',
                                   onRemove: _removeImage,
                                   child: Image.file(
                                     File(_image!.path),
@@ -384,20 +379,21 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: Sp.md),
                         Expanded(
                           child: Column(
                             children: [
                               _UploadTile(
                                 icon: Icons.videocam_outlined,
                                 label: _video == null
-                                    ? 'UPLOAD VIDEO'
-                                    : 'CHANGE VIDEO',
+                                    ? 'Add video'
+                                    : 'Change video',
                                 onTap: _pickVideo,
                               ),
                               if (_video != null && _videoCtrl != null) ...[
-                                const SizedBox(height: 10),
+                                const SizedBox(height: Sp.sm),
                                 _PreviewBox(
+                                  label: 'video',
                                   onRemove: _removeVideo,
                                   child: _videoPreview(_videoCtrl!),
                                 ),
@@ -407,59 +403,32 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: Sp.sm),
                     const Center(
                       child: Text(
-                        'Visual information helps responders prepare better.',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: AppColors.textMuted,
-                        ),
+                        'A photo or video helps responders prepare.',
+                        style: T.meta,
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: Sp.xl),
                     _warning(),
                   ],
                 ),
               ),
             ),
+            // The one main action, always in the same spot.
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: _sending ? null : _send,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.red,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: AppColors.red.withValues(
-                      alpha: 0.5,
-                    ),
-                    elevation: 4,
-                    shadowColor: AppColors.red.withValues(alpha: 0.4),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  icon: _sending
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.send_outlined, size: 18),
-                  label: Text(
-                    _sending ? 'SENDING...' : 'SEND EMERGENCY REQUEST',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
+              padding: const EdgeInsets.fromLTRB(
+                Sp.gutter,
+                Sp.xs,
+                Sp.gutter,
+                Sp.lg,
+              ),
+              child: PrimaryButton(
+                label: 'Send SOS',
+                icon: Icons.send_rounded,
+                loading: _sending,
+                onPressed: _send,
               ),
             ),
           ],
@@ -509,112 +478,50 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   }
 
   InputDecoration _inputDecoration(String hint, {IconData? prefix}) {
-    OutlineInputBorder border(Color color) => OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: BorderSide(color: color),
-    );
+    OutlineInputBorder border(Color color, [double width = 1]) =>
+        OutlineInputBorder(
+          borderRadius: BorderRadius.circular(Rd.control),
+          borderSide: BorderSide(color: color, width: width),
+        );
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: Colors.black38),
+      hintStyle: T.body.copyWith(color: AppColors.textMuted),
       prefixIcon: prefix == null
           ? null
-          : Icon(prefix, color: AppColors.textMuted),
+          : Icon(prefix, color: AppColors.textMuted, size: 22),
       filled: true,
       fillColor: Colors.white,
-      border: border(Colors.grey.shade300),
-      enabledBorder: border(Colors.grey.shade300),
-      focusedBorder: border(AppColors.red),
+      contentPadding: const EdgeInsets.all(Sp.lg),
+      border: border(AppColors.line),
+      enabledBorder: border(AppColors.line),
+      focusedBorder: border(AppColors.textDark, 1.5),
     );
   }
 
   Widget _fieldLabel(String text) => Padding(
     padding: const EdgeInsets.only(bottom: 6),
-    child: Text(
-      text,
-      style: const TextStyle(
-        fontSize: 12.5,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textMuted,
-      ),
-    ),
+    child: Text(text, style: T.label),
   );
 
-  Widget _titleRow() {
-    return Row(
-      children: [
-        Container(
-          width: 76,
-          height: 76,
-          decoration: BoxDecoration(
-            color: AppColors.redSoft,
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColors.red.withValues(alpha: 0.25)),
-          ),
-          child: const Icon(
-            Icons.medical_services_outlined,
-            color: AppColors.red,
-            size: 32,
-          ),
-        ),
-        const SizedBox(width: 14),
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Emergency Request',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
-                ),
-              ),
-              SizedBox(height: 2),
-              Text(
-                'REQUEST IMMEDIATE ASSISTANCE',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.4,
-                  color: AppColors.red,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _sectionHeader(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 15,
-        fontWeight: FontWeight.w800,
-        color: AppColors.textDark,
-      ),
-    );
-  }
+  Widget _sectionHeader(String title) => Text(title, style: T.heading);
 
   Widget _warning() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(Sp.md),
       decoration: BoxDecoration(
         color: AppColors.redSoft,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.red.withValues(alpha: 0.25)),
+        borderRadius: BorderRadius.circular(Rd.control),
       ),
       child: const Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.warning_amber_rounded, color: AppColors.red, size: 20),
-          SizedBox(width: 10),
+          Icon(Icons.info_outline_rounded, color: AppColors.redText, size: 20),
+          SizedBox(width: Sp.md),
           Expanded(
             child: Text(
-              'False reports are punishable by law. Only use this service '
-              'for actual emergencies requiring immediate assistance.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF9B1C1C)),
+              'False reports are punishable by law. Only use this for real '
+              'emergencies that need immediate help.',
+              style: T.secondary,
             ),
           ),
         ],
@@ -640,35 +547,39 @@ class _PickerField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasValue = value != null;
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.textMuted, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                value ?? hint,
-                style: TextStyle(
-                  fontSize: 15,
-                  color: hasValue ? AppColors.textDark : Colors.black38,
-                  fontWeight: hasValue ? FontWeight.w600 : FontWeight.w400,
+    return Semantics(
+      button: true,
+      label: hasValue ? '$hint: $value' : hint,
+      excludeSemantics: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(Rd.control),
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 56),
+          padding: const EdgeInsets.symmetric(horizontal: Sp.lg),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(Rd.control),
+            border: Border.all(color: AppColors.line),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: AppColors.textMuted, size: 22),
+              const SizedBox(width: Sp.md),
+              Expanded(
+                child: Text(
+                  value ?? hint,
+                  style: hasValue
+                      ? T.body.copyWith(fontWeight: FontWeight.w600)
+                      : T.body.copyWith(color: AppColors.textMuted),
                 ),
               ),
-            ),
-            const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: AppColors.textMuted,
-            ),
-          ],
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: AppColors.textMuted,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -728,14 +639,7 @@ class _OptionSheetState extends State<_OptionSheet> {
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: Text(
-                  widget.title,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textDark,
-                  ),
-                ),
+                child: Text(widget.title, style: T.heading),
               ),
             ),
             if (widget.searchable)
@@ -751,7 +655,7 @@ class _OptionSheetState extends State<_OptionSheet> {
                     fillColor: AppColors.background,
                     contentPadding: const EdgeInsets.symmetric(vertical: 12),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(Rd.control),
                       borderSide: BorderSide.none,
                     ),
                   ),
@@ -761,10 +665,7 @@ class _OptionSheetState extends State<_OptionSheet> {
               child: filtered.isEmpty
                   ? const Padding(
                       padding: EdgeInsets.all(32),
-                      child: Text(
-                        'No results found',
-                        style: TextStyle(color: AppColors.textMuted),
-                      ),
+                      child: Text('No results found', style: T.secondary),
                     )
                   : ListView.builder(
                       shrinkWrap: true,
@@ -775,19 +676,16 @@ class _OptionSheetState extends State<_OptionSheet> {
                         return ListTile(
                           title: Text(
                             item,
-                            style: TextStyle(
+                            style: T.body.copyWith(
                               fontWeight: isSelected
-                                  ? FontWeight.w800
-                                  : FontWeight.w500,
-                              color: isSelected
-                                  ? AppColors.red
-                                  : AppColors.textDark,
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
                             ),
                           ),
                           trailing: isSelected
                               ? const Icon(
                                   Icons.check_rounded,
-                                  color: AppColors.red,
+                                  color: AppColors.textDark,
                                 )
                               : null,
                           onTap: () => Navigator.pop(context, item),
@@ -806,32 +704,49 @@ class _OptionSheetState extends State<_OptionSheet> {
 /// Square preview with a remove (X) button in the corner.
 class _PreviewBox extends StatelessWidget {
   final Widget child;
+  final String label;
   final VoidCallback onRemove;
 
-  const _PreviewBox({required this.child, required this.onRemove});
+  const _PreviewBox({
+    required this.child,
+    required this.label,
+    required this.onRemove,
+  });
 
   @override
   Widget build(BuildContext context) {
     return AspectRatio(
       aspectRatio: 1,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(Rd.control),
         child: Stack(
           fit: StackFit.expand,
           children: [
             ColoredBox(color: Colors.black12, child: child),
             Positioned(
-              top: 6,
-              right: 6,
-              child: GestureDetector(
-                onTap: onRemove,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.black54,
-                    shape: BoxShape.circle,
+              top: 0,
+              right: 0,
+              child: Semantics(
+                button: true,
+                label: 'Remove $label',
+                excludeSemantics: true,
+                child: InkWell(
+                  onTap: onRemove,
+                  // A 48-dp target around the small icon.
+                  child: const Padding(
+                    padding: EdgeInsets.all(Sp.sm),
+                    child: SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.close, size: 18, color: Colors.white),
+                      ),
+                    ),
                   ),
-                  child: const Icon(Icons.close, size: 16, color: Colors.white),
                 ),
               ),
             ),
@@ -855,63 +770,34 @@ class _UploadTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: CustomPaint(
-        painter: _DashedRRectPainter(
-          color: AppColors.red.withValues(alpha: 0.6),
-        ),
-        child: Container(
-          height: 96,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: AppColors.redSoft.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: AppColors.red, size: 26),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.red,
-                ),
-              ),
-            ],
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(Rd.control),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(Rd.control),
+          onTap: onTap,
+          child: Container(
+            height: 88,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(Rd.control),
+              border: Border.all(color: AppColors.line),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: AppColors.textDark, size: 24),
+                const SizedBox(height: Sp.sm),
+                Text(label, style: T.label),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
-}
-
-class _DashedRRectPainter extends CustomPainter {
-  final Color color;
-  const _DashedRRectPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    final path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(14)),
-      );
-    for (final PathMetric m in path.computeMetrics()) {
-      double d = 0;
-      while (d < m.length) {
-        canvas.drawPath(m.extractPath(d, d + 6), paint);
-        d += 10;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DashedRRectPainter old) => old.color != color;
 }
