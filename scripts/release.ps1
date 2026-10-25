@@ -116,7 +116,10 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
 # Same version released again (-KeepVersionName): keep the tags unique.
 $tag = "release-$versionName"
 if (git tag --list $tag) { $tag = "release-$versionName-$build" }
-Invoke-Checked 'git commit' { git add pubspec.yaml; git commit -q -m "chore(release): RondaGo $versionName" }
+# With -KeepVersionName the version may already be committed: nothing to commit then.
+git add pubspec.yaml
+git diff --cached --quiet
+if ($LASTEXITCODE -ne 0) { Invoke-Checked 'git commit' { git commit -q -m "chore(release): RondaGo $versionName" } }
 Invoke-Checked 'git tag' { git tag $tag }
 
 Write-Host "release: RondaGo $versionName sent to '$TesterGroups' and tagged $tag." -ForegroundColor Green
