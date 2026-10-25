@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_app_installations/firebase_app_installations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -28,10 +29,16 @@ class PushService {
   static final PushService instance = PushService._();
 
   bool _ready = false;
+  bool _openedInitial = false;
 
   /// This phone's Firebase Installation ID (FID): where the server sends to.
   String? _token;
-  StreamSubscription<String>? _registeredSub;
+
+  /// Whether this phone is registered with the server for the signed-in
+  /// user, or why not. Shown in the resident's Notification Settings.
+  final ValueNotifier<PushStatus> status = ValueNotifier(
+    const PushStatus.unknown(),
+  );
 
   /// Called once from main(). The app still works without Firebase.
   Future<void> init() async {
@@ -40,39 +47,55 @@ class PushService {
       _ready = true;
     } catch (e) {
       debugPrint('[push] Firebase not available: $e');
+      status.value = const PushStatus.failed(
+        'Notifications are not available on this phone.',
+      );
       return;
     }
 
     FirebaseMessaging.onMessage.listen(_onForeground);
     FirebaseMessaging.onMessageOpenedApp.listen((m) => _open(m.data));
+    // Listen from the start: Firebase announces the FID once, often before
+    // anyone has logged in. If it ever changes, tell the server.
+    FirebaseMessaging.instance.onRegistered.listen((fid) {
+      _token = fid;
+      if (AuthService.instance.isLoggedIn) _send(fid);
+    });
   }
 
   /// After login (or a restored session): ask permission and register this
   /// phone with the server so this user's notifications reach it.
   Future<void> registerDevice() async {
     if (!_ready) return;
+    status.value = const PushStatus.working();
     try {
       final messaging = FirebaseMessaging.instance;
       await messaging.requestPermission(); // Android 13+ asks the user once
-
-      // Fires with the FID once registered, and again if it ever changes.
-      _registeredSub ??= messaging.onRegistered.listen((fid) {
-        _token = fid;
-        _send(fid);
-      });
       await messaging.register();
-      // Already registered earlier (e.g. another login on this phone): send it again.
-      if (_token != null) await _send(_token!);
-
-      // The app was opened by tapping a notification while it was closed.
-      final initial = await messaging.getInitialMessage();
-      if (initial != null) _open(initial.data);
+      // Ask for the ID directly instead of waiting for the one-time event,
+      // which may have fired before login.
+      final fid = await FirebaseInstallations.instance.getId();
+      _token = fid;
+      await _send(fid);
     } catch (e) {
       debugPrint('[push] could not register this phone: $e');
+      status.value = const PushStatus.failed(
+        "Couldn't set up notifications. Check your connection and try again.",
+      );
+    }
+
+    // The app was opened by tapping a notification while it was closed.
+    if (!_openedInitial) {
+      _openedInitial = true;
+      try {
+        final initial = await FirebaseMessaging.instance.getInitialMessage();
+        if (initial != null) _open(initial.data);
+      } catch (_) {}
     }
   }
 
   /// Before logout, so the next person on this phone doesn't get them.
+  /// (The phone's Firebase ID stays; it moves to whoever logs in next.)
   Future<void> unregisterDevice() async {
     if (!_ready || _token == null) return;
     await AuthService.instance.callAuthed(
@@ -80,17 +103,19 @@ class PushService {
       '/mobile/device-token',
       body: {'token': _token},
     );
-    try {
-      await FirebaseMessaging.instance.unregister();
-    } catch (_) {}
-    _token = null;
+    status.value = const PushStatus.unknown();
   }
 
-  Future<void> _send(String token) => AuthService.instance.callAuthed(
-    'POST',
-    '/mobile/device-token',
-    body: {'token': token},
-  );
+  Future<void> _send(String token) async {
+    final res = await AuthService.instance.callAuthed(
+      'POST',
+      '/mobile/device-token',
+      body: {'token': token},
+    );
+    status.value = res.ok
+        ? const PushStatus.registered()
+        : PushStatus.failed("Couldn't register this phone: ${res.message}");
+  }
 
   void _onForeground(RemoteMessage message) {
     _refresh(message.data['type']);
@@ -149,4 +174,17 @@ class _SafetyScreen extends StatelessWidget {
     appBar: AppBar(),
     body: const SafeArea(child: SafetyTab(active: true)),
   );
+}
+
+/// Whether this phone is set up to receive the signed-in user's notifications.
+class PushStatus {
+  const PushStatus._(this.state, [this.message]);
+  const PushStatus.unknown() : this._('unknown');
+  const PushStatus.working() : this._('working');
+  const PushStatus.registered() : this._('registered');
+  const PushStatus.failed(String message) : this._('failed', message);
+
+  /// unknown, working, registered or failed.
+  final String state;
+  final String? message;
 }

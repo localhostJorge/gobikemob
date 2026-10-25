@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/push_service.dart';
 import 'app_colors.dart';
 import 'patient_store.dart';
 import 'patient_ui.dart';
@@ -50,6 +51,8 @@ class NotificationSettingsScreen extends StatelessWidget {
                   ),
                 ]),
                 const SizedBox(height: 16),
+                const _PhoneStatus(),
+                const SizedBox(height: 12),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 4),
                   child: Text(
@@ -131,6 +134,81 @@ class _Toggle extends StatelessWidget {
         subtitle,
         style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
       ),
+    );
+  }
+}
+
+/// Whether this phone is set up to receive notifications, with a retry when
+/// it isn't (so testers can see at a glance why nothing arrives).
+class _PhoneStatus extends StatelessWidget {
+  const _PhoneStatus();
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<PushStatus>(
+      valueListenable: PushService.instance.status,
+      builder: (context, status, _) {
+        final (icon, color, text) = switch (status.state) {
+          'registered' => (
+            Icons.check_circle_rounded,
+            const Color(0xFF2E9E5B),
+            'This phone receives your notifications.',
+          ),
+          'working' => (
+            Icons.sync_rounded,
+            AppColors.textMuted,
+            'Setting up notifications on this phone…',
+          ),
+          'failed' => (
+            Icons.error_outline_rounded,
+            AppColors.red,
+            status.message ?? 'Notifications are not set up on this phone.',
+          ),
+          _ => (
+            Icons.help_outline_rounded,
+            AppColors.textMuted,
+            'Not checked yet on this phone.',
+          ),
+        };
+        final canRetry = status.state == 'failed' || status.state == 'unknown';
+
+        return Semantics(
+          liveRegion: true,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
+            decoration: cardDecoration(14),
+            child: Row(
+              children: [
+                Icon(icon, color: color, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    text,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: color == AppColors.textMuted
+                          ? AppColors.textDark
+                          : color,
+                    ),
+                  ),
+                ),
+                if (canRetry)
+                  TextButton(
+                    onPressed: PushService.instance.registerDevice,
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.red,
+                      minimumSize: const Size(48, 48),
+                    ),
+                    child: const Text('Try again'),
+                  )
+                else
+                  const SizedBox(height: 48),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
