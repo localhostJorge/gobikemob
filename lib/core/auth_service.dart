@@ -26,39 +26,6 @@ import 'push_service.dart';
 import 'resident_sos.dart';
 import 'resident_visits.dart';
 
-/// A GoBiker's ronda days and hours, set by the admin.
-class RondaSchedule {
-  const RondaSchedule({
-    required this.days,
-    required this.start,
-    required this.end,
-  });
-
-  final List<String> days; // e.g. ["Mon", "Wed", "Fri"]
-  final String start; // "08:00"
-  final String end; // "12:00"
-
-  static RondaSchedule? fromJson(dynamic raw) {
-    if (raw is! Map) return null;
-    final days = (raw['days'] as List?)?.map((d) => '$d').toList() ?? [];
-    final start = raw['start']?.toString();
-    final end = raw['end']?.toString();
-    if (days.isEmpty || start == null || end == null) return null;
-    return RondaSchedule(days: days, start: start, end: end);
-  }
-
-  /// "Mon, Wed, Fri · 8:00 AM – 12:00 PM"
-  String get label => '${days.join(', ')} · ${_time(start)} – ${_time(end)}';
-
-  static String _time(String hhmm) {
-    final parts = hhmm.split(':');
-    final h = int.tryParse(parts.first) ?? 0;
-    final m = parts.length > 1 ? parts[1] : '00';
-    final h12 = h % 12 == 0 ? 12 : h % 12;
-    return '$h12:$m ${h >= 12 ? 'PM' : 'AM'}';
-  }
-}
-
 /// The logged-in person, as returned by the Laravel API.
 class AppUser {
   const AppUser({
@@ -68,7 +35,6 @@ class AppUser {
     required this.role,
     this.mobile,
     this.barangay,
-    this.schedule,
     this.hasPassword = true,
     this.notificationPrefs = const {},
   });
@@ -79,9 +45,6 @@ class AppUser {
   final String role; // "User" (resident), "GoBiker" or "Admin"
   final String? mobile;
   final String? barangay;
-
-  /// GoBikers only; null when the admin has not set one.
-  final RondaSchedule? schedule;
 
   /// False for a Google sign-in account that never set its own password.
   final bool hasPassword;
@@ -98,7 +61,6 @@ class AppUser {
     role: (json['role'] ?? 'User').toString(),
     mobile: json['mobile']?.toString(),
     barangay: json['barangay']?.toString(),
-    schedule: RondaSchedule.fromJson(json['schedule']),
     hasPassword: json['has_password'] != false,
     notificationPrefs: {
       if (json['notification_prefs'] is Map)
@@ -407,7 +369,7 @@ class AuthService {
     } catch (_) {}
   }
 
-  /// Reloads the signed-in user (e.g. a schedule the admin just changed).
+  /// Reloads the signed-in user (e.g. a barangay the admin just changed).
   /// Keeps the current user when the server can't be reached.
   Future<void> refreshUser() async {
     if (_token == null) return;

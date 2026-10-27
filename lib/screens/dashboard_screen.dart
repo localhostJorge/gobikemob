@@ -52,7 +52,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     GobikerAppointments.instance
       ..addListener(_onAppointmentsChanged)
       ..load(); // visit requests from residents
-    _refreshUser(); // the schedule may have changed
+    _refreshUser(); // the admin may have changed the barangay
   }
 
   void _onAppointmentsChanged() {
@@ -801,22 +801,12 @@ class _DashboardScreenState extends State<DashboardScreen>
               _iconBadge(Icons.location_on_rounded, AppTheme.blue),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Barangay $barangay',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Schedule: ${AuthService.instance.currentUser?.schedule?.label ?? 'not set yet'}',
-                      style: TextStyle(fontSize: 13, color: muted),
-                    ),
-                  ],
+                child: Text(
+                  'Barangay $barangay',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
                 ),
               ),
             ],

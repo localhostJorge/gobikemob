@@ -3,35 +3,22 @@ import 'package:go_bike_app/core/appointments.dart';
 import 'package:go_bike_app/core/auth_service.dart';
 
 void main() {
-  group('ronda schedule', () {
-    test('reads the schedule the admin set and shows it plainly', () {
-      final user = AppUser.fromJson({
-        'id': 1,
-        'name': 'Maria',
-        'email': 'm@example.com',
-        'role': 'GoBiker',
-        'schedule': {
-          'days': ['Mon', 'Wed', 'Fri'],
-          'start': '08:00',
-          'end': '13:30',
-        },
-      });
-
-      expect(user.schedule?.label, 'Mon, Wed, Fri · 8:00 AM – 1:30 PM');
+  test('still reads a GoBiker from an older server that sends a schedule', () {
+    final user = AppUser.fromJson({
+      'id': 1,
+      'name': 'Maria',
+      'email': 'm@example.com',
+      'role': 'GoBiker',
+      'barangay': 'Poblacion',
+      'schedule': {
+        'days': ['Mon'],
+        'start': '08:00',
+        'end': '12:00',
+      },
     });
 
-    test('no schedule when the admin has not set one', () {
-      expect(RondaSchedule.fromJson(null), isNull);
-      expect(
-        RondaSchedule.fromJson({'days': [], 'start': '08:00', 'end': '12:00'}),
-        isNull,
-      );
-    });
-
-    test('midnight and noon read correctly', () {
-      const s = RondaSchedule(days: ['Sun'], start: '00:00', end: '12:00');
-      expect(s.label, 'Sun · 12:00 AM – 12:00 PM');
-    });
+    expect(user.isGoBiker, isTrue);
+    expect(user.barangay, 'Poblacion');
   });
 
   test('reads a visit request', () {
