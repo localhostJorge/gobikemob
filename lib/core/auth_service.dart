@@ -149,6 +149,24 @@ class AuthService {
   bool _googleReady = false;
 
   AppUser? get currentUser => _user;
+
+  /// After the resident changed a notification switch, so the next
+  /// PatientStore.load() starts from what the server now has.
+  void updateNotificationPrefs(Map<String, bool> prefs) {
+    final u = _user;
+    if (u == null) return;
+    _user = AppUser(
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      mobile: u.mobile,
+      barangay: u.barangay,
+      hasPassword: u.hasPassword,
+      notificationPrefs: prefs,
+    );
+  }
+
   String? get token => _token;
   bool get isLoggedIn => _token != null && _user != null;
 

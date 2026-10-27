@@ -134,6 +134,12 @@ class PatientStore extends ChangeNotifier {
       return res.message;
     }
     await p.setBool(_k('t_$key'), value);
+    final saved = res.body['notification_prefs'];
+    if (saved is Map) {
+      AuthService.instance.updateNotificationPrefs({
+        for (final e in saved.entries) '${e.key}': e.value == true,
+      });
+    }
     return null;
   }
 

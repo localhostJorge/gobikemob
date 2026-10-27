@@ -4,6 +4,7 @@ import 'package:firebase_app_installations/firebase_app_installations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PlatformException;
 
 import '../screens/appointments_screen.dart';
 import '../screens/patient/appointment_screen.dart';
@@ -63,25 +64,51 @@ class PushService {
     });
   }
 
+  Future<void>? _registering;
+
   /// After login (or a restored session): ask permission and register this
   /// phone with the server so this user's notifications reach it.
-  Future<void> registerDevice() async {
+  /// Calls made while one is running wait for that one.
+  Future<void> registerDevice() =>
+      _registering ??= _register().whenComplete(() => _registering = null);
+
+  Future<void> _register() async {
     if (!_ready) return;
     status.value = const PushStatus.working();
+    final messaging = FirebaseMessaging.instance;
+
+    // Android 13+ asks the user once. This throws while another permission
+    // prompt (like location, asked when the app opens) is showing; that is
+    // no reason to give up, so carry on and check the permission at the end.
     try {
-      final messaging = FirebaseMessaging.instance;
-      await messaging.requestPermission(); // Android 13+ asks the user once
-      await messaging.register();
-      // Ask for the ID directly instead of waiting for the one-time event,
-      // which may have fired before login.
-      final fid = await FirebaseInstallations.instance.getId();
+      await messaging.requestPermission();
+    } catch (e) {
+      debugPrint('[push] permission request skipped: $e');
+    }
+
+    try {
+      final fid = await _withRetry(() async {
+        await messaging.register();
+        // Ask for the ID directly instead of waiting for the one-time event,
+        // which may have fired before login.
+        return FirebaseInstallations.instance.getId();
+      });
       _token = fid;
       await _send(fid);
     } catch (e) {
       debugPrint('[push] could not register this phone: $e');
-      status.value = const PushStatus.failed(
-        "Couldn't set up notifications. Check your connection and try again.",
+      status.value = PushStatus.failed(
+        "Couldn't set up notifications on this phone (${_reason(e)}).",
       );
+    }
+
+    if (status.value.state == 'registered') {
+      try {
+        final settings = await messaging.getNotificationSettings();
+        if (settings.authorizationStatus == AuthorizationStatus.denied) {
+          status.value = const PushStatus.blocked();
+        }
+      } catch (_) {}
     }
 
     // The app was opened by tapping a notification while it was closed.
@@ -105,6 +132,29 @@ class PushService {
     );
     status.value = const PushStatus.unknown();
   }
+
+  /// Firebase can fail for a moment right after the app opens, so try
+  /// up to three times before reporting a problem.
+  Future<T> _withRetry<T>(Future<T> Function() attempt) async {
+    const waits = [Duration(seconds: 2), Duration(seconds: 5)];
+    for (var i = 0; ; i++) {
+      try {
+        return await attempt().timeout(const Duration(seconds: 20));
+      } catch (e) {
+        if (i >= waits.length) rethrow;
+        debugPrint('[push] attempt ${i + 1} failed, trying again: $e');
+        await Future<void>.delayed(waits[i]);
+      }
+    }
+  }
+
+  /// A short reason a tester can report, e.g. "SERVICE_NOT_AVAILABLE".
+  String _reason(Object e) => switch (e) {
+    FirebaseException(:final code) => code,
+    PlatformException(:final code) => code,
+    TimeoutException() => 'timed out',
+    _ => e.runtimeType.toString(),
+  };
 
   Future<void> _send(String token) async {
     final res = await AuthService.instance.callAuthed(
@@ -187,7 +237,11 @@ class PushStatus {
   const PushStatus.registered() : this._('registered');
   const PushStatus.failed(String message) : this._('failed', message);
 
-  /// unknown, working, registered or failed.
+  /// Registered, but notifications are turned off for the app in the
+  /// phone's settings, so nothing will show.
+  const PushStatus.blocked() : this._('blocked');
+
+  /// unknown, working, registered, blocked or failed.
   final String state;
   final String? message;
 }

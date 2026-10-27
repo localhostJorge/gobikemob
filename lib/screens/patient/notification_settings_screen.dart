@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart' show Geolocator;
 
 import '../../core/push_service.dart';
 import 'app_colors.dart';
@@ -98,29 +99,68 @@ class _Toggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = PatientStore.instance;
-    return SwitchListTile(
-      value: store.toggle(keyName),
-      onChanged: (v) async {
-        final error = await store.setToggle(keyName, v);
-        if (error != null && context.mounted) {
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(SnackBar(content: Text("Couldn't save: $error")));
-        }
-      },
-      contentPadding: const EdgeInsets.fromLTRB(Sp.lg, 4, Sp.md, 4),
-      activeTrackColor: AppColors.textDark,
-      activeThumbColor: Colors.white,
-      title: Text(title, style: T.rowTitle),
-      subtitle: Text(subtitle, style: T.secondary),
+    // Listens itself: the toggles are const, so the screen's rebuild skips
+    // them and the switch would only move after reopening the screen.
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) => SwitchListTile(
+        value: store.toggle(keyName),
+        onChanged: (v) async {
+          final error = await store.setToggle(keyName, v);
+          if (error != null && context.mounted) {
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(SnackBar(content: Text("Couldn't save: $error")));
+          }
+        },
+        contentPadding: const EdgeInsets.fromLTRB(Sp.lg, 4, Sp.md, 4),
+        activeTrackColor: AppColors.textDark,
+        activeThumbColor: Colors.white,
+        title: Text(title, style: T.rowTitle),
+        subtitle: Text(subtitle, style: T.secondary),
+      ),
     );
   }
 }
 
 /// Whether this phone is set up to receive notifications, with a retry when
 /// it isn't (so testers can see at a glance why nothing arrives).
-class _PhoneStatus extends StatelessWidget {
+class _PhoneStatus extends StatefulWidget {
   const _PhoneStatus();
+
+  @override
+  State<_PhoneStatus> createState() => _PhoneStatusState();
+}
+
+class _PhoneStatusState extends State<_PhoneStatus>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // A failure at app start (e.g. while the location prompt was open) is
+    // often gone by now: check again instead of showing an old error.
+    _recheck();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Back from the phone's settings (maybe after allowing notifications).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _recheck();
+  }
+
+  void _recheck() {
+    final state = PushService.instance.status.value.state;
+    if (state != 'registered' && state != 'working') {
+      PushService.instance.registerDevice();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -137,6 +177,11 @@ class _PhoneStatus extends StatelessWidget {
             Icons.sync_rounded,
             AppColors.textMuted,
             'Setting up notifications on this phone…',
+          ),
+          'blocked' => (
+            Icons.notifications_off_outlined,
+            AppColors.redText,
+            "Notifications are turned off for RondaGo in your phone's settings.",
           ),
           'failed' => (
             Icons.error_outline_rounded,
@@ -173,7 +218,13 @@ class _PhoneStatus extends StatelessWidget {
                           ),
                         ),
                 ),
-                if (canRetry)
+                if (status.state == 'blocked')
+                  QuietButton(
+                    label: 'Open settings',
+                    color: AppColors.redText,
+                    onPressed: Geolocator.openAppSettings,
+                  )
+                else if (canRetry)
                   QuietButton(
                     label: 'Try again',
                     color: AppColors.redText,
