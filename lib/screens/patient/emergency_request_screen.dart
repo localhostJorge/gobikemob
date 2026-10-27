@@ -51,11 +51,12 @@ class EmergencyRequestScreen extends StatefulWidget {
 
 class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   final _description = TextEditingController();
+  final _address = TextEditingController();
   final _landmark = TextEditingController();
   final _picker = ImagePicker();
 
-  String? _municipality;
-  String? _barangay;
+  /// Shows "Required" under empty fields after the resident taps Send.
+  bool _showErrors = false;
 
   XFile? _image;
   XFile? _video;
@@ -72,72 +73,15 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   void initState() {
     super.initState();
     _position; // start looking for the phone's position now
-    // Most emergencies are at home: start from the resident's own barangay.
-    final home = AuthService.instance.currentUser?.barangay;
-    for (final entry in kLocations.entries) {
-      if (entry.value.contains(home)) {
-        _municipality = entry.key;
-        _barangay = home;
-        break;
-      }
-    }
   }
 
   @override
   void dispose() {
     _description.dispose();
+    _address.dispose();
     _landmark.dispose();
     _videoCtrl?.dispose();
     super.dispose();
-  }
-
-  // ---------- location pickers ----------
-
-  Future<void> _chooseMunicipality() async {
-    final result = await _showOptions(
-      title: 'Select Municipality',
-      options: kLocations.keys.toList(),
-      selected: _municipality,
-    );
-    if (result == null || result == _municipality) return;
-    setState(() {
-      _municipality = result;
-      _barangay = null; // barangay depends on municipality
-      _landmark.clear();
-    });
-  }
-
-  Future<void> _chooseBarangay() async {
-    final result = await _showOptions(
-      title: 'Select Barangay',
-      options: kLocations[_municipality] ?? const [],
-      selected: _barangay,
-      searchable: true,
-    );
-    if (result != null) setState(() => _barangay = result);
-  }
-
-  Future<String?> _showOptions({
-    required String title,
-    required List<String> options,
-    String? selected,
-    bool searchable = false,
-  }) {
-    return showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(Rd.sheet)),
-      ),
-      builder: (_) => _OptionSheet(
-        title: title,
-        options: options,
-        selected: selected,
-        searchable: searchable,
-      ),
-    );
   }
 
   // ---------- media ----------
@@ -208,14 +152,13 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   // ---------- send ----------
 
   Future<void> _send() async {
-    if (_municipality == null ||
-        _barangay == null ||
-        _landmark.text.trim().isEmpty) {
+    if (_address.text.trim().isEmpty || _landmark.text.trim().isEmpty) {
+      setState(() => _showErrors = true);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('Please select municipality, barangay and landmark'),
+            content: Text('Please enter your address and a landmark'),
           ),
         );
       return;
@@ -230,8 +173,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
       onTimeout: () => null,
     );
     final result = await ResidentSos.instance.send(
-      municipality: _municipality!,
-      barangay: _barangay!,
+      address: _address.text,
       landmark: _landmark.text,
       description: _description.text,
       position: position,
@@ -310,36 +252,33 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                     ),
                     const SizedBox(height: Sp.xl),
                     _sectionHeader('Where are you?'),
+                    const SizedBox(height: Sp.xs),
+                    Text(_barangayNote(), style: T.meta),
                     const SizedBox(height: Sp.md),
-                    _fieldLabel('Municipality'),
-                    _PickerField(
-                      value: _municipality,
-                      hint: 'Select municipality',
-                      icon: Icons.location_city_outlined,
-                      onTap: _chooseMunicipality,
+                    _fieldLabel('Address'),
+                    TextField(
+                      controller: _address,
+                      textCapitalization: TextCapitalization.words,
+                      textInputAction: TextInputAction.next,
+                      onChanged: (_) => _showErrors ? setState(() {}) : null,
+                      decoration: _inputDecoration(
+                        'House no., street, purok',
+                        prefix: Icons.home_outlined,
+                        error: _requiredError(_address),
+                      ),
                     ),
-                    if (_municipality != null) ...[
-                      const SizedBox(height: Sp.lg),
-                      _fieldLabel('Barangay'),
-                      _PickerField(
-                        value: _barangay,
-                        hint: 'Select barangay',
-                        icon: Icons.map_outlined,
-                        onTap: _chooseBarangay,
+                    const SizedBox(height: Sp.lg),
+                    _fieldLabel('Landmark'),
+                    TextField(
+                      controller: _landmark,
+                      textCapitalization: TextCapitalization.words,
+                      onChanged: (_) => _showErrors ? setState(() {}) : null,
+                      decoration: _inputDecoration(
+                        'e.g. Beside the barangay hall',
+                        prefix: Icons.flag_outlined,
+                        error: _requiredError(_landmark),
                       ),
-                    ],
-                    if (_barangay != null) ...[
-                      const SizedBox(height: Sp.lg),
-                      _fieldLabel('Landmark'),
-                      TextField(
-                        controller: _landmark,
-                        textCapitalization: TextCapitalization.words,
-                        decoration: _inputDecoration(
-                          'e.g. Beside the barangay hall',
-                          prefix: Icons.flag_outlined,
-                        ),
-                      ),
-                    ],
+                    ),
                     const SizedBox(height: Sp.xl),
                     _sectionHeader('What happened?'),
                     const SizedBox(height: Sp.md),
@@ -477,13 +416,31 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
     );
   }
 
-  InputDecoration _inputDecoration(String hint, {IconData? prefix}) {
+  /// The server files the SOS under the resident's own barangay.
+  String _barangayNote() {
+    final barangay = AuthService.instance.currentUser?.barangay;
+    return (barangay == null || barangay.isEmpty)
+        ? 'Set your barangay in your profile so we can find you.'
+        : 'Barangay $barangay, Bugallon (from your profile)';
+  }
+
+  String? _requiredError(TextEditingController c) =>
+      _showErrors && c.text.trim().isEmpty ? 'Required' : null;
+
+  InputDecoration _inputDecoration(
+    String hint, {
+    IconData? prefix,
+    String? error,
+  }) {
     OutlineInputBorder border(Color color, [double width = 1]) =>
         OutlineInputBorder(
           borderRadius: BorderRadius.circular(Rd.control),
           borderSide: BorderSide(color: color, width: width),
         );
     return InputDecoration(
+      errorText: error,
+      errorBorder: border(AppColors.redText),
+      focusedErrorBorder: border(AppColors.redText, 1.5),
       hintText: hint,
       hintStyle: T.body.copyWith(color: AppColors.textMuted),
       prefixIcon: prefix == null
@@ -498,9 +455,22 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
     );
   }
 
+  /// Label for a required field, marked with a red asterisk.
   Widget _fieldLabel(String text) => Padding(
     padding: const EdgeInsets.only(bottom: 6),
-    child: Text(text, style: T.label),
+    child: Text.rich(
+      TextSpan(
+        text: text,
+        style: T.label,
+        children: const [
+          TextSpan(
+            text: ' *',
+            style: TextStyle(color: AppColors.redText),
+          ),
+        ],
+      ),
+      semanticsLabel: '$text, required',
+    ),
   );
 
   Widget _sectionHeader(String title) => Text(title, style: T.heading);
@@ -525,177 +495,6 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Tappable field that looks like a dropdown and opens a bottom sheet.
-class _PickerField extends StatelessWidget {
-  final String? value;
-  final String hint;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _PickerField({
-    required this.value,
-    required this.hint,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final hasValue = value != null;
-    return Semantics(
-      button: true,
-      label: hasValue ? '$hint: $value' : hint,
-      excludeSemantics: true,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(Rd.control),
-        onTap: onTap,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 56),
-          padding: const EdgeInsets.symmetric(horizontal: Sp.lg),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(Rd.control),
-            border: Border.all(color: AppColors.line),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: AppColors.textMuted, size: 22),
-              const SizedBox(width: Sp.md),
-              Expanded(
-                child: Text(
-                  value ?? hint,
-                  style: hasValue
-                      ? T.body.copyWith(fontWeight: FontWeight.w600)
-                      : T.body.copyWith(color: AppColors.textMuted),
-                ),
-              ),
-              const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: AppColors.textMuted,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Bottom sheet list with an optional search bar at the top.
-class _OptionSheet extends StatefulWidget {
-  final String title;
-  final List<String> options;
-  final String? selected;
-  final bool searchable;
-
-  const _OptionSheet({
-    required this.title,
-    required this.options,
-    required this.selected,
-    required this.searchable,
-  });
-
-  @override
-  State<_OptionSheet> createState() => _OptionSheetState();
-}
-
-class _OptionSheetState extends State<_OptionSheet> {
-  String _query = '';
-
-  @override
-  Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
-    final maxHeight = (media.size.height * 0.8 - media.viewInsets.bottom).clamp(
-      240.0,
-      700.0,
-    );
-
-    final filtered = widget.options
-        .where((o) => o.toLowerCase().contains(_query.trim().toLowerCase()))
-        .toList();
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxHeight),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(widget.title, style: T.heading),
-              ),
-            ),
-            if (widget.searchable)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: TextField(
-                  autofocus: false,
-                  onChanged: (v) => setState(() => _query = v),
-                  decoration: InputDecoration(
-                    hintText: 'Search barangay',
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    fillColor: AppColors.background,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(Rd.control),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-              ),
-            Flexible(
-              child: filtered.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Text('No results found', style: T.secondary),
-                    )
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: filtered.length,
-                      itemBuilder: (context, i) {
-                        final item = filtered[i];
-                        final isSelected = item == widget.selected;
-                        return ListTile(
-                          title: Text(
-                            item,
-                            style: T.body.copyWith(
-                              fontWeight: isSelected
-                                  ? FontWeight.w700
-                                  : FontWeight.w400,
-                            ),
-                          ),
-                          trailing: isSelected
-                              ? const Icon(
-                                  Icons.check_rounded,
-                                  color: AppColors.textDark,
-                                )
-                              : null,
-                          onTap: () => Navigator.pop(context, item),
-                        );
-                      },
-                    ),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
       ),
     );
   }

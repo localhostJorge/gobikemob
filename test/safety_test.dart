@@ -46,6 +46,22 @@ void main() {
     expect(SosEntry.fromJson({'status': 'resolved'}).isOpen, isFalse);
   });
 
+  test('shows where the SOS is, with or without a typed address', () {
+    final typed = SosEntry.fromJson({
+      'barangay': 'Poblacion',
+      'address': '12 Rizal St., Purok 2',
+      'landmark': 'Beside the chapel',
+    });
+    expect(typed.place, '12 Rizal St., Purok 2, Poblacion · Beside the chapel');
+
+    // Requests sent before the address field existed.
+    final older = SosEntry.fromJson({
+      'barangay': 'Poblacion',
+      'landmark': 'Beside the chapel',
+    });
+    expect(older.place, 'Poblacion · Beside the chapel');
+  });
+
   testWidgets('the Safety tab lists 911 first and every hotline', (
     tester,
   ) async {
@@ -86,7 +102,7 @@ void main() {
     );
 
     expect(find.text('Someone is Responding'), findsOneWidget);
-    expect(find.textContaining('Salomague Sur, Bugallon'), findsOneWidget);
+    expect(find.text('Salomague Sur · bahay'), findsOneWidget);
   });
 
   testWidgets('an open SOS can be marked resolved; a resolved one cannot', (

@@ -304,10 +304,7 @@ class _SosRequestCardState extends State<SosRequestCard> {
               ],
             ),
             const SizedBox(height: Sp.md),
-            Text(
-              '${sos.barangay}, ${sos.municipality} · ${sos.landmark}',
-              style: T.body,
-            ),
+            Text(sos.place, style: T.body),
             const SizedBox(height: Sp.xs),
             Text(
               'Sent ${formatDate(sos.createdAt)}, ${formatTime(sos.createdAt)}',

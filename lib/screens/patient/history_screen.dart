@@ -66,7 +66,7 @@ class _HistoryTabState extends State<HistoryTab> {
         _Item(
           kind: _Kind.sos,
           title: 'SOS request',
-          subtitle: '${s.barangay} · ${s.landmark}',
+          subtitle: s.place,
           time: s.createdAt,
           status: sosStatusStyle(s).label,
           statusColor: sosStatusStyle(s).color,

@@ -13,6 +13,7 @@ class SosEntry {
     required this.barangay,
     required this.landmark,
     required this.createdAt,
+    this.address = '',
     this.description,
     this.hasPhoto = false,
     this.hasVideo = false,
@@ -28,6 +29,9 @@ class SosEntry {
   final String statusLabel;
   final String municipality;
   final String barangay;
+
+  /// Typed by the resident (house no., street, purok). Empty on older requests.
+  final String address;
   final String landmark;
   final String? description;
   final bool hasPhoto;
@@ -41,6 +45,12 @@ class SosEntry {
 
   bool get isOpen => status != 'resolved';
 
+  /// Where the emergency is, e.g. "12 Rizal St., Poblacion · Beside the chapel".
+  String get place => [
+    [address, barangay].where((s) => s.isNotEmpty).join(', '),
+    landmark,
+  ].where((s) => s.isNotEmpty).join(' · ');
+
   factory SosEntry.fromJson(Map<String, dynamic> j) {
     DateTime? date(dynamic v) => DateTime.tryParse('${v ?? ''}')?.toLocal();
     return SosEntry(
@@ -49,6 +59,7 @@ class SosEntry {
       statusLabel: '${j['status_label'] ?? 'Sent'}',
       municipality: '${j['municipality'] ?? ''}',
       barangay: '${j['barangay'] ?? ''}',
+      address: '${j['address'] ?? ''}'.trim(),
       landmark: '${j['landmark'] ?? ''}',
       description: (j['description'] as String?)?.trim(),
       hasPhoto: j['image_url'] != null,
@@ -106,9 +117,9 @@ class ResidentSos extends ChangeNotifier {
 
   /// Sends the request itself (no media). The admin is alerted as soon as
   /// this succeeds, so it must not wait for a photo or video upload.
+  /// The server files it under the resident's own barangay.
   Future<({SosEntry? sos, String? error})> send({
-    required String municipality,
-    required String barangay,
+    required String address,
     required String landmark,
     String? description,
     Position? position,
@@ -117,8 +128,7 @@ class ResidentSos extends ChangeNotifier {
       'POST',
       '/resident/sos',
       body: {
-        'municipality': municipality,
-        'barangay': barangay,
+        'address': address.trim(),
         'landmark': landmark.trim(),
         if (description != null && description.trim().isNotEmpty)
           'description': description.trim(),
