@@ -6,15 +6,19 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show PlatformException;
 
+import '../screens/announcements_screen.dart';
 import '../screens/appointments_screen.dart';
+import '../screens/patient_management_screen.dart';
 import '../screens/patient/appointment_screen.dart';
 import '../screens/patient/medical_history_screen.dart';
 import '../screens/patient/safety_tab.dart';
 import '../widgets/app_toast.dart';
+import 'announcements.dart';
 import 'app_navigator.dart';
 import 'appointments.dart';
 import 'auth_service.dart';
 import 'emergency_watcher.dart';
+import 'follow_up_alerts.dart';
 import 'resident_sos.dart';
 import 'resident_visits.dart';
 
@@ -207,6 +211,10 @@ class PushService {
         GobikerAppointments.instance.load();
       case 'emergency':
         if (EmergencyWatcher.instance.isOpen) EmergencyWatcher.instance.check();
+      case 'announcement':
+        Announcements.instance.refresh();
+      case 'follow_up':
+        FollowUpAlerts.instance.refresh();
     }
   }
 
@@ -222,6 +230,8 @@ class PushService {
       'checkup' => const MedicalHistoryScreen(),
       'appointment_request' ||
       'appointment_assigned' => const AppointmentsScreen(),
+      'announcement' => const AnnouncementsScreen(),
+      'follow_up' => const PatientManagementScreen(),
       _ => null, // e.g. an emergency: the dashboard already shows it
     };
     if (screen != null) {
