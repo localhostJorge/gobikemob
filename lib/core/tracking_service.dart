@@ -186,7 +186,7 @@ class TrackingService {
       // During a ronda, reuse the position already available to tracking.
       p = _latest;
     } else {
-      final accessError = await _ensureLocationAccess();
+      final accessError = await _ensureLocationAccess(forEmergency: true);
       if (accessError != null) return accessError;
       try {
         p = await _currentPosition();
@@ -218,9 +218,13 @@ class TrackingService {
     debugPrint('Ronda saved'); // temporary: delete after testing
   }
 
-  Future<String?> _ensureLocationAccess() async {
+  /// [forEmergency]: the message is about the alert, not a ronda (an alert can be
+  /// sent without being on ronda).
+  Future<String?> _ensureLocationAccess({bool forEmergency = false}) async {
     if (!await Geolocator.isLocationServiceEnabled()) {
-      return "Turn on your phone's location (GPS) to start a ronda.";
+      return forEmergency
+          ? "Turn on your phone's location (GPS) so the admin can see where you are."
+          : "Turn on your phone's location (GPS) to start a ronda.";
     }
 
     var permission = await Geolocator.checkPermission();
@@ -228,7 +232,9 @@ class TrackingService {
       permission = await Geolocator.requestPermission();
     }
     if (permission == LocationPermission.denied) {
-      return 'Location permission is needed to share your position with the Go Bike admin during a ronda.';
+      return forEmergency
+          ? 'Location permission is needed so the Go Bike admin can see where you are.'
+          : 'Location permission is needed to share your position with the Go Bike admin during a ronda.';
     }
     if (permission == LocationPermission.deniedForever) {
       return 'Location permission is blocked. Enable it for this app in your phone settings.';

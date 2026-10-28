@@ -32,7 +32,8 @@ class PushService {
   bool _ready = false;
   bool _openedInitial = false;
 
-  /// This phone's Firebase Installation ID (FID): where the server sends to.
+  /// Where the server sends to: this phone's FCM registration token (or, if
+  /// Firebase can't give one, its installation ID).
   String? _token;
 
   /// Whether this phone is registered with the server for the signed-in
@@ -56,11 +57,12 @@ class PushService {
 
     FirebaseMessaging.onMessage.listen(_onForeground);
     FirebaseMessaging.onMessageOpenedApp.listen((m) => _open(m.data));
-    // Listen from the start: Firebase announces the FID once, often before
-    // anyone has logged in. If it ever changes, tell the server.
-    FirebaseMessaging.instance.onRegistered.listen((fid) {
-      _token = fid;
-      if (AuthService.instance.isLoggedIn) _send(fid);
+    // Firebase can replace the token (e.g. after a reinstall or a long time
+    // offline). Tell the server, or notifications stop arriving.
+    // ignore: deprecated_member_use
+    FirebaseMessaging.instance.onTokenRefresh.listen((token) {
+      _token = token;
+      if (AuthService.instance.isLoggedIn) _send(token);
     });
   }
 
@@ -87,14 +89,9 @@ class PushService {
     }
 
     try {
-      final fid = await _withRetry(() async {
-        await messaging.register();
-        // Ask for the ID directly instead of waiting for the one-time event,
-        // which may have fired before login.
-        return FirebaseInstallations.instance.getId();
-      });
-      _token = fid;
-      await _send(fid);
+      final token = await _withRetry(() => _deviceToken(messaging));
+      _token = token;
+      await _send(token);
     } catch (e) {
       debugPrint('[push] could not register this phone: $e');
       status.value = PushStatus.failed(
@@ -131,6 +128,21 @@ class PushService {
       body: {'token': _token},
     );
     status.value = const PushStatus.unknown();
+  }
+
+  /// The FCM registration token: Firebase only gives it once this phone is
+  /// really registered for messages, so the server never gets an ID Firebase
+  /// can't deliver to yet. Falls back to the installation ID if there is none.
+  Future<String> _deviceToken(FirebaseMessaging messaging) async {
+    try {
+      // ignore: deprecated_member_use
+      final token = await messaging.getToken();
+      if (token != null && token.isNotEmpty) return token;
+    } catch (e) {
+      debugPrint('[push] no FCM token, using the installation ID: $e');
+    }
+    await messaging.register();
+    return FirebaseInstallations.instance.getId();
   }
 
   /// Firebase can fail for a moment right after the app opens, so try

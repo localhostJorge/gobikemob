@@ -4,7 +4,6 @@ import 'package:geolocator/geolocator.dart' show Geolocator;
 import '../../core/push_service.dart';
 import 'app_colors.dart';
 import 'patient_store.dart';
-import 'skeletons.dart';
 import 'ui_kit.dart';
 
 class NotificationSettingsScreen extends StatelessWidget {
@@ -27,9 +26,9 @@ class NotificationSettingsScreen extends StatelessWidget {
                 Sp.xl,
               ),
               children: [
-                // First: does this phone receive them at all?
+                // Sets up notifications quietly; shows a notice only when
+                // they are turned off in the phone's settings.
                 const _PhoneStatus(),
-                const SizedBox(height: Sp.xl),
                 const SectionHeader('Tell me about'),
                 const CardGroup(
                   children: [
@@ -123,8 +122,9 @@ class _Toggle extends StatelessWidget {
   }
 }
 
-/// Whether this phone is set up to receive notifications, with a retry when
-/// it isn't (so testers can see at a glance why nothing arrives).
+/// Sets this phone up for notifications without showing anything (no loading,
+/// no retry). Only when notifications are turned off for RondaGo in the
+/// phone's settings does it show a notice with a way to turn them on.
 class _PhoneStatus extends StatefulWidget {
   const _PhoneStatus();
 
@@ -138,8 +138,6 @@ class _PhoneStatusState extends State<_PhoneStatus>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // A failure at app start (e.g. while the location prompt was open) is
-    // often gone by now: check again instead of showing an old error.
     _recheck();
   }
 
@@ -167,70 +165,37 @@ class _PhoneStatusState extends State<_PhoneStatus>
     return ValueListenableBuilder<PushStatus>(
       valueListenable: PushService.instance.status,
       builder: (context, status, _) {
-        final (icon, color, text) = switch (status.state) {
-          'registered' => (
-            Icons.check_circle_rounded,
-            AppColors.greenText,
-            'This phone receives your notifications.',
-          ),
-          'working' => (
-            Icons.sync_rounded,
-            AppColors.textMuted,
-            'Setting up notifications on this phone…',
-          ),
-          'blocked' => (
-            Icons.notifications_off_outlined,
-            AppColors.redText,
-            "Notifications are turned off for RondaGo in your phone's settings.",
-          ),
-          'failed' => (
-            Icons.error_outline_rounded,
-            AppColors.redText,
-            status.message ?? 'Notifications are not set up on this phone.',
-          ),
-          _ => (
-            Icons.help_outline_rounded,
-            AppColors.textMuted,
-            'Not checked yet on this phone.',
-          ),
-        };
-        final canRetry = status.state == 'failed' || status.state == 'unknown';
+        if (status.state != 'blocked') return const SizedBox.shrink();
 
-        return Semantics(
-          liveRegion: true,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(Sp.lg, Sp.xs, Sp.xs, Sp.xs),
-            decoration: cardDecoration(),
-            constraints: const BoxConstraints(minHeight: 56),
-            child: Row(
-              children: [
-                Icon(icon, color: color, size: 22),
-                const SizedBox(width: Sp.md),
-                Expanded(
-                  child: status.state == 'working'
-                      ? const LineSkeleton(width: 220)
-                      : Text(
-                          text,
-                          style: T.label.copyWith(
-                            color: color == AppColors.textMuted
-                                ? AppColors.textDark
-                                : color,
-                          ),
-                        ),
-                ),
-                if (status.state == 'blocked')
-                  QuietButton(
+        return Padding(
+          padding: const EdgeInsets.only(bottom: Sp.xl),
+          child: Semantics(
+            liveRegion: true,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(Sp.lg, Sp.xs, Sp.xs, Sp.xs),
+              decoration: cardDecoration(),
+              constraints: const BoxConstraints(minHeight: 56),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.notifications_off_outlined,
+                    color: AppColors.redText,
+                    size: 22,
+                  ),
+                  const SizedBox(width: Sp.md),
+                  Expanded(
+                    child: Text(
+                      "Notifications are turned off for RondaGo in your phone's settings.",
+                      style: T.label.copyWith(color: AppColors.redText),
+                    ),
+                  ),
+                  const QuietButton(
                     label: 'Open settings',
                     color: AppColors.redText,
                     onPressed: Geolocator.openAppSettings,
-                  )
-                else if (canRetry)
-                  QuietButton(
-                    label: 'Try again',
-                    color: AppColors.redText,
-                    onPressed: PushService.instance.registerDevice,
                   ),
-              ],
+                ],
+              ),
             ),
           ),
         );
