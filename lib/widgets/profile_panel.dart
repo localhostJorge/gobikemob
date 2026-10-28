@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../core/auth_service.dart';
 import '../core/theme.dart';
@@ -116,6 +117,9 @@ class _ProfilePanelBody extends StatefulWidget {
 }
 
 class _ProfilePanelBodyState extends State<_ProfilePanelBody> {
+  /// The installed app's version, shown under "About".
+  final Future<PackageInfo> _appInfo = PackageInfo.fromPlatform();
+
   String _roleLabel(AppUser user) {
     if (user.isGoBiker) return 'GoBiker';
     if (user.isResident) return 'Resident';
@@ -379,6 +383,19 @@ class _ProfilePanelBodyState extends State<_ProfilePanelBody> {
                                 builder: (_) =>
                                     const LegalScreen(type: LegalType.privacy),
                               ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+
+                          _SectionLabel('ABOUT', muted),
+                          FutureBuilder<PackageInfo>(
+                            future: _appInfo,
+                            builder: (context, snap) => _InfoRow(
+                              Icons.info_outline_rounded,
+                              'RondaGo',
+                              snap.hasData
+                                  ? 'Version ${snap.data!.version}'
+                                  : null,
                             ),
                           ),
                         ],

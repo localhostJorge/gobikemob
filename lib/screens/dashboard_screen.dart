@@ -440,44 +440,17 @@ class _DashboardScreenState extends State<DashboardScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _sectionTitle("TODAY'S SUMMARY", muted),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _summaryCard(
-                                    theme,
-                                    muted,
-                                    icon: Icons.people_alt_rounded,
-                                    color: AppTheme.blue,
-                                    value: '$todayPatients',
-                                    label: 'Visited',
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _summaryCard(
-                                    theme,
-                                    muted,
-                                    icon: Icons.event_note_rounded,
-                                    color: AppTheme.orange,
-                                    value:
-                                        '${GobikerAppointments.instance.openCount}',
-                                    label: 'Appointments',
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _summaryCard(
-                                    theme,
-                                    muted,
-                                    icon: Icons.route_rounded,
-                                    color: AppTheme.successGreen,
-                                    value:
-                                        '${todayDistance.toStringAsFixed(1)} km',
-                                    label: 'Distance',
-                                  ),
-                                ),
-                              ],
-                            ),
+                            _summaryStrip(theme, muted, [
+                              ('$todayPatients', 'Visited'),
+                              (
+                                '${GobikerAppointments.instance.openCount}',
+                                'Appointments',
+                              ),
+                              (
+                                '${todayDistance.toStringAsFixed(1)} km',
+                                'Distance',
+                              ),
+                            ]),
                           ],
                         ),
                       ),
@@ -527,6 +500,16 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     icon: Icons.event_note_rounded,
                                     color: AppTheme.orange,
                                     label: 'Appointments',
+                                    // Requests waiting for this GoBiker's answer.
+                                    badge:
+                                        GobikerAppointments
+                                            .instance
+                                            .requests
+                                            .length +
+                                        GobikerAppointments
+                                            .instance
+                                            .available
+                                            .length,
                                     onTap: _onAppointments,
                                   ),
                                 ),
@@ -830,36 +813,59 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _summaryCard(
+  /// Today's numbers as one flat strip: no icons, borders or shadow, so it
+  /// reads as information and not as more buttons like the quick actions.
+  Widget _summaryStrip(
     ThemeData theme,
-    Color muted, {
-    required IconData icon,
-    required Color color,
-    required String value,
-    required String label,
-  }) {
+    Color muted,
+    List<(String value, String label)> stats,
+  ) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-      decoration: _cardDecoration(theme),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 10),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 12, color: muted),
-          ),
-        ],
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            for (var i = 0; i < stats.length; i++) ...[
+              if (i > 0)
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: theme.dividerColor,
+                ),
+              Expanded(
+                child: Semantics(
+                  label: '${stats[i].$2}: ${stats[i].$1}',
+                  excludeSemantics: true,
+                  child: Column(
+                    children: [
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          stats[i].$1,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        stats[i].$2,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: muted),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
