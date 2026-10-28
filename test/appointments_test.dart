@@ -46,4 +46,25 @@ void main() {
     expect(a.residentMobile, '09170001111');
     expect(Appointment.fromJson({'status': 'completed'}).isOpen, isFalse);
   });
+
+  test('reads the GoBiker the resident chose, from any barangay', () {
+    final a = Appointment.fromJson({
+      'status': 'pending',
+      'gobiker_id': 7,
+      'gobiker_name': 'Jose Cruz',
+      'gobiker_barangay': 'Hacienda',
+    });
+    expect(a.gobikerId, 7);
+    expect(a.gobikerBarangay, 'Hacienda');
+
+    final g = GobikerOption.fromJson({
+      'id': 7,
+      'name': 'Jose Cruz',
+      'barangay': 'Hacienda',
+      'visits_done': 3,
+    });
+    expect(g.id, 7);
+    expect(g.visitsDone, 3);
+    expect(GobikerOption.fromJson({'id': 8}).visitsDone, 0);
+  });
 }

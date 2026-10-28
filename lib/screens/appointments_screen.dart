@@ -7,8 +7,8 @@ import '../core/patient_service.dart';
 import '../core/theme.dart';
 import '../widgets/app_toast.dart';
 
-/// Home-visit requests for the GoBiker: new ones in their barangay to accept,
-/// and the visits they took (to call the resident and mark done).
+/// Home-visit requests for the GoBiker: the ones residents sent them (to
+/// accept or decline), and the visits they took (to call and mark done).
 class AppointmentsScreen extends StatefulWidget {
   const AppointmentsScreen({super.key});
 
@@ -35,6 +35,25 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       context,
       error ??
           'Visit accepted. ${a.residentName ?? 'The resident'} can see you are coming.',
+      type: error == null ? ToastType.success : ToastType.error,
+    );
+  }
+
+  Future<void> _decline(Appointment a) async {
+    final note = await showDialog<String>(
+      context: context,
+      builder: (_) => _DeclineDialog(residentName: a.residentName),
+    );
+    if (note == null || !mounted) return;
+
+    setState(() => _busy.add(a.id));
+    final error = await _store.decline(a.id, note: note);
+    if (!mounted) return;
+    setState(() => _busy.remove(a.id));
+    AppToast.show(
+      context,
+      error ??
+          'Request declined. ${a.residentName ?? 'The resident'} can ask another GoBiker.',
       type: error == null ? ToastType.success : ToastType.error,
     );
   }
@@ -77,6 +96,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       listenable: _store,
       builder: (context, _) {
         final toVisit = _store.mine.where((a) => a.status == 'accepted').length;
+        final toAnswer = _store.requests.length + _store.available.length;
         return DefaultTabController(
           length: 2,
           child: Scaffold(
@@ -90,7 +110,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
               bottom: TabBar(
                 labelStyle: const TextStyle(fontWeight: FontWeight.w700),
                 tabs: [
-                  Tab(text: 'New requests (${_store.available.length})'),
+                  Tab(text: 'Requests ($toAnswer)'),
                   Tab(text: 'My visits ($toVisit)'),
                 ],
               ),
@@ -99,9 +119,12 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
               child: TabBarView(
                 children: [
                   _list(
-                    _store.available,
-                    empty: 'No new requests in your barangay.',
-                    emptyHint: 'When a resident asks for a home check-up, it shows up here.',
+                    _store.requests,
+                    // Older app versions send requests to the whole barangay.
+                    more: _store.available,
+                    moreTitle: 'Open requests in your barangay',
+                    empty: 'No requests for you.',
+                    emptyHint: 'When a resident chooses you for a home check-up, it shows up here.',
                   ),
                   _list(
                     _store.mine,
@@ -117,8 +140,25 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     );
   }
 
+  Widget _card(Appointment a) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: _AppointmentCard(
+      appointment: a,
+      busy: _busy.contains(a.id),
+      onAccept: a.status == 'pending' ? () => _accept(a) : null,
+      // Only a request the resident sent to this GoBiker can be declined.
+      onDecline: a.status == 'pending' && a.gobikerId != null
+          ? () => _decline(a)
+          : null,
+      onComplete: a.status == 'accepted' ? () => _complete(a) : null,
+      onCall: a.residentMobile == null ? null : () => _call(a.residentMobile!),
+    ),
+  );
+
   Widget _list(
     List<Appointment> items, {
+    List<Appointment> more = const [],
+    String? moreTitle,
     required String empty,
     required String emptyHint,
   }) {
@@ -137,7 +177,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
         children: [
           if (_store.error != null)
             _ErrorBanner(message: _store.error!, onRetry: _store.load),
-          if (items.isEmpty)
+          if (items.isEmpty && more.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 64),
               child: Column(
@@ -161,22 +201,25 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                 ],
               ),
             )
-          else
-            for (final a in items)
+          else ...[
+            for (final a in items) _card(a),
+            if (more.isNotEmpty) ...[
               Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _AppointmentCard(
-                  appointment: a,
-                  busy: _busy.contains(a.id),
-                  onAccept: a.status == 'pending' ? () => _accept(a) : null,
-                  onComplete: a.status == 'accepted'
-                      ? () => _complete(a)
-                      : null,
-                  onCall: a.residentMobile == null
-                      ? null
-                      : () => _call(a.residentMobile!),
+                padding: EdgeInsets.only(
+                  top: items.isEmpty ? 0 : 12,
+                  bottom: 8,
+                ),
+                child: Text(
+                  moreTitle ?? '',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
+              for (final a in more) _card(a),
+            ],
+          ],
         ],
       ),
     );
@@ -188,6 +231,7 @@ class _AppointmentCard extends StatelessWidget {
     required this.appointment,
     required this.busy,
     this.onAccept,
+    this.onDecline,
     this.onComplete,
     this.onCall,
   });
@@ -195,6 +239,7 @@ class _AppointmentCard extends StatelessWidget {
   final Appointment appointment;
   final bool busy;
   final VoidCallback? onAccept;
+  final VoidCallback? onDecline;
   final VoidCallback? onComplete;
   final VoidCallback? onCall;
 
@@ -262,10 +307,20 @@ class _AppointmentCard extends StatelessWidget {
                   FilledButton.icon(
                     onPressed: busy ? null : onAccept,
                     icon: const Icon(Icons.check_rounded, size: 18),
-                    label: Text(busy ? 'Accepting…' : 'Accept'),
+                    label: Text(busy ? 'Saving…' : 'Accept'),
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(48, 48),
                       backgroundColor: AppTheme.blue,
+                    ),
+                  ),
+                if (onDecline != null)
+                  OutlinedButton.icon(
+                    onPressed: busy ? null : onDecline,
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    label: const Text('Decline'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                      foregroundColor: AppTheme.errorRed,
                     ),
                   ),
                 if (onComplete != null)
@@ -362,6 +417,69 @@ class _ErrorBanner extends StatelessWidget {
         ],
       ),
     ),
+  );
+}
+
+/// Asks for an optional reason before declining; returns it ('' for none),
+/// or null when the GoBiker changes their mind.
+class _DeclineDialog extends StatefulWidget {
+  const _DeclineDialog({this.residentName});
+  final String? residentName;
+
+  @override
+  State<_DeclineDialog> createState() => _DeclineDialogState();
+}
+
+class _DeclineDialogState extends State<_DeclineDialog> {
+  final _note = TextEditingController();
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Decline this visit?'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${widget.residentName ?? 'The resident'} will be told, and can ask '
+          'another GoBiker.',
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _note,
+          maxLength: 300,
+          maxLines: 3,
+          minLines: 2,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            labelText: 'Reason (optional)',
+            hintText: 'e.g. I am out of town that day',
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+        child: const Text('Keep it'),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(context, _note.text.trim()),
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(48, 48),
+          backgroundColor: AppTheme.errorRed,
+        ),
+        child: const Text('Decline'),
+      ),
+    ],
   );
 }
 

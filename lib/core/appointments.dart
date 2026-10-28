@@ -15,7 +15,9 @@ class Appointment {
     required this.windowLabel,
     required this.reason,
     required this.createdAt,
+    this.gobikerId,
     this.gobikerName,
+    this.gobikerBarangay,
     this.declineNote,
     this.residentName,
     this.residentMobile,
@@ -36,7 +38,11 @@ class Appointment {
   final String windowLabel;
   final String reason;
   final DateTime createdAt;
+
+  /// The GoBiker the resident chose (or who accepted an older open request).
+  final int? gobikerId;
   final String? gobikerName;
+  final String? gobikerBarangay;
   final String? declineNote;
 
   // Only sent to GoBikers.
@@ -66,13 +72,37 @@ class Appointment {
       createdAt:
           DateTime.tryParse('${j['created_at'] ?? ''}')?.toLocal() ??
           DateTime.now(),
+      gobikerId: (j['gobiker_id'] as num?)?.toInt(),
       gobikerName: text(j['gobiker_name']),
+      gobikerBarangay: text(j['gobiker_barangay']),
       declineNote: text(j['decline_note']),
       residentName: text(j['resident_name']),
       residentMobile: text(j['resident_mobile']),
       patientId: (j['patient_id'] as num?)?.toInt(),
     );
   }
+}
+
+/// A GoBiker the resident can ask for a home visit.
+class GobikerOption {
+  const GobikerOption({
+    required this.id,
+    required this.name,
+    required this.barangay,
+    this.visitsDone = 0,
+  });
+
+  final int id;
+  final String name;
+  final String barangay;
+  final int visitsDone;
+
+  factory GobikerOption.fromJson(Map<String, dynamic> j) => GobikerOption(
+    id: (j['id'] as num?)?.toInt() ?? 0,
+    name: '${j['name'] ?? ''}',
+    barangay: '${j['barangay'] ?? ''}',
+    visitsDone: (j['visits_done'] as num?)?.toInt() ?? 0,
+  );
 }
 
 List<Appointment> _parseList(dynamic raw) => raw is List
@@ -116,33 +146,49 @@ abstract class _AppointmentStore extends ChangeNotifier {
   }
 }
 
-/// The GoBiker's side: open requests in their barangay and their own visits.
+/// The GoBiker's side: requests residents sent to them, older open requests
+/// in their barangay, and their own visits.
 class GobikerAppointments extends _AppointmentStore {
   GobikerAppointments._();
   static final GobikerAppointments instance = GobikerAppointments._();
 
+  /// Sent to this GoBiker by the resident: accept or decline.
+  List<Appointment> requests = const [];
+
+  /// From app versions that did not let the resident choose: anyone in the
+  /// barangay may accept.
   List<Appointment> available = const [];
   List<Appointment> mine = const [];
 
-  /// Requests nobody took yet plus visits still to do (the dashboard counter).
+  /// Requests to answer plus visits still to do (the dashboard counter).
   int get openCount =>
-      available.length + mine.where((a) => a.status == 'accepted').length;
+      requests.length +
+      available.length +
+      mine.where((a) => a.status == 'accepted').length;
 
   @override
   String get _path => '/gobiker/appointments';
 
   @override
   void _read(Map<String, dynamic> body) {
+    requests = _parseList(body['requests']);
     available = _parseList(body['available']);
     mine = _parseList(body['mine']);
   }
 
   Future<String?> accept(int id) => _act('/gobiker/appointments/$id/accept');
 
+  /// Declines a request sent to this GoBiker. [note] is shown to the resident.
+  Future<String?> decline(int id, {String? note}) => _act(
+    '/gobiker/appointments/$id/decline',
+    {'note': ?((note ?? '').trim().isEmpty ? null : note!.trim())},
+  );
+
   Future<String?> complete(int id, {int? patientId}) =>
       _act('/gobiker/appointments/$id/complete', {'patient_id': ?patientId});
 
   void reset() {
+    requests = const [];
     available = const [];
     mine = const [];
     loaded = false;
@@ -168,6 +214,32 @@ class ResidentAppointments extends _AppointmentStore {
     appointments = _parseList(body['appointments']);
   }
 
+  /// Approved GoBikers in [barangay] (the resident's own when null).
+  Future<({List<GobikerOption> gobikers, String? error})> gobikers(
+    String? barangay,
+  ) async {
+    final res = await AuthService.instance.callAuthed(
+      'GET',
+      barangay == null
+          ? '/resident/gobikers'
+          : '/resident/gobikers?barangay=${Uri.encodeQueryComponent(barangay)}',
+    );
+    if (!res.ok) return (gobikers: const <GobikerOption>[], error: res.message);
+    final raw = res.body['gobikers'];
+    return (
+      gobikers: raw is List
+          ? raw
+                .whereType<Map>()
+                .map(
+                  (m) => GobikerOption.fromJson(Map<String, dynamic>.from(m)),
+                )
+                .toList()
+          : const <GobikerOption>[],
+      error: null,
+    );
+  }
+
+  /// Sends the request to [gobikerId], who accepts or declines it.
   /// Returns null on success, otherwise an error message.
   Future<String?> request({
     required String barangay,
@@ -175,9 +247,11 @@ class ResidentAppointments extends _AppointmentStore {
     required DateTime date,
     required String window,
     required String reason,
+    required int gobikerId,
   }) {
     final d = date.toIso8601String().substring(0, 10);
     return _act('/resident/appointments', {
+      'gobiker_id': gobikerId,
       'barangay': barangay,
       'address': address.trim(),
       'preferred_date': d,

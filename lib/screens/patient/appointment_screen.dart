@@ -25,7 +25,9 @@ import 'visit_record.dart' show formatDate;
   'declined' => (
     icon: Icons.block_rounded,
     color: AppColors.textMuted,
-    help: a.declineNote ?? 'The admin could not schedule this visit.',
+    help:
+        a.declineNote ??
+        'This visit could not be scheduled. You can ask another GoBiker.',
   ),
   'cancelled' => (
     icon: Icons.cancel_outlined,
@@ -35,7 +37,9 @@ import 'visit_record.dart' show formatDate;
   _ => (
     icon: Icons.schedule_rounded,
     color: AppColors.orangeText,
-    help: 'Waiting for a GoBiker in your barangay to accept it.',
+    help: a.gobikerName == null
+        ? 'Waiting for a GoBiker in your barangay to accept it.'
+        : 'Waiting for ${a.gobikerName} to accept. You will get a notification.',
   ),
 };
 
@@ -229,6 +233,13 @@ class _StatusCard extends StatelessWidget {
               Icons.event_rounded,
               '${formatDate(a.preferredDate)} · ${a.windowLabel}',
             ),
+            if (a.gobikerName != null)
+              _FactRow(
+                Icons.directions_bike_rounded,
+                a.gobikerBarangay == null
+                    ? a.gobikerName!
+                    : '${a.gobikerName} · ${a.gobikerBarangay}',
+              ),
             _FactRow(Icons.home_outlined, '${a.address}, ${a.barangay}'),
             _FactRow(Icons.notes_rounded, a.reason),
             const SizedBox(height: Sp.lg),
@@ -298,6 +309,8 @@ class _RequestFormState extends State<_RequestForm> {
   late String? _barangay = _homeBarangay();
   DateTime? _date;
   bool _dateMissing = false;
+  GobikerOption? _gobiker;
+  bool _gobikerMissing = false;
   String _window = 'morning';
 
   static List<String> get _barangays => kLocations['Bugallon'] ?? const [];
@@ -331,11 +344,37 @@ class _RequestFormState extends State<_RequestForm> {
     }
   }
 
+  Future<void> _pickGobiker() async {
+    final picked = await showModalBottomSheet<GobikerOption>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(Rd.sheet)),
+      ),
+      builder: (_) => _GobikerSheet(
+        // Start with the GoBikers where the visit is; others are one tap away.
+        startBarangay: _barangay ?? _homeBarangay(),
+        selectedId: _gobiker?.id,
+      ),
+    );
+    if (picked != null) {
+      setState(() {
+        _gobiker = picked;
+        _gobikerMissing = false;
+      });
+    }
+  }
+
   /// Called by the screen's "Request visit" button.
   Future<void> submit() async {
     final valid = _form.currentState!.validate();
-    setState(() => _dateMissing = _date == null);
-    if (!valid || _date == null) return;
+    setState(() {
+      _dateMissing = _date == null;
+      _gobikerMissing = _gobiker == null;
+    });
+    if (!valid || _date == null || _gobiker == null) return;
 
     widget.sending.value = true;
     final error = await ResidentAppointments.instance.request(
@@ -344,6 +383,7 @@ class _RequestFormState extends State<_RequestForm> {
       date: _date!,
       window: _window,
       reason: _reason.text,
+      gobikerId: _gobiker!.id,
     );
     widget.sending.value = false;
     if (!mounted) return;
@@ -352,7 +392,8 @@ class _RequestFormState extends State<_RequestForm> {
       ..showSnackBar(
         SnackBar(
           content: Text(
-            error ?? 'Visit requested. A GoBiker in your barangay will accept it soon.',
+            error ??
+                'Visit requested. ${_gobiker!.name} will accept or decline it soon.',
           ),
         ),
       );
@@ -369,9 +410,9 @@ class _RequestFormState extends State<_RequestForm> {
           const Text('Request a home check-up', style: T.title),
           const SizedBox(height: Sp.sm),
           const Text(
-            'A GoBiker in your barangay will visit to check your blood '
-            'pressure, pulse, temperature and more. For emergencies, use the '
-            'SOS button instead.',
+            'Choose a GoBiker to visit you and check your blood pressure, '
+            'pulse, temperature and more. They accept or decline in their '
+            'app. For emergencies, use the SOS button instead.',
             style: T.secondary,
           ),
           const SizedBox(height: Sp.xl),
@@ -385,6 +426,12 @@ class _RequestFormState extends State<_RequestForm> {
             ],
             onChanged: (v) => setState(() => _barangay = v),
             validator: (v) => v == null ? 'Select your barangay' : null,
+          ),
+          const SizedBox(height: Sp.lg),
+          _GobikerField(
+            gobiker: _gobiker,
+            onTap: _pickGobiker,
+            showError: _gobikerMissing,
           ),
           const SizedBox(height: Sp.lg),
           TextFormField(
@@ -484,4 +531,210 @@ class _DateField extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Looks like the other fields; opens the GoBiker list.
+class _GobikerField extends StatelessWidget {
+  const _GobikerField({
+    required this.gobiker,
+    required this.onTap,
+    required this.showError,
+  });
+  final GobikerOption? gobiker;
+  final VoidCallback onTap;
+  final bool showError;
+
+  @override
+  Widget build(BuildContext context) {
+    final g = gobiker;
+    return Semantics(
+      button: true,
+      label: g == null
+          ? 'Choose a GoBiker'
+          : 'GoBiker, ${g.name} from ${g.barangay}. Tap to change.',
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(Rd.control),
+        child: InputDecorator(
+          decoration: inputDecoration(
+            'GoBiker',
+            Icons.directions_bike_rounded,
+            suffix: const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: AppColors.textMuted,
+            ),
+          ).copyWith(errorText: showError ? 'Choose a GoBiker' : null),
+          child: Text(
+            g == null ? 'Choose a GoBiker' : '${g.name} · ${g.barangay}',
+            style: g == null
+                ? T.body.copyWith(color: AppColors.textMuted)
+                : T.body,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The GoBikers of a barangay (the visit's barangay first), with a switch to
+/// look at another barangay. Returns the chosen one.
+class _GobikerSheet extends StatefulWidget {
+  const _GobikerSheet({required this.startBarangay, this.selectedId});
+  final String? startBarangay;
+  final int? selectedId;
+
+  @override
+  State<_GobikerSheet> createState() => _GobikerSheetState();
+}
+
+class _GobikerSheetState extends State<_GobikerSheet> {
+  late String? _barangay = widget.startBarangay;
+  List<GobikerOption> _list = const [];
+  bool _loading = true;
+  String? _error;
+
+  String? get _home => AuthService.instance.currentUser?.barangay;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    final barangay = _barangay;
+    final res = await ResidentAppointments.instance.gobikers(barangay);
+    // A slower answer for a barangay the resident already moved away from.
+    if (!mounted || barangay != _barangay) return;
+    setState(() {
+      _list = res.gobikers;
+      _error = res.error;
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: media.size.height * 0.85),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 10),
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.line,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Sp.gutter, Sp.lg, Sp.gutter, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Choose a GoBiker', style: T.heading),
+                const SizedBox(height: Sp.xs),
+                const Text(
+                  'GoBikers from your barangay are shown first. You can also '
+                  'choose one from another barangay.',
+                  style: T.secondary,
+                ),
+                const SizedBox(height: Sp.lg),
+                DropdownButtonFormField<String>(
+                  initialValue: _barangay,
+                  isExpanded: true,
+                  decoration: inputDecoration(
+                    'GoBikers from',
+                    Icons.map_outlined,
+                  ),
+                  items: [
+                    for (final b in _RequestFormState._barangays)
+                      DropdownMenuItem(
+                        value: b,
+                        child: Text(b == _home ? '$b (your barangay)' : b),
+                      ),
+                  ],
+                  onChanged: (v) {
+                    if (v == null || v == _barangay) return;
+                    setState(() => _barangay = v);
+                    _load();
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: Sp.md),
+          Flexible(child: _body()),
+          SizedBox(height: Sp.md + media.padding.bottom),
+        ],
+      ),
+    );
+  }
+
+  Widget _body() {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.all(Sp.xl),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_error != null) {
+      return EmptyState(
+        title: "Couldn't load the GoBikers",
+        message: _error!,
+        actionLabel: 'Try again',
+        onAction: _load,
+      );
+    }
+    if (_list.isEmpty) {
+      return EmptyState(
+        title: 'No GoBikers in ${_barangay ?? 'your barangay'} yet',
+        message: 'Choose another barangay above to see its GoBikers.',
+      );
+    }
+    return ListView.separated(
+      shrinkWrap: true,
+      padding: const EdgeInsets.symmetric(horizontal: Sp.sm),
+      itemCount: _list.length,
+      separatorBuilder: (_, _) =>
+          const Divider(height: 1, indent: 72, color: AppColors.divider),
+      itemBuilder: (context, i) {
+        final g = _list[i];
+        final selected = g.id == widget.selectedId;
+        return ListTile(
+          minVerticalPadding: 12,
+          leading: CircleAvatar(
+            backgroundColor: AppColors.background,
+            foregroundColor: AppColors.textDark,
+            child: Text(g.name.isEmpty ? '?' : g.name[0].toUpperCase()),
+          ),
+          title: Text(
+            g.name,
+            style: selected
+                ? T.rowTitle.copyWith(fontWeight: FontWeight.w700)
+                : T.rowTitle,
+          ),
+          subtitle: Text(
+            '${g.barangay} · ${g.visitsDone == 1 ? '1 visit done' : '${g.visitsDone} visits done'}',
+            style: T.secondary,
+          ),
+          trailing: selected
+              ? const Icon(Icons.check_rounded, color: AppColors.textDark)
+              : null,
+          onTap: () => Navigator.pop(context, g),
+        );
+      },
+    );
+  }
 }
