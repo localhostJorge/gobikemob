@@ -9,6 +9,8 @@ import '../core/emergency_flow.dart';
 import '../core/emergency_watcher.dart';
 import '../core/follow_up_alerts.dart';
 import '../core/greeting.dart';
+import '../core/live_map.dart';
+import '../core/presence_service.dart';
 import '../core/theme.dart';
 import '../core/tracking_service.dart';
 import '../widgets/app_toast.dart';
@@ -22,6 +24,7 @@ import 'active_ronda_screen.dart';
 import 'announcements_screen.dart';
 import 'appointments_screen.dart';
 import 'global_state.dart';
+import 'live_map_screen.dart';
 import 'patient_management_screen.dart';
 import '../core/ronda_store.dart';
 
@@ -52,6 +55,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     GobikerAppointments.instance
       ..addListener(_onAppointmentsChanged)
       ..load(); // visit requests from residents
+    GobikerSos.instance
+      ..addListener(_onAppointmentsChanged)
+      ..load(); // SOS requests the admin assigned to this GoBiker
+    PresenceService.instance.start(); // on the live map while the app is open
     _refreshUser(); // the admin may have changed the barangay
   }
 
@@ -68,6 +75,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     GobikerAppointments.instance.removeListener(_onAppointmentsChanged);
+    GobikerSos.instance.removeListener(_onAppointmentsChanged);
     super.dispose();
   }
 
@@ -79,6 +87,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       FollowUpAlerts.instance.refresh();
       Announcements.instance.refresh();
       GobikerAppointments.instance.load();
+      GobikerSos.instance.load();
       _refreshUser();
       if (EmergencyWatcher.instance.isOpen) EmergencyWatcher.instance.check();
     }
@@ -241,6 +250,117 @@ class _DashboardScreenState extends State<DashboardScreen>
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const AppointmentsScreen()),
+    );
+  }
+
+  void _onMap({int? focusSosId}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => LiveMapScreen(focusSosId: focusSosId)),
+    ).then((_) => GobikerSos.instance.load());
+  }
+
+  Future<void> _resolveSos(AssignedSos sos) async {
+    var confirmed = false;
+    await ConfirmModal.show(
+      context: context,
+      icon: Icons.check_circle_rounded,
+      color: AppTheme.successGreen,
+      title: 'Mark this SOS as resolved?',
+      description:
+          '${sos.residentName} will be told the emergency is over and asked to rate your response.',
+      confirmText: 'Resolve',
+      onConfirm: () => confirmed = true,
+    );
+    if (!confirmed || !mounted) return;
+    final error = await GobikerSos.instance.resolve(sos.id);
+    if (!mounted) return;
+    AppToast.show(
+      context,
+      error ?? 'SOS resolved. Thank you for responding!',
+      type: error == null ? ToastType.success : ToastType.error,
+    );
+  }
+
+  /// SOS requests the admin sent this GoBiker to, with a Resolve button.
+  Widget _buildAssignedSos(ThemeData theme, Color muted) {
+    final open = GobikerSos.instance.open;
+    if (open.isEmpty) return const SizedBox.shrink();
+    const yellow = Color(0xFFEAB308);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('ASSIGNED SOS', muted),
+        for (final sos in open)
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: yellow.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: yellow, width: 1.5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.sos_rounded, color: yellow, size: 26),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        sos.residentName,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      'Responding',
+                      style: TextStyle(
+                        color: const Color(0xFF8A6A00),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+                if (sos.place.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(sos.place, style: TextStyle(color: muted)),
+                ],
+                if (sos.description != null) ...[
+                  const SizedBox(height: 4),
+                  Text(sos.description!),
+                ],
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _onMap(focusSosId: sos.id),
+                        icon: const Icon(Icons.map_rounded),
+                        label: const Text('View on map'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppTheme.successGreen,
+                        ),
+                        onPressed: () => _resolveSos(sos),
+                        icon: const Icon(Icons.check_circle_rounded),
+                        label: const Text('Resolve'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 12),
+      ],
     );
   }
 
@@ -415,6 +535,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                       // The admin's answer to an emergency alert, if one was sent
                       const EmergencyStatusCard(),
 
+                      // SOS requests the admin sent this GoBiker to
+                      _buildAssignedSos(theme, muted),
+
                       // 2) Today's assignment (primary)
                       FadeInSlide(
                         delay: const Duration(milliseconds: 80),
@@ -497,10 +620,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 Expanded(
                                   child: _quickAction(
                                     theme,
-                                    icon: Icons.event_note_rounded,
+                                    icon: Icons.calendar_month_rounded,
                                     color: AppTheme.orange,
                                     label: 'Appointments',
-                                    // Requests waiting for this GoBiker's answer.
                                     badge:
                                         GobikerAppointments
                                             .instance
@@ -1044,16 +1166,14 @@ class _DashboardScreenState extends State<DashboardScreen>
             muted: muted,
             onTap: () {},
           ),
-          ListenableBuilder(
-            listenable: FollowUpAlerts.instance,
-            builder: (context, _) => _NavItem(
-              icon: Icons.people_alt_rounded,
-              label: 'Patients',
-              selected: false,
-              muted: muted,
-              badge: FollowUpAlerts.instance.count,
-              onTap: _openPatients,
-            ),
+          _NavItem(
+            icon: Icons.map_rounded,
+            label: 'Map',
+            selected: false,
+            muted: muted,
+            // Open SOS requests assigned to this GoBiker.
+            badge: GobikerSos.instance.open.length,
+            onTap: _onMap,
           ),
           _NavItem(
             icon: Icons.person_rounded,

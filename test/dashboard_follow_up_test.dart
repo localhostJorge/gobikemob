@@ -75,4 +75,29 @@ void main() {
 
     expect(find.text('The admin saw your alert'), findsOneWidget);
   });
+
+  testWidgets('the quick actions and the bottom bar hold the agreed buttons', (
+    tester,
+  ) async {
+    globalPatients = [];
+    tester.view.physicalSize = const Size(900, 2600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const MaterialApp(home: DashboardScreen()));
+    await tester.pump(const Duration(seconds: 2));
+
+    // Quick actions: Patients, Emergency, Appointments.
+    for (final label in ['Patients', 'Emergency', 'Appointments']) {
+      expect(find.text(label), findsWidgets, reason: label);
+    }
+
+    // Bottom bar: Home, Map, Profile. Patients is reached from its tile.
+    for (final label in ['Home', 'Map', 'Profile']) {
+      expect(find.text(label), findsOneWidget, reason: label);
+    }
+
+    // The summary figures are information, not more buttons.
+    expect(find.text('Appointments ›'), findsNothing);
+  });
 }

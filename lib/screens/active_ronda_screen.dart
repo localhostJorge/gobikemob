@@ -11,6 +11,7 @@ import '../widgets/app_text_field.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/confirm_modal.dart';
 import '../widgets/emergency_status_card.dart';
+import '../widgets/initials_avatar.dart';
 import 'add_patient_screen.dart';
 import 'global_state.dart';
 import 'view_patient_screen.dart';
@@ -91,7 +92,9 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
         (_barangays.contains(mine) ? mine : null);
     _syncTracking();
 
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+    // Repaints the live distance, which TrackingService changes without
+    // telling us. Same 10 seconds as its own fixes, so nothing is missed.
+    _timer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (mounted) setState(() {});
     });
 
@@ -105,23 +108,6 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
     _timer?.cancel();
     _pulse.dispose();
     super.dispose();
-  }
-
-  String get _duration {
-    final d = DateTime.now().difference(_startedAt);
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '${two(d.inHours)}:${two(d.inMinutes % 60)}:${two(d.inSeconds % 60)}';
-  }
-
-  String _initials(String name) {
-    final parts = name
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((p) => p.isNotEmpty)
-        .toList();
-    if (parts.isEmpty) return '?';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
   //  actions
@@ -362,19 +348,6 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Text(
-            _duration,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 40,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const Text(
-            'Duration',
-            style: TextStyle(color: Colors.white60, fontSize: 12),
-          ),
           const SizedBox(height: 18),
           const Divider(color: Colors.white24, height: 1),
           const SizedBox(height: 16),
@@ -499,18 +472,7 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
           ),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: AppTheme.blue.withValues(alpha: 0.12),
-                child: Text(
-                  _initials(name),
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.blue,
-                  ),
-                ),
-              ),
+              InitialsAvatar(name, fontSize: 13),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
