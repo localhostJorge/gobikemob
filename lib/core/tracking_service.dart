@@ -242,6 +242,10 @@ class TrackingService {
     return null;
   }
 
+  /// The best position the phone can give right now (also used by the live
+  /// map). Throws when there is none.
+  Future<Position> bestPosition() => _currentPosition();
+
   Future<Position> _currentPosition() async {
     // 1) Best accuracy first (works outdoors)
     try {
