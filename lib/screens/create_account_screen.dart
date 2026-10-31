@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../widgets/app_text_field.dart';
 import '../widgets/app_toast.dart';
@@ -33,6 +36,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
   String selectedRole = 'Resident';
   String? selectedBarangay;
+
+  /// A GoBiker's profile photo. Required for them, unused for residents.
+  XFile? _photo;
   bool _acceptedTerms = false;
   bool _isLoading = false;
 
@@ -79,6 +85,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       selectedBarangay != null &&
       _passwordController.text.isNotEmpty &&
       _confirmController.text.isNotEmpty &&
+      // A GoBiker is sent to people's homes, so a photo is part of signing up.
+      (!_isGoBiker || _photo != null) &&
       _acceptedTerms;
 
   @override
@@ -147,6 +155,14 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       );
       return;
     }
+    if (_isGoBiker && _photo == null) {
+      AppToast.show(
+        context,
+        'Please add a profile photo to register as a GoBiker.',
+        type: ToastType.error,
+      );
+      return;
+    }
 
     setState(() => _isLoading = true);
 
@@ -157,6 +173,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       barangay: selectedBarangay!,
       role: selectedRole,
       password: _passwordController.text,
+      photoPath: _isGoBiker ? _photo?.path : null,
     );
 
     if (!mounted) return;
@@ -291,6 +308,19 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                                     ],
                                   ),
                                 ),
+                              )
+                            : const SizedBox(width: double.infinity),
+                      ),
+                      // A GoBiker's photo, so the resident they are sent to
+                      // can see who is coming.
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.topCenter,
+                        child: _isGoBiker
+                            ? Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: _buildPhotoPicker(onSurface, muted),
                               )
                             : const SizedBox(width: double.infinity),
                       ),
@@ -508,6 +538,124 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         ),
       ),
     );
+  }
+
+  /// Lets a GoBiker add their photo, and says what makes a usable one.
+  Widget _buildPhotoPicker(Color onSurface, Color muted) {
+    final photo = _photo;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: onSurface.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: photo == null
+              ? onSurface.withValues(alpha: 0.12)
+              : kAuthBlue.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: photo == null
+                    ? Container(
+                        width: 64,
+                        height: 64,
+                        color: onSurface.withValues(alpha: 0.06),
+                        child: Icon(
+                          Icons.person_outline_rounded,
+                          color: muted,
+                          size: 30,
+                        ),
+                      )
+                    : Image.file(
+                        File(photo.path),
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                      ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Profile Photo',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      photo == null ? 'Required' : 'Photo added',
+                      style: TextStyle(fontSize: 12, color: muted),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => _pickPhoto(ImageSource.camera),
+                          icon: const Icon(
+                            Icons.photo_camera_outlined,
+                            size: 16,
+                          ),
+                          label: const Text('Camera'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => _pickPhoto(ImageSource.gallery),
+                          icon: const Icon(
+                            Icons.photo_library_outlined,
+                            size: 16,
+                          ),
+                          label: Text(photo == null ? 'Gallery' : 'Change'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Profile Photo Requirements: Please upload a clear and formal '
+            'photo of yourself. Only one person should appear in the photo, '
+            'and your face must be clearly visible. Do not upload group '
+            'photos, unclear photos, or photos containing other people.',
+            style: TextStyle(fontSize: 12, height: 1.35, color: muted),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickPhoto(ImageSource source) async {
+    try {
+      // Small enough to upload on mobile data, still clear enough to recognise.
+      final file = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 800,
+        imageQuality: 85,
+      );
+      if (file != null && mounted) setState(() => _photo = file);
+    } catch (_) {
+      if (mounted) {
+        AppToast.show(
+          context,
+          "Couldn't open the camera or gallery.",
+          type: ToastType.error,
+        );
+      }
+    }
   }
 
   Widget _buildRoleCard(String role, IconData icon, String subtitle) {

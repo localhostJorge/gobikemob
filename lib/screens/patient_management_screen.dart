@@ -9,6 +9,7 @@ import '../core/theme.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/fade_in_slide.dart';
 import '../widgets/follow_up_banner.dart';
+import '../widgets/initials_avatar.dart';
 import 'add_patient_screen.dart';
 import 'global_state.dart';
 import 'view_patient_screen.dart';
@@ -101,17 +102,6 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
       if (diff == 1) return 'Yesterday';
     } catch (_) {}
     return date;
-  }
-
-  String _initials(String name) {
-    final parts = name
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((p) => p.isNotEmpty)
-        .toList();
-    if (parts.isEmpty) return '?';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
   // ----------------------------------------------------------------- actions
@@ -539,19 +529,9 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
                       ),
                       child: Row(
                         children: [
-                          CircleAvatar(
-                            radius: 20,
-                            backgroundColor: AppTheme.blue.withValues(
-                              alpha: 0.12,
-                            ),
-                            child: Text(
-                              _initials(items[i]['name']?.toString() ?? ''),
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.blue,
-                              ),
-                            ),
+                          InitialsAvatar(
+                            items[i]['name']?.toString() ?? '',
+                            fontSize: 13,
                           ),
                           const SizedBox(width: 12),
                           Expanded(

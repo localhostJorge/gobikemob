@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../core/auth_service.dart';
@@ -12,6 +13,7 @@ import '../screens/login_screen.dart';
 import 'app_toast.dart';
 import 'app_text_field.dart';
 import 'confirm_modal.dart';
+import 'initials_avatar.dart';
 import '../screens/global_state.dart';
 import '../core/ronda_store.dart';
 
@@ -126,17 +128,6 @@ class _ProfilePanelBodyState extends State<_ProfilePanelBody> {
     return user.role;
   }
 
-  String _initials(String name) {
-    final parts = name
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((p) => p.isNotEmpty)
-        .toList();
-    if (parts.isEmpty) return '?';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return (parts.first[0] + parts.last[0]).toUpperCase();
-  }
-
   Future<void> _confirmLogout(BuildContext context) async {
     final confirmed = await ConfirmModal.show(
       context: context,
@@ -152,6 +143,48 @@ class _ProfilePanelBodyState extends State<_ProfilePanelBody> {
 
     Navigator.of(context).pop(); // close the panel
     await ProfilePanel.logout(widget.rootContext);
+  }
+
+  /// Takes or picks a photo and sends it to the server.
+  Future<void> _changePhoto(BuildContext context) async {
+    final picked = await showModalBottomSheet<ImageSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+
+    final file = await ImagePicker().pickImage(
+      source: picked,
+      maxWidth: 800,
+      imageQuality: 85,
+    );
+    if (file == null || !mounted || !context.mounted) return;
+
+    final error = await AuthService.instance.uploadProfilePhoto(file.path);
+    if (!mounted || !context.mounted) return;
+    if (error == null) setState(() {});
+    AppToast.show(
+      context,
+      error ?? 'Profile photo updated.',
+      type: error == null ? ToastType.success : ToastType.error,
+    );
   }
 
   Future<void> _editProfile(BuildContext context, AppUser user) async {
@@ -218,20 +251,29 @@ class _ProfilePanelBodyState extends State<_ProfilePanelBody> {
                           Center(
                             child: Column(
                               children: [
-                                CircleAvatar(
+                                InitialsAvatar(
+                                  user?.name ?? '',
+                                  imageUrl: user?.photoUrl,
                                   radius: 38,
-                                  backgroundColor: AppTheme.blue.withValues(
-                                    alpha: 0.14,
-                                  ),
-                                  child: Text(
-                                    _initials(user?.name ?? ''),
-                                    style: const TextStyle(
-                                      fontSize: 26,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppTheme.blue,
+                                  fontSize: 26,
+                                ),
+                                // GoBikers now send a photo when they sign up.
+                                // Anyone who joined earlier can add one here.
+                                if (user != null && user.isGoBiker)
+                                  TextButton.icon(
+                                    onPressed: () => _changePhoto(context),
+                                    icon: Icon(
+                                      user.photoUrl == null
+                                          ? Icons.add_a_photo_outlined
+                                          : Icons.photo_camera_outlined,
+                                      size: 16,
+                                    ),
+                                    label: Text(
+                                      user.photoUrl == null
+                                          ? 'Add your photo'
+                                          : 'Change photo',
                                     ),
                                   ),
-                                ),
                                 const SizedBox(height: 14),
                                 Text(
                                   user?.name ?? 'Guest',

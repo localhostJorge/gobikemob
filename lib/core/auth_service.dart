@@ -21,12 +21,21 @@ import 'api_config.dart';
 import 'announcements.dart';
 import 'appointments.dart';
 import 'emergency_watcher.dart';
+import 'feedback_prompt.dart';
 import 'follow_up_alerts.dart';
+import 'live_map.dart';
+import 'presence_service.dart';
 import 'push_service.dart';
 import 'resident_sos.dart';
 import 'resident_visits.dart';
 
 /// The logged-in person, as returned by the Laravel API.
+/// Trimmed, or null when there is nothing worth showing.
+String? _text(dynamic value) {
+  final text = value?.toString().trim();
+  return (text == null || text.isEmpty) ? null : text;
+}
+
 class AppUser {
   const AppUser({
     required this.id,
@@ -35,6 +44,7 @@ class AppUser {
     required this.role,
     this.mobile,
     this.barangay,
+    this.photoUrl,
     this.hasPassword = true,
     this.notificationPrefs = const {},
   });
@@ -45,6 +55,11 @@ class AppUser {
   final String role; // "User" (resident), "GoBiker" or "Admin"
   final String? mobile;
   final String? barangay;
+
+  /// Their profile photo on the server. Null for accounts made before a
+  /// GoBiker photo was required, and for residents, whose photo stays on
+  /// their own phone.
+  final String? photoUrl;
 
   /// False for a Google sign-in account that never set its own password.
   final bool hasPassword;
@@ -61,6 +76,7 @@ class AppUser {
     role: (json['role'] ?? 'User').toString(),
     mobile: json['mobile']?.toString(),
     barangay: json['barangay']?.toString(),
+    photoUrl: _text(json['photo_url']),
     hasPassword: json['has_password'] != false,
     notificationPrefs: {
       if (json['notification_prefs'] is Map)
@@ -448,6 +464,10 @@ class AuthService {
   }
 
   /// [role] is "Resident" or "GoBiker".
+  ///
+  /// [photoPath] is required for a GoBiker: the resident they are sent to has
+  /// to see who is coming. The photo goes with the form, because signing up
+  /// returns no token to upload it with afterwards.
   Future<AuthResult> register({
     required String name,
     required String email,
@@ -455,26 +475,51 @@ class AuthService {
     required String barangay,
     required String role,
     required String password,
+    String? photoPath,
   }) async {
-    final res = await _request(
-      'POST',
-      '/mobile/register',
-      body: {
-        'name': name.trim(),
-        'email': email.trim(),
-        'mobile': mobile.trim(),
-        'barangay': barangay,
-        'role': role,
-        'password': password,
-      },
-    );
+    final fields = {
+      'name': name.trim(),
+      'email': email.trim(),
+      'mobile': mobile.trim(),
+      'barangay': barangay,
+      'role': role,
+      'password': password,
+    };
 
-    if (!res.ok) return AuthResult.failure(res.errorMessage);
+    final res = photoPath == null
+        ? await _request('POST', '/mobile/register', body: fields)
+        : null;
+    final upload = photoPath == null
+        ? null
+        : await _multipart(
+            '/mobile/register',
+            fields: fields,
+            files: {'photo': photoPath},
+            auth: false,
+          );
 
+    final ok = res?.ok ?? upload!.ok;
+    if (!ok) return AuthResult.failure(res?.errorMessage ?? upload!.message);
+
+    final body = res?.body ?? upload!.body;
     return AuthResult.success(
-      message: res.body['message']?.toString(),
-      pendingApproval: res.body['pending_approval'] == true,
+      message: body['message']?.toString(),
+      pendingApproval: body['pending_approval'] == true,
     );
+  }
+
+  /// Sets or replaces the signed-in user's profile photo.
+  /// Returns null, or a message to show.
+  Future<String?> uploadProfilePhoto(String photoPath) async {
+    final res = await uploadAuthed(
+      '/mobile/photo',
+      files: {'photo': photoPath},
+    );
+    if (!res.ok) return res.message;
+
+    final user = res.body['user'];
+    if (user is Map<String, dynamic>) _user = AppUser.fromJson(user);
+    return null;
   }
 
   Future<AuthResult> signInWithGoogle() async {
@@ -538,12 +583,22 @@ class AuthService {
     String path, {
     Map<String, String> fields = const {},
     required Map<String, String> files,
+  }) => _multipart(path, fields: fields, files: files);
+
+  /// A multipart POST. [auth] is false only for signing up, where there is no
+  /// token yet: a GoBiker must send their profile photo with the form itself.
+  Future<({bool ok, int status, String message, Map<String, dynamic> body})>
+  _multipart(
+    String path, {
+    Map<String, String> fields = const {},
+    required Map<String, String> files,
+    bool auth = true,
   }) async {
     final request =
         http.MultipartRequest('POST', Uri.parse('$kApiBaseUrl$path'))
           ..headers.addAll({
             'Accept': 'application/json',
-            if (_token != null) 'Authorization': 'Bearer $_token',
+            if (auth && _token != null) 'Authorization': 'Bearer $_token',
           })
           ..fields.addAll(fields);
 
@@ -585,6 +640,7 @@ class AuthService {
   }
 
   Future<void> logout() async {
+    PresenceService.instance.stop(); // off the live map
     await PushService.instance.unregisterDevice(); // while still signed in
     if (_token != null) {
       await _request('POST', '/mobile/logout', auth: true); // result ignored
@@ -598,6 +654,9 @@ class AuthService {
     ResidentSos.instance.reset();
     GobikerAppointments.instance.reset();
     ResidentAppointments.instance.reset();
+    GobikerSos.instance.reset();
+    FeedbackPrompt.instance.reset();
+    PushService.instance.reset();
     try {
       await GoogleSignIn.instance.signOut();
     } catch (_) {}
