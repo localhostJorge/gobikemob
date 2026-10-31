@@ -8,6 +8,7 @@ import 'package:flutter/services.dart' show PlatformException;
 
 import '../screens/announcements_screen.dart';
 import '../screens/appointments_screen.dart';
+import '../screens/live_map_screen.dart';
 import '../screens/patient_management_screen.dart';
 import '../screens/patient/appointment_screen.dart';
 import '../screens/patient/medical_history_screen.dart';
@@ -18,7 +19,9 @@ import 'app_navigator.dart';
 import 'appointments.dart';
 import 'auth_service.dart';
 import 'emergency_watcher.dart';
+import 'feedback_prompt.dart';
 import 'follow_up_alerts.dart';
+import 'live_map.dart';
 import 'resident_sos.dart';
 import 'resident_visits.dart';
 
@@ -35,6 +38,11 @@ class PushService {
 
   bool _ready = false;
   bool _openedInitial = false;
+
+  /// SOS requests this GoBiker has already been alerted about, so a repeated
+  /// push can't stack dialogs on top of each other. Cleared on sign-out.
+  final Set<int> _alertedSos = {};
+  bool _alerting = false;
 
   /// Where the server sends to: this phone's FCM registration token (or, if
   /// Firebase can't give one, its installation ID).
@@ -185,6 +193,12 @@ class PushService {
 
   void _onForeground(RemoteMessage message) {
     final type = message.data['type'];
+    // The admin sent this GoBiker to an emergency: its own alert loads the
+    // list, so don't also refresh here and race it.
+    if (type == 'sos_assigned') {
+      _alertSosAssigned(int.tryParse('${message.data['id'] ?? ''}'));
+      return;
+    }
     _refresh(type);
     // SOS changes: the resident home vibrates and shows its own notice.
     if (type == 'sos') return;
@@ -198,15 +212,49 @@ class PushService {
     );
   }
 
+  /// Vibrates and pops up the emergency the admin just sent this GoBiker to,
+  /// with a button that opens the map on the resident's exact location.
+  Future<void> _alertSosAssigned(int? id) async {
+    if (id == null || _alerting || !_alertedSos.add(id)) return;
+    _alerting = true;
+    try {
+      await GobikerSos.instance.load();
+      final sos = GobikerSos.instance.open.where((s) => s.id == id).firstOrNull;
+      // Already resolved, or not ours after all: nothing to show.
+      if (sos == null) return;
+
+      final view = await showSosAssignedAlert(
+        residentName: sos.residentName,
+        place: sos.place,
+      );
+      if (!view) return;
+      appNavigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => LiveMapScreen(focusSosId: id)),
+      );
+    } finally {
+      _alerting = false;
+    }
+  }
+
+  /// Forgets which emergencies were already shown (on sign-out).
+  void reset() {
+    _alertedSos.clear();
+    _alerting = false;
+  }
+
   /// Reloads what the notification is about, so open screens are up to date.
   void _refresh(String? type) {
     switch (type) {
       case 'sos':
         ResidentSos.instance.load();
+        FeedbackPrompt.instance.check(); // a GoBiker resolved it: rate them
       case 'appointment':
         ResidentAppointments.instance.load();
       case 'checkup':
         ResidentVisits.instance.load();
+        FeedbackPrompt.instance.check(); // rate the check-up
+      case 'sos_assigned':
+        GobikerSos.instance.load();
       case 'appointment_request' || 'appointment_assigned':
         GobikerAppointments.instance.load();
       case 'emergency':
@@ -232,6 +280,9 @@ class PushService {
       'appointment_assigned' => const AppointmentsScreen(),
       'announcement' => const AnnouncementsScreen(),
       'follow_up' => const PatientManagementScreen(),
+      'sos_assigned' => LiveMapScreen(
+        focusSosId: int.tryParse('${data['id'] ?? ''}'),
+      ),
       _ => null, // e.g. an emergency: the dashboard already shows it
     };
     if (screen != null) {

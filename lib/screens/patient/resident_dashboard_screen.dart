@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import '../../core/app_navigator.dart' show vibratePhone;
 import '../../core/appointments.dart';
 import '../../core/auth_service.dart';
+import '../../core/feedback_prompt.dart';
+import '../../core/presence_service.dart';
 import '../../core/resident_sos.dart';
 import '../../core/resident_visits.dart';
+import '../live_map_screen.dart';
 import 'app_colors.dart';
 import 'appointment_screen.dart';
 import 'emergency_request_screen.dart';
@@ -31,7 +34,8 @@ class ResidentDashboardScreen extends StatefulWidget {
       _ResidentDashboardScreenState();
 }
 
-class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
+class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
+    with WidgetsBindingObserver {
   int _tab = 0;
 
   @override
@@ -41,10 +45,22 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
     ResidentVisits.instance.load();
     ResidentAppointments.instance.load(); // shown in History
     ResidentSos.instance.onStatusChanged = _onSosChanged;
+    WidgetsBinding.instance.addObserver(this);
+    PresenceService.instance.start(); // on the GoBikers' live map while open
+    // A GoBiker resolved an SOS or did a check-up: ask for a rating.
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => FeedbackPrompt.instance.check(),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) FeedbackPrompt.instance.check();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (ResidentSos.instance.onStatusChanged == _onSosChanged) {
       ResidentSos.instance.onStatusChanged = null;
     }
@@ -54,6 +70,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
   /// The admin answered the SOS while the app is open: vibrate and say so.
   void _onSosChanged(SosEntry sos) {
     if (sos.status != 'responding' && sos.status != 'resolved') return;
+    if (sos.status == 'resolved') FeedbackPrompt.instance.check();
     if (PatientStore.instance.toggle('vibration')) vibratePhone();
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -61,11 +78,13 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
       ..showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 6),
-          content: Text(
-            sos.status == 'responding'
-                ? 'Someone is Responding to your SOS.'
-                : 'Your SOS request was resolved.',
-          ),
+          content: Text(switch (sos.status) {
+            // Only name a responder once the admin has actually sent one.
+            'responding' when sos.responderName != null =>
+              '${sos.responderName} is responding to your SOS.',
+            'responding' => 'The Go Bike admin is handling your SOS.',
+            _ => 'Your SOS request was resolved.',
+          }),
         ),
       );
   }
@@ -319,6 +338,16 @@ class _HealthList extends StatelessWidget {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const AppointmentScreen()),
+                ),
+              ),
+              NavRow(
+                icon: Icons.map_outlined,
+                color: AppColors.blue,
+                title: 'Map',
+                subtitle: 'View live map',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LiveMapScreen()),
                 ),
               ),
             ],

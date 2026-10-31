@@ -80,32 +80,102 @@ void main() {
     expect(find.text('(075) 633 0312'), findsOneWidget);
     expect(find.text('Rural Health Unit · Temporary number'), findsOneWidget);
     expect(find.text('CENPELCO'), findsOneWidget);
-    expect(
-      find.text('Your past SOS requests are in History.'),
-      findsOneWidget,
-    );
+    expect(find.text('Your past SOS requests are in History.'), findsOneWidget);
   });
 
-  testWidgets('an answered SOS says "Someone is Responding"', (tester) async {
-    final sos = SosEntry.fromJson({
+  testWidgets('an SOS says who is responding, and does not invent one', (
+    tester,
+  ) async {
+    SosEntry sos(Map<String, dynamic> extra) => SosEntry.fromJson({
       'id': 1,
       'status': 'responding',
       'municipality': 'Bugallon',
       'barangay': 'Salomague Sur',
       'landmark': 'bahay',
       'created_at': '2026-10-25T03:57:00+00:00',
+      ...extra,
     });
+
+    // The admin took the request on but has not sent anybody yet.
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: SosRequestCard(sos: sos)),
+        home: Scaffold(body: SosRequestCard(sos: sos({}))),
+      ),
+    );
+    expect(find.text('Admin is handling it'), findsOneWidget);
+    expect(find.text('Someone is Responding'), findsNothing);
+    expect(find.text('Salomague Sur · bahay'), findsOneWidget);
+
+    // A GoBiker is on the way: now it may say so, and name them.
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SosRequestCard(
+            sos: sos({
+              'responder': {'name': 'Juan Dela Cruz', 'barangay': 'Salasa'},
+            }),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Someone is Responding'), findsOneWidget);
+    expect(find.text('Admin is handling it'), findsNothing);
+  });
+
+  testWidgets('an answered SOS names the GoBiker who is coming', (
+    tester,
+  ) async {
+    SosEntry sos(Map<String, dynamic> extra) => SosEntry.fromJson({
+      'id': 3,
+      'status': 'responding',
+      'municipality': 'Bugallon',
+      'barangay': 'Poblacion',
+      'landmark': 'Chapel',
+      'created_at': '2026-10-25T03:57:00+00:00',
+      ...extra,
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SosRequestCard(
+            sos: sos({
+              'responder': {
+                'name': 'Juan Dela Cruz',
+                'barangay': 'Salasa',
+                'photo_url': null,
+              },
+            }),
+          ),
+        ),
       ),
     );
 
-    expect(find.text('Someone is Responding'), findsOneWidget);
-    expect(find.text('Salomague Sur · bahay'), findsOneWidget);
+    expect(find.text('Juan Dela Cruz'), findsOneWidget);
+    expect(
+      find.text('Juan Dela Cruz is on the way to help you.'),
+      findsOneWidget,
+    );
+    expect(find.text('Responding · GoBiker · Salasa'), findsOneWidget);
+    expect(
+      find.text('JC'),
+      findsOneWidget,
+    ); // no photos exist: initials stand in
+
+    // Before the admin assigns anyone there is no name to show.
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: SosRequestCard(sos: sos({}))),
+      ),
+    );
+    expect(find.text('Juan Dela Cruz'), findsNothing);
+    expect(
+      find.text('The Go Bike admin has your request and is handling it.'),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('an open SOS can be marked resolved; a resolved one cannot', (
+  testWidgets('a resident is given no way to close their own emergency', (
     tester,
   ) async {
     SosEntry sos(String status) => SosEntry.fromJson({
@@ -118,25 +188,22 @@ void main() {
       'resolved_by_resident': status == 'resolved',
     });
 
+    // Only the GoBiker sent to help, or the admin, ends an emergency.
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(body: SosRequestCard(sos: sos('sent'))),
       ),
     );
-    expect(find.text('Mark as resolved'), findsOneWidget);
+    expect(find.text('Mark as resolved'), findsNothing);
+    // Nothing to press at all: no button of any kind on the card.
+    expect(find.byType(ButtonStyleButton), findsNothing);
 
-    await tester.tap(find.text('Mark as resolved'));
-    await tester.pumpAndSettle();
-    expect(find.text('Mark as resolved?'), findsOneWidget); // asks first
-    await tester.tap(find.text('I still need help'));
-    await tester.pumpAndSettle();
-
+    // Requests a resident closed before this changed still read that way.
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(body: SosRequestCard(sos: sos('resolved'))),
       ),
     );
-    expect(find.text('Mark as resolved'), findsNothing);
     expect(find.text('You marked this request as resolved.'), findsOneWidget);
   });
 }

@@ -25,6 +25,70 @@ Future<void> Function() vibratePhone = () async {
   await HapticFeedback.heavyImpact();
 };
 
+/// A longer, broken pattern for an emergency handed to this GoBiker: it has to
+/// be felt through a pocket, out on the road.
+const List<int> sosAssignedVibration = [0, 600, 250, 600, 250, 600];
+
+/// Vibrates [sosAssignedVibration]. Replaced in tests.
+Future<void> Function() vibrateUrgently = () async {
+  try {
+    if (await Vibration.hasVibrator()) {
+      await Vibration.vibrate(pattern: sosAssignedVibration);
+      return;
+    }
+  } catch (_) {
+    // Fall through to the short tap below.
+  }
+  await HapticFeedback.heavyImpact();
+};
+
+/// The admin sent this GoBiker to a resident's emergency: vibrate and say so on
+/// top of whatever screen they are on, with a button that opens the map on it.
+///
+/// Returns true if the GoBiker asked to see it. Shown only while the app is
+/// open; with the app closed the notification itself opens the same map.
+Future<bool> showSosAssignedAlert({
+  required String residentName,
+  required String place,
+}) async {
+  final context = appNavigatorKey.currentContext;
+  if (context == null) return false;
+
+  vibrateUrgently();
+  SystemSound.play(SystemSoundType.alert);
+
+  final view = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      icon: const Icon(Icons.sos_rounded, color: AppTheme.errorRed, size: 40),
+      title: const Text(
+        'Emergency assigned to you',
+        textAlign: TextAlign.center,
+      ),
+      content: Text(
+        place.isEmpty
+            ? '$residentName needs help. You are the GoBiker sent to respond.'
+            : '$residentName needs help at $place. You are the GoBiker sent to respond.',
+        textAlign: TextAlign.center,
+      ),
+      actionsAlignment: MainAxisAlignment.center,
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Later'),
+        ),
+        FilledButton.icon(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          icon: const Icon(Icons.map_rounded),
+          label: const Text('View'),
+        ),
+      ],
+    ),
+  );
+
+  return view ?? false;
+}
+
 /// Pops up "The admin saw your alert" / "Emergency resolved" with a vibration.
 /// Hooked up in `main.dart`.
 void showEmergencyAlert(EmergencyPhase phase) {

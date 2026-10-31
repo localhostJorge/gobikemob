@@ -20,6 +20,9 @@ class SosEntry {
     this.respondedAt,
     this.resolvedAt,
     this.resolvedByResident = false,
+    this.responderName,
+    this.responderBarangay,
+    this.responderPhotoUrl,
   });
 
   final int id;
@@ -43,6 +46,12 @@ class SosEntry {
   /// The resident closed it themselves (no longer needed help).
   final bool resolvedByResident;
 
+  /// The GoBiker the admin sent, or the one who resolved it. Null until the
+  /// admin assigns someone.
+  final String? responderName;
+  final String? responderBarangay;
+  final String? responderPhotoUrl;
+
   bool get isOpen => status != 'resolved';
 
   /// Where the emergency is, e.g. "12 Rizal St., Poblacion · Beside the chapel".
@@ -53,6 +62,7 @@ class SosEntry {
 
   factory SosEntry.fromJson(Map<String, dynamic> j) {
     DateTime? date(dynamic v) => DateTime.tryParse('${v ?? ''}')?.toLocal();
+    final responder = j['responder'] is Map ? j['responder'] as Map : null;
     return SosEntry(
       id: (j['id'] as num?)?.toInt() ?? 0,
       status: '${j['status'] ?? 'sent'}',
@@ -68,6 +78,9 @@ class SosEntry {
       respondedAt: date(j['responded_at']),
       resolvedAt: date(j['resolved_at']),
       resolvedByResident: j['resolved_by_resident'] == true,
+      responderName: responder?['name']?.toString().trim(),
+      responderBarangay: responder?['barangay']?.toString().trim(),
+      responderPhotoUrl: responder?['photo_url']?.toString().trim(),
     );
   }
 }
@@ -161,25 +174,6 @@ class ResidentSos extends ChangeNotifier {
     final res = await AuthService.instance.uploadAuthed(
       '/resident/sos/$id/media',
       files: {'image': ?imagePath, 'video': ?videoPath},
-    );
-    if (!res.ok) return res.message;
-
-    final raw = res.body['sos'];
-    if (raw is Map) {
-      final sos = SosEntry.fromJson(Map<String, dynamic>.from(raw));
-      requests = [for (final r in requests) r.id == sos.id ? sos : r];
-      notifyListeners();
-    }
-    return null;
-  }
-
-  /// The resident no longer needs help. Returns null on success, otherwise
-  /// an error message. The list is updated from the answer, so this does not
-  /// count as the admin changing the status (no vibration).
-  Future<String?> resolve(int id) async {
-    final res = await AuthService.instance.callAuthed(
-      'POST',
-      '/resident/sos/$id/resolve',
     );
     if (!res.ok) return res.message;
 

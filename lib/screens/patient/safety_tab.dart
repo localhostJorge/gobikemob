@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/hotlines.dart';
 import '../../core/resident_sos.dart';
+import '../../widgets/initials_avatar.dart';
 import 'app_colors.dart';
 import 'ui_kit.dart';
 import 'visit_record.dart' show formatDate, formatTime;
@@ -14,19 +15,32 @@ import 'visit_record.dart' show formatDate, formatTime;
 ({String label, IconData icon, Color color, String help}) sosStatusStyle(
   SosEntry sos,
 ) => switch (sos.status) {
-  'responding' => (
-    label: 'Someone is Responding',
-    icon: Icons.directions_run_rounded,
-    color: AppColors.orangeText,
-    help: 'The Go Bike admin is handling your request.',
-  ),
+  // Only say somebody is coming once a GoBiker has actually been sent: the admin can take a
+  // request on before choosing who goes.
+  'responding' =>
+    sos.responderName == null
+        ? (
+            label: 'Admin is handling it',
+            icon: Icons.support_agent_rounded,
+            color: AppColors.orangeText,
+            help: 'The Go Bike admin has your request and is handling it.',
+          )
+        : (
+            label: 'Someone is Responding',
+            icon: Icons.directions_run_rounded,
+            color: AppColors.orangeText,
+            help: '${sos.responderName} is on the way to help you.',
+          ),
   'resolved' => (
     label: 'Resolved',
     icon: Icons.check_circle_rounded,
     color: AppColors.greenText,
-    help: sos.resolvedByResident
-        ? 'You marked this request as resolved.'
-        : 'The admin marked this request as resolved.',
+    help: switch (sos) {
+      _ when sos.resolvedByResident => 'You marked this request as resolved.',
+      _ when sos.responderName != null =>
+        '${sos.responderName} marked this request as resolved.',
+      _ => 'The admin marked this request as resolved.',
+    },
   ),
   _ => (
     label: 'Waiting for response',
@@ -244,48 +258,17 @@ class _HomeSosStatusState extends State<HomeSosStatus> with _SosPolling {
   }
 }
 
-/// One open SOS request with its status, what it means, and a way to close it.
-class SosRequestCard extends StatefulWidget {
+/// One open SOS request: its status, what that means, and who is coming.
+///
+/// There is nothing to press. An emergency stays open until the GoBiker sent
+/// to help, or the admin, ends it, so the resident cannot close it themselves.
+class SosRequestCard extends StatelessWidget {
   const SosRequestCard({super.key, required this.sos});
+
   final SosEntry sos;
 
   @override
-  State<SosRequestCard> createState() => _SosRequestCardState();
-}
-
-class _SosRequestCardState extends State<SosRequestCard> {
-  bool _resolving = false;
-
-  /// The resident no longer needs help: close the request after a check.
-  Future<void> _resolve() async {
-    final ok = await showConfirm(
-      context,
-      title: 'Mark as resolved?',
-      message:
-          'Do this only if you no longer need help. The admin will see that '
-          'you closed this request.',
-      confirmLabel: 'Yes, resolved',
-      cancelLabel: 'I still need help',
-      confirmColor: AppColors.greenText,
-    );
-    if (!ok || !mounted) return;
-
-    setState(() => _resolving = true);
-    final error = await ResidentSos.instance.resolve(widget.sos.id);
-    if (!mounted) return;
-    setState(() => _resolving = false);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(error ?? 'SOS request resolved. Glad you are okay.'),
-        ),
-      );
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final sos = widget.sos;
     final s = sosStatusStyle(sos);
     return Semantics(
       liveRegion: true,
@@ -312,17 +295,62 @@ class _SosRequestCardState extends State<SosRequestCard> {
             ),
             const SizedBox(height: Sp.md),
             Text(s.help, style: T.label.copyWith(color: s.color)),
-            if (sos.isOpen) ...[
-              const SizedBox(height: Sp.lg),
-              SecondaryButton(
-                label: _resolving ? 'Resolving…' : 'Mark as resolved',
-                icon: Icons.check_circle_outline_rounded,
-                loading: _resolving,
-                onPressed: _resolve,
-              ),
+            if (sos.responderName != null) ...[
+              const SizedBox(height: Sp.md),
+              _Responder(sos: sos, color: s.color),
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The GoBiker coming to help: who they are and that they are responding.
+/// There are no photos on the server, so their initials stand in for one.
+class _Responder extends StatelessWidget {
+  const _Responder({required this.sos, required this.color});
+
+  final SosEntry sos;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = sos.responderName ?? '';
+    final where = sos.responderBarangay;
+
+    return Container(
+      padding: const EdgeInsets.all(Sp.sm),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          InitialsAvatar(
+            name,
+            imageUrl: sos.responderPhotoUrl,
+            radius: 20,
+            color: color,
+          ),
+          const SizedBox(width: Sp.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: T.rowTitle),
+                const SizedBox(height: 2),
+                Text(
+                  [
+                    sos.isOpen ? 'Responding' : 'Responded',
+                    if (where != null && where.isNotEmpty) 'GoBiker · $where',
+                  ].join(' · '),
+                  style: T.meta,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
