@@ -26,6 +26,19 @@ Color sosColor(String status) => switch (status) {
   _ => sosRed,
 };
 
+/// How far there is left to go, read the way people say it: "640 m", "2.4 km".
+String formatDistance(double metres) => metres < 1000
+    ? '${metres.round()} m'
+    : '${(metres / 1000).toStringAsFixed(1)} km';
+
+/// GoBiker colors: blue on an ordinary ronda, orange once they are responding,
+/// red while their own emergency alarm is still up.
+Color gobikerColor(String status) => switch (status) {
+  'responding' => AppTheme.orange,
+  'emergency' => sosRed,
+  _ => AppTheme.blue,
+};
+
 /// The live map. GoBikers see the other GoBikers of their barangay and the
 /// exact location of the SOS requests the admin assigned to them; residents
 /// see the GoBikers of their barangay and themselves.
@@ -53,6 +66,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
   String? _error;
   bool _centered = false;
   int? _focusSosId;
+  int? _directionsSosId;
 
   bool get _isGobiker => AuthService.instance.currentUser?.isGoBiker ?? false;
 
@@ -61,6 +75,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
     super.initState();
     _focusSosId = widget.focusSosId;
     PresenceService.instance.latest.addListener(_onMyPosition);
+    PresenceService.instance.watch(); // the pin moves as the GoBiker rides
     PresenceService.instance.sendNow();
     _locateMe(move: false);
     _load();
@@ -71,17 +86,92 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
   void dispose() {
     _timer?.cancel();
     PresenceService.instance.latest.removeListener(_onMyPosition);
+    PresenceService.instance.unwatch();
     super.dispose();
   }
 
   Position? get _me => PresenceService.instance.latest.value;
 
+  /// The emergency the GoBiker asked directions to, while it is still open.
+  AssignedSos? get _directionsSos {
+    final id = _directionsSosId;
+    if (id == null) return null;
+
+    return _data.sos
+        .where((s) => s.id == id && s.hasPosition && s.isOpen)
+        .firstOrNull;
+  }
+
+  /// Points the map at the emergency: both ends on screen, and the line
+  /// between them. Everything stays in the app; no maps app is opened.
+  void _showDirections(AssignedSos sos) {
+    if (!sos.hasPosition) return;
+    setState(() => _directionsSosId = sos.id);
+    // Stop the map re-centring on the GoBiker the moment their position moves.
+    _centered = true;
+    _fitToDirections(sos);
+  }
+
+  void _fitToDirections(AssignedSos sos) {
+    final me = _me;
+    final there = LatLng(sos.latitude!, sos.longitude!);
+    if (me == null) {
+      // No position yet: show the emergency, and the line appears when it lands.
+      _map.move(there, 17);
+      AppToast.show(
+        context,
+        'Waiting for your location to draw the way there.',
+      );
+
+      return;
+    }
+    _map.fitCamera(
+      CameraFit.bounds(
+        bounds: LatLngBounds.fromPoints([
+          LatLng(me.latitude, me.longitude),
+          there,
+        ]),
+        padding: const EdgeInsets.fromLTRB(60, 140, 60, 180),
+        maxZoom: 17,
+      ),
+    );
+  }
+
+  /// How far the GoBiker still has to go, in a straight line.
+  String? get _distanceToSos {
+    final sos = _directionsSos;
+    final me = _me;
+    if (sos == null || me == null) return null;
+    return formatDistance(
+      const Distance().as(
+        LengthUnit.Meter,
+        LatLng(me.latitude, me.longitude),
+        LatLng(sos.latitude!, sos.longitude!),
+      ),
+    );
+  }
+
   void _onMyPosition() {
     if (!mounted) return;
-    setState(() {});
-    if (!_centered && _me != null && _focusSosId == null) {
+    setState(() {}); // the pin, the line and the distance all follow from this
+    final me = _me;
+    if (me == null) return;
+
+    final directions = _directionsSos;
+    if (directions != null) {
+      // Riding off the edge of the screen: bring both ends back into view,
+      // but leave the map alone while they are still on it.
+      if (!_map.camera.visibleBounds.contains(
+        LatLng(me.latitude, me.longitude),
+      )) {
+        _fitToDirections(directions);
+      }
+
+      return;
+    }
+    if (!_centered && _focusSosId == null) {
       _centered = true;
-      _map.move(LatLng(_me!.latitude, _me!.longitude), 16);
+      _map.move(LatLng(me.latitude, me.longitude), 16);
     }
   }
 
@@ -145,8 +235,14 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (sheetContext) =>
-          _SosSheet(sos: sos, onResolve: () => _resolve(sheetContext, sos)),
+      builder: (sheetContext) => _SosSheet(
+        sos: sos,
+        onResolve: () => _resolve(sheetContext, sos),
+        onDirections: () {
+          Navigator.pop(sheetContext);
+          _showDirections(sos);
+        },
+      ),
     );
   }
 
@@ -185,7 +281,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
         _personMarker(
           g,
           icon: Icons.pedal_bike_rounded,
-          color: g.status == 'active' ? AppTheme.orange : sosRed,
+          color: gobikerColor(g.status),
           size: 36,
         ),
       );
@@ -285,6 +381,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
     final theme = Theme.of(context);
     final me = _me;
     final barangay = _data.barangay;
+    final directions = _directionsSos;
 
     return Scaffold(
       appBar: AppBar(
@@ -311,17 +408,56 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
               ),
             ),
             children: [
+              // Satellite imagery: a GoBiker finds a house by its roof and the
+              // road to it, not by a street name. Esri serves both the pictures
+              // and the labels on top, so this stays one provider.
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate:
+                    'https://server.arcgisonline.com/ArcGIS/rest/services/'
+                    'World_Imagery/MapServer/tile/{z}/{y}/{x}',
                 userAgentPackageName: 'com.rondago.app',
                 maxZoom: 19,
               ),
+              TileLayer(
+                urlTemplate:
+                    'https://server.arcgisonline.com/ArcGIS/rest/services/'
+                    'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+                userAgentPackageName: 'com.rondago.app',
+                maxZoom: 19,
+              ),
+              if (directions != null && me != null)
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: [
+                        LatLng(me.latitude, me.longitude),
+                        LatLng(directions.latitude!, directions.longitude!),
+                      ],
+                      color: AppTheme.orange,
+                      strokeWidth: 5,
+                      borderColor: Colors.white,
+                      borderStrokeWidth: 2,
+                    ),
+                  ],
+                ),
               MarkerLayer(markers: _markers()),
               const SimpleAttributionWidget(
-                source: Text('OpenStreetMap contributors'),
+                source: Text('Esri, Maxar, Earthstar Geographics'),
               ),
             ],
           ),
+          if (directions != null)
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: _DirectionsBar(
+                residentName: directions.residentName,
+                distance: _distanceToSos,
+                onRecenter: () => _fitToDirections(directions),
+                onClose: () => setState(() => _directionsSosId = null),
+              ),
+            ),
           Positioned(
             left: 12,
             right: 12,
@@ -427,7 +563,8 @@ class _InfoBar extends StatelessWidget {
               runSpacing: 4,
               children: [
                 legend(const Color(0xFF1A73E8), 'You'),
-                legend(AppTheme.orange, 'GoBiker'),
+                legend(AppTheme.blue, 'GoBiker'),
+                legend(AppTheme.orange, 'Responding'),
                 if (isGobiker) ...[
                   legend(sosYellow, 'SOS responding'),
                   legend(sosGreen, 'SOS resolved'),
@@ -441,12 +578,72 @@ class _InfoBar extends StatelessWidget {
   }
 }
 
+/// "2.4 km to Ana Reyes", under the map, while the way there is shown.
+class _DirectionsBar extends StatelessWidget {
+  const _DirectionsBar({
+    required this.residentName,
+    required this.distance,
+    required this.onRecenter,
+    required this.onClose,
+  });
+
+  final String residentName;
+  final String? distance;
+  final VoidCallback onRecenter;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Material(
+      elevation: 3,
+      borderRadius: BorderRadius.circular(14),
+      color: theme.colorScheme.surface,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+        child: Row(
+          children: [
+            const Icon(Icons.directions_rounded, color: AppTheme.orange),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                distance == null
+                    ? 'Finding your position…'
+                    : '$distance to $residentName',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Fit both on screen',
+              onPressed: onRecenter,
+              icon: const Icon(Icons.fit_screen_rounded),
+            ),
+            IconButton(
+              tooltip: 'Hide the way there',
+              onPressed: onClose,
+              icon: const Icon(Icons.close_rounded),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Details of an assigned SOS: call, directions, resolve.
 class _SosSheet extends StatelessWidget {
-  const _SosSheet({required this.sos, required this.onResolve});
+  const _SosSheet({
+    required this.sos,
+    required this.onResolve,
+    required this.onDirections,
+  });
 
   final AssignedSos sos;
   final VoidCallback onResolve;
+  final VoidCallback onDirections;
 
   @override
   Widget build(BuildContext context) {
@@ -526,12 +723,9 @@ class _SosSheet extends StatelessWidget {
                 if (sos.hasPosition)
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () => launchUrl(
-                        Uri.parse(
-                          'https://www.google.com/maps/dir/?api=1&destination=${sos.latitude},${sos.longitude}',
-                        ),
-                        mode: LaunchMode.externalApplication,
-                      ),
+                      // Stays on this map: a GoBiker on a call should not be
+                      // handed off to another app to find the way.
+                      onPressed: onDirections,
                       icon: const Icon(Icons.directions_rounded),
                       label: const Text('Directions'),
                     ),
