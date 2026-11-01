@@ -287,6 +287,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     final open = GobikerSos.instance.open;
     if (open.isEmpty) return const SizedBox.shrink();
     const yellow = Color(0xFFEAB308);
+    // The label sat on a dark brown that vanished against the dark card.
+    final respondingInk = theme.brightness == Brightness.dark
+        ? const Color(0xFFFACC15)
+        : const Color(0xFF8A6A00);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -296,7 +300,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: yellow.withValues(alpha: 0.10),
+              color: _tint(theme, yellow),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: yellow, width: 1.5),
             ),
@@ -318,7 +322,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     Text(
                       'Responding',
                       style: TextStyle(
-                        color: const Color(0xFF8A6A00),
+                        color: respondingInk,
                         fontWeight: FontWeight.w700,
                         fontSize: 12,
                       ),
@@ -732,6 +736,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  /// A wash of a status colour that still reads as a surface in both themes.
+  /// Dark mode needs more of it: a tenth of yellow over near-black is mud.
+  Color _tint(ThemeData theme, Color color) => color.withValues(
+    alpha: theme.brightness == Brightness.dark ? 0.18 : 0.10,
+  );
+
   Widget _sectionTitle(String text, Color muted) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -825,7 +835,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.orange.withValues(alpha: 0.10),
+        color: _tint(theme, AppTheme.orange),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.orange.withValues(alpha: 0.5)),
       ),
@@ -1111,7 +1121,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppTheme.blue.withValues(alpha: 0.10),
+            color: _tint(theme, AppTheme.blue),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppTheme.blue.withValues(alpha: 0.35)),
           ),
@@ -1207,7 +1217,10 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppTheme.blue : muted;
+    // The brand blue is too dark to read against a dark bar, so dark mode lifts it.
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = isDark ? const Color(0xFF7FA6F0) : AppTheme.blue;
+    final color = selected ? accent : muted;
     return Expanded(
       child: InkWell(
         onTap: onTap,
@@ -1217,7 +1230,7 @@ class _NavItem extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
             color: selected
-                ? AppTheme.blue.withValues(alpha: 0.10)
+                ? accent.withValues(alpha: isDark ? 0.18 : 0.10)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
           ),
