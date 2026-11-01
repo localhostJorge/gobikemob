@@ -196,7 +196,7 @@ void main() {
     );
     expect(find.text('Mark as resolved'), findsNothing);
     // Nothing to press at all: no button of any kind on the card.
-    expect(find.byType(ButtonStyleButton), findsNothing);
+    expect(find.byWidgetPredicate((w) => w is ButtonStyleButton), findsNothing);
 
     // Requests a resident closed before this changed still read that way.
     await tester.pumpWidget(
