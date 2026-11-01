@@ -23,6 +23,8 @@ class PresenceService with WidgetsBindingObserver {
   static const Duration _interval = Duration(seconds: 15);
 
   Timer? _timer;
+  StreamSubscription<Position>? _watch;
+  int _watchers = 0;
   bool _started = false;
   bool _foreground = true;
   bool _sending = false;
@@ -45,12 +47,44 @@ class PresenceService with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _timer = null;
+    _watch?.cancel();
+    _watch = null;
+    _watchers = 0;
     latest.value = null;
     _askedPermission = false;
   }
 
   /// Sends a position right away (e.g. when the live map opens).
   Future<void> sendNow() => _tick();
+
+  /// Follow the phone closely while a map is on screen, so the pin really
+  /// moves as the GoBiker rides instead of hopping once every [_interval].
+  ///
+  /// This only draws: how often the position is *sent* is unchanged. It is
+  /// also what keeps the pin alive during a ronda, when [_tick] stands aside
+  /// for the [TrackingService] and so never refreshes [latest] itself.
+  void watch() {
+    _watchers++;
+    if (_watch != null) return;
+    _watch =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 5,
+          ),
+        ).listen(
+          (p) => latest.value = p,
+          onError: (Object e) => debugPrint('Position stream error: $e'),
+        );
+  }
+
+  /// The map was closed. The stream stops when the last map lets go of it.
+  void unwatch() {
+    if (_watchers > 0) _watchers--;
+    if (_watchers > 0) return;
+    _watch?.cancel();
+    _watch = null;
+  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -59,9 +93,16 @@ class PresenceService with WidgetsBindingObserver {
     _foreground = foreground;
     if (foreground) {
       _resume();
+      if (_watchers > 0) {
+        _watchers--; // watch() counts it back up
+        watch();
+      }
     } else {
       _timer?.cancel();
       _timer = null;
+      // No background location permission is asked for, so the stream stops too.
+      _watch?.cancel();
+      _watch = null;
     }
   }
 
