@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/theme.dart';
+
 // Brand tokens used by the form widgets.
 const Color _kBlue = Color(0xFF2E62C8);
 const Color _kError = Color(0xFFD93025);
 
+// Dark mode takes its surfaces from the theme's colour scheme, the same ones
+// the cards and the profile panel use.
 Color _fill(BuildContext c) => Theme.of(c).brightness == Brightness.dark
-    ? const Color(0xFF1C2236)
+    ? Theme.of(c).colorScheme.surfaceContainerLow
     : const Color(0xFFF5F7FB);
 
 Color _border(BuildContext c) => Theme.of(c).brightness == Brightness.dark
-    ? const Color(0xFF2E3650)
+    ? AppTheme.darkLine
     : const Color(0xFFE2E6EE);
 
 Color _hint(BuildContext c) => Theme.of(c).brightness == Brightness.dark
-    ? const Color(0xFF7C86A2)
+    ? Theme.of(c).colorScheme.onSurfaceVariant
     : const Color(0xFF8A94A6);
 
 OutlineInputBorder _outline(Color color, {double width = 1}) =>

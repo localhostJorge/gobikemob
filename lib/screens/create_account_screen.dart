@@ -10,6 +10,7 @@ import '../widgets/app_toast.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/loading_overlay.dart';
 import '../core/auth_service.dart';
+import '../core/theme.dart';
 import 'legal_screen.dart';
 import 'login_screen.dart';
 
@@ -663,7 +664,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
     final onSurface = theme.colorScheme.onSurface;
-    final border = dark ? const Color(0xFF33415F) : const Color(0xFFD8DDEA);
+    final border = dark ? AppTheme.darkLine : const Color(0xFFD8DDEA);
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,

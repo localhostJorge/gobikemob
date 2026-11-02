@@ -63,20 +63,29 @@ class AppTheme {
     );
   }
 
+  /// Outline of cards and fields in dark mode (navy, visible on the neutral surfaces).
+  static const Color darkLine = Color(0xFF2A3752);
+
   static ThemeData get darkTheme {
+    // Every dark surface comes from this one scheme, so the page, cards,
+    // dialogs, sheets and fields can't drift apart.
+    final scheme = ColorScheme.fromSeed(seedColor: blue, brightness: Brightness.dark);
     final base = ThemeData(
       useMaterial3: true,
       fontFamily: 'Roboto',
       brightness: Brightness.dark,
-      colorScheme: ColorScheme.fromSeed(seedColor: blue, brightness: Brightness.dark),
-      scaffoldBackgroundColor: const Color(0xFF101827),
-      cardColor: const Color(0xFF182338),
-      dividerColor: const Color(0xFF2A3752),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF101827),
+      colorScheme: scheme,
+      scaffoldBackgroundColor: scheme.surface,
+      cardColor: scheme.surfaceContainerLow,
+      dividerColor: darkLine,
+      appBarTheme: AppBarTheme(
+        backgroundColor: scheme.surface,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
+      dialogTheme: DialogThemeData(backgroundColor: scheme.surface),
+      bottomSheetTheme: BottomSheetThemeData(backgroundColor: scheme.surface),
+      snackBarTheme: SnackBarThemeData(backgroundColor: scheme.surfaceContainerHigh),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: blue,
@@ -89,22 +98,22 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: Colors.white,
-          side: const BorderSide(color: Color(0xFF33415F)),
+          side: const BorderSide(color: darkLine),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: const Color(0xFF182338),
-        hintStyle: const TextStyle(color: Color(0xFF9CA9BF)),
+        fillColor: scheme.surfaceContainerLow,
+        hintStyle: TextStyle(color: scheme.onSurfaceVariant),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF33415F)),
+          borderSide: const BorderSide(color: darkLine),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF33415F)),
+          borderSide: const BorderSide(color: darkLine),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
