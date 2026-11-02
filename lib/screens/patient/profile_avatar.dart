@@ -34,12 +34,12 @@ class ProfileAvatar extends StatelessWidget {
           padding: EdgeInsets.all(big ? 4 : 2),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white,
+            color: context.pal.card,
             border: Border.all(color: AppColors.red, width: big ? 3 : 2),
           ),
           child: CircleAvatar(
             radius: radius,
-            backgroundColor: AppColors.redSoft,
+            backgroundColor: context.pal.redSoft,
             backgroundImage: path == null ? null : FileImage(File(path)),
             child: path == null
                 ? Icon(Icons.person, size: radius * 1.1, color: AppColors.red)
@@ -61,14 +61,14 @@ class ProfileAvatar extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
-                    color: AppColors.textDark,
+                    color: context.pal.ink,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
+                    border: Border.all(color: context.pal.card, width: 2),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.photo_camera,
                     size: 16,
-                    color: Colors.white,
+                    color: context.pal.card,
                   ),
                 ),
               ),
@@ -86,7 +86,7 @@ Future<void> changeProfilePhoto(BuildContext context) async {
 
   final choice = await showModalBottomSheet<String>(
     context: context,
-    backgroundColor: Colors.white,
+    backgroundColor: context.pal.card,
     showDragHandle: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(Rd.sheet)),
@@ -107,13 +107,13 @@ Future<void> changeProfilePhoto(BuildContext context) async {
           ),
           if (store.photoPath != null)
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.delete_outline_rounded,
-                color: AppColors.redText,
+                color: context.pal.redText,
               ),
               title: Text(
                 'Remove photo',
-                style: T.body.copyWith(color: AppColors.redText),
+                style: T.body.copyWith(color: context.pal.redText),
               ),
               onTap: () => Navigator.pop(ctx, 'remove'),
             ),

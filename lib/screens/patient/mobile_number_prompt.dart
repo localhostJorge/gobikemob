@@ -32,16 +32,16 @@ class MobileNumberPrompt extends StatelessWidget {
         return Padding(
           padding: const EdgeInsets.only(bottom: Sp.xl),
           child: AppCard(
-            borderColor: AppColors.orangeText.withValues(alpha: 0.5),
+            borderColor: context.pal.orangeText.withValues(alpha: 0.5),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Add your mobile number', style: T.rowTitle),
                 const SizedBox(height: Sp.xs),
-                const Text(
+                Text(
                   'GoBikers record check-ups with your name and mobile number. '
                   'Add yours so your check-ups appear in your Medical History.',
-                  style: T.secondary,
+                  style: T.secondary.muted(context),
                 ),
                 const SizedBox(height: Sp.md),
                 SecondaryButton(

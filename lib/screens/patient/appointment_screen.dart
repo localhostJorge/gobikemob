@@ -10,6 +10,7 @@ import 'visit_record.dart' show formatDate;
 
 ({IconData icon, Color color, String help}) _statusStyle(
   Appointment a,
+  AppPalette pal,
 ) => switch (a.status) {
   'accepted' => (
     icon: Icons.directions_bike_rounded,
@@ -19,24 +20,24 @@ import 'visit_record.dart' show formatDate;
   ),
   'completed' => (
     icon: Icons.check_circle_rounded,
-    color: AppColors.greenText,
+    color: pal.greenText,
     help: 'Your visit is done. The check-up is in your Medical History.',
   ),
   'declined' => (
     icon: Icons.block_rounded,
-    color: AppColors.textMuted,
+    color: pal.muted,
     help:
         a.declineNote ??
         'This visit could not be scheduled. You can ask another GoBiker.',
   ),
   'cancelled' => (
     icon: Icons.cancel_outlined,
-    color: AppColors.textMuted,
+    color: pal.muted,
     help: 'You cancelled this request.',
   ),
   _ => (
     icon: Icons.schedule_rounded,
-    color: AppColors.orangeText,
+    color: pal.orangeText,
     help: a.gobikerName == null
         ? 'Waiting for a GoBiker in your barangay to accept it.'
         : 'Waiting for ${a.gobikerName} to accept. You will get a notification.',
@@ -97,7 +98,7 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.pal.background,
       appBar: patientAppBar(context, 'Home visit'),
       body: SafeArea(
         child: ListenableBuilder(
@@ -202,7 +203,7 @@ class _StatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final a = appointment;
-    final s = _statusStyle(a);
+    final s = _statusStyle(a, context.pal);
     return Semantics(
       container: true,
       liveRegion: true,
@@ -225,9 +226,9 @@ class _StatusCard extends StatelessWidget {
             ),
             const SizedBox(height: Sp.sm),
             Text(s.help, style: T.body),
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: Sp.lg),
-              child: Divider(height: 1, color: AppColors.divider),
+              child: Divider(height: 1, color: context.pal.divider),
             ),
             _FactRow(
               Icons.event_rounded,
@@ -267,7 +268,7 @@ class _FactRow extends StatelessWidget {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: AppColors.textMuted),
+        Icon(icon, size: 18, color: context.pal.muted),
         const SizedBox(width: Sp.md),
         Expanded(child: Text(text, style: T.body)),
       ],
@@ -282,7 +283,7 @@ class _PastRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final a = appointment;
-    final s = _statusStyle(a);
+    final s = _statusStyle(a, context.pal);
     return NavRow(
       icon: s.icon,
       color: s.color,
@@ -349,7 +350,7 @@ class _RequestFormState extends State<_RequestForm> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.pal.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(Rd.sheet)),
       ),
@@ -409,17 +410,23 @@ class _RequestFormState extends State<_RequestForm> {
         children: [
           const Text('Request a home check-up', style: T.title),
           const SizedBox(height: Sp.sm),
-          const Text(
+          Text(
             'Choose a GoBiker to visit you and check your blood pressure, '
             'pulse, temperature and more. They accept or decline in their '
             'app. For emergencies, use the SOS button instead.',
-            style: T.secondary,
+            style: T.secondary.muted(context),
           ),
           const SizedBox(height: Sp.xl),
           DropdownButtonFormField<String>(
+            style: T.body.copyWith(color: context.pal.ink),
+            dropdownColor: context.pal.card,
             initialValue: _barangay,
             isExpanded: true,
-            decoration: inputDecoration('Barangay', Icons.map_outlined),
+            decoration: inputDecoration(
+              context,
+              'Barangay',
+              Icons.map_outlined,
+            ),
             items: [
               for (final b in _barangays)
                 DropdownMenuItem(value: b, child: Text(b)),
@@ -435,10 +442,13 @@ class _RequestFormState extends State<_RequestForm> {
           ),
           const SizedBox(height: Sp.lg),
           TextFormField(
+            style: T.body.copyWith(color: context.pal.ink),
+            cursorColor: context.pal.ink,
             controller: _address,
             textCapitalization: TextCapitalization.sentences,
             maxLength: 255,
             decoration: inputDecoration(
+              context,
               'House address or landmark',
               Icons.home_outlined,
             ).copyWith(counterText: ''),
@@ -470,20 +480,23 @@ class _RequestFormState extends State<_RequestForm> {
             style: SegmentedButton.styleFrom(
               minimumSize: const Size(0, 48),
               textStyle: T.label.copyWith(fontFamily: kFontFamily),
-              side: const BorderSide(color: AppColors.line),
-              selectedBackgroundColor: AppColors.textDark,
-              selectedForegroundColor: Colors.white,
-              foregroundColor: AppColors.textDark,
+              side: BorderSide(color: context.pal.line),
+              selectedBackgroundColor: context.pal.ink,
+              selectedForegroundColor: context.pal.card,
+              foregroundColor: context.pal.ink,
             ),
           ),
           const SizedBox(height: Sp.lg),
           TextFormField(
+            style: T.body.copyWith(color: context.pal.ink),
+            cursorColor: context.pal.ink,
             controller: _reason,
             minLines: 3,
             maxLines: 5,
             maxLength: 500,
             textCapitalization: TextCapitalization.sentences,
             decoration: inputDecoration(
+              context,
               'Reason for the visit',
               Icons.notes_rounded,
             ).copyWith(hintText: 'e.g. Blood pressure check for my mother'),
@@ -519,13 +532,14 @@ class _DateField extends StatelessWidget {
       borderRadius: BorderRadius.circular(Rd.control),
       child: InputDecorator(
         decoration: inputDecoration(
+          context,
           'Preferred date',
           Icons.event_rounded,
         ).copyWith(errorText: showError ? 'Choose a date' : null),
         child: Text(
           date == null ? 'Choose a date' : formatDate(date!),
           style: date == null
-              ? T.body.copyWith(color: AppColors.textMuted)
+              ? T.body.copyWith(color: context.pal.muted)
               : T.body,
         ),
       ),
@@ -558,17 +572,18 @@ class _GobikerField extends StatelessWidget {
         borderRadius: BorderRadius.circular(Rd.control),
         child: InputDecorator(
           decoration: inputDecoration(
+            context,
             'GoBiker',
             Icons.directions_bike_rounded,
-            suffix: const Icon(
+            suffix: Icon(
               Icons.keyboard_arrow_down_rounded,
-              color: AppColors.textMuted,
+              color: context.pal.muted,
             ),
           ).copyWith(errorText: showError ? 'Choose a GoBiker' : null),
           child: Text(
             g == null ? 'Choose a GoBiker' : '${g.name} · ${g.barangay}',
             style: g == null
-                ? T.body.copyWith(color: AppColors.textMuted)
+                ? T.body.copyWith(color: context.pal.muted)
                 : T.body,
           ),
         ),
@@ -633,7 +648,7 @@ class _GobikerSheetState extends State<_GobikerSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.line,
+                color: context.pal.line,
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
@@ -645,16 +660,19 @@ class _GobikerSheetState extends State<_GobikerSheet> {
               children: [
                 const Text('Choose a GoBiker', style: T.heading),
                 const SizedBox(height: Sp.xs),
-                const Text(
+                Text(
                   'GoBikers from your barangay are shown first. You can also '
                   'choose one from another barangay.',
-                  style: T.secondary,
+                  style: T.secondary.muted(context),
                 ),
                 const SizedBox(height: Sp.lg),
                 DropdownButtonFormField<String>(
+                  style: T.body.copyWith(color: context.pal.ink),
+                  dropdownColor: context.pal.card,
                   initialValue: _barangay,
                   isExpanded: true,
                   decoration: inputDecoration(
+                    context,
                     'GoBikers from',
                     Icons.map_outlined,
                   ),
@@ -708,15 +726,15 @@ class _GobikerSheetState extends State<_GobikerSheet> {
       padding: const EdgeInsets.symmetric(horizontal: Sp.sm),
       itemCount: _list.length,
       separatorBuilder: (_, _) =>
-          const Divider(height: 1, indent: 72, color: AppColors.divider),
+          Divider(height: 1, indent: 72, color: context.pal.divider),
       itemBuilder: (context, i) {
         final g = _list[i];
         final selected = g.id == widget.selectedId;
         return ListTile(
           minVerticalPadding: 12,
           leading: CircleAvatar(
-            backgroundColor: AppColors.background,
-            foregroundColor: AppColors.textDark,
+            backgroundColor: context.pal.background,
+            foregroundColor: context.pal.ink,
             child: Text(g.name.isEmpty ? '?' : g.name[0].toUpperCase()),
           ),
           title: Text(
@@ -727,10 +745,10 @@ class _GobikerSheetState extends State<_GobikerSheet> {
           ),
           subtitle: Text(
             '${g.barangay} · ${g.visitsDone == 1 ? '1 visit done' : '${g.visitsDone} visits done'}',
-            style: T.secondary,
+            style: T.secondary.muted(context),
           ),
           trailing: selected
-              ? const Icon(Icons.check_rounded, color: AppColors.textDark)
+              ? Icon(Icons.check_rounded, color: context.pal.ink)
               : null,
           onTap: () => Navigator.pop(context, g),
         );

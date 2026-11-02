@@ -123,7 +123,7 @@ class _SosButtonState extends State<SosButton> with TickerProviderStateMixin {
                           strokeWidth: _ringWidth,
                           strokeCap: StrokeCap.round,
                           color: AppColors.red,
-                          backgroundColor: AppColors.redSoft,
+                          backgroundColor: context.pal.redSoft,
                         ),
                       ),
                       AnimatedScale(
@@ -164,8 +164,8 @@ class _SosButtonState extends State<SosButton> with TickerProviderStateMixin {
                 ? 'Keep holding…'
                 : 'Hold for $_seconds to send an SOS',
             style: _hold.value > 0
-                ? T.label.copyWith(color: AppColors.redText)
-                : T.secondary,
+                ? T.label.copyWith(color: context.pal.redText)
+                : T.secondary.muted(context),
           ),
         ),
       ],

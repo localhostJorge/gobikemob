@@ -14,6 +14,7 @@ import 'visit_record.dart' show formatDate, formatTime;
 /// are the readable text shades.
 ({String label, IconData icon, Color color, String help}) sosStatusStyle(
   SosEntry sos,
+  AppPalette pal,
 ) => switch (sos.status) {
   // Only say somebody is coming once a GoBiker has actually been sent: the admin can take a
   // request on before choosing who goes.
@@ -22,26 +23,26 @@ import 'visit_record.dart' show formatDate, formatTime;
         ? (
             label: 'Admin is handling it',
             icon: Icons.support_agent_rounded,
-            color: AppColors.orangeText,
+            color: pal.orangeText,
             help: 'The Go Bike admin has your request and is handling it.',
           )
         : (
             label: 'Someone is Responding',
             icon: Icons.directions_run_rounded,
-            color: AppColors.orangeText,
+            color: pal.orangeText,
             help: '${sos.responderName} is on the way to help you.',
           ),
   // A cancelled request comes from the server as `resolved`, so tell them apart here.
   'resolved' when sos.cancelled => (
     label: 'Cancelled',
     icon: Icons.cancel_outlined,
-    color: AppColors.textMuted,
+    color: pal.muted,
     help: 'You cancelled this request.',
   ),
   'resolved' => (
     label: 'Resolved',
     icon: Icons.check_circle_rounded,
-    color: AppColors.greenText,
+    color: pal.greenText,
     help: switch (sos) {
       _ when sos.resolvedByResident => 'You marked this request as resolved.',
       _ when sos.responderName != null =>
@@ -52,7 +53,7 @@ import 'visit_record.dart' show formatDate, formatTime;
   _ => (
     label: 'Waiting for response',
     icon: Icons.schedule_rounded,
-    color: AppColors.redText,
+    color: pal.redText,
     help: 'The admin has been alerted. If it is life-threatening, call 911.',
   ),
 };
@@ -175,11 +176,11 @@ class _SafetyTabState extends State<SafetyTab> with _SosPolling {
                           _HotlineRow(hotline: h, onCall: _call),
                       ],
                     ),
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.fromLTRB(4, Sp.lg, 4, 0),
                       child: Text(
                         'Your past SOS requests are in History.',
-                        style: T.secondary,
+                        style: T.secondary.muted(context),
                       ),
                     ),
                   ],
@@ -201,7 +202,7 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = sosStatusStyle(sos);
+    final s = sosStatusStyle(sos, context.pal);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
@@ -311,7 +312,7 @@ class _SosRequestCardState extends State<SosRequestCard> {
 
   @override
   Widget build(BuildContext context) {
-    final s = sosStatusStyle(sos);
+    final s = sosStatusStyle(sos, context.pal);
     return Semantics(
       liveRegion: true,
       container: true,
@@ -333,7 +334,7 @@ class _SosRequestCardState extends State<SosRequestCard> {
             const SizedBox(height: Sp.xs),
             Text(
               'Sent ${formatDate(sos.createdAt)}, ${formatTime(sos.createdAt)}',
-              style: T.meta,
+              style: T.meta.muted(context),
             ),
             const SizedBox(height: Sp.md),
             Text(s.help, style: T.label.copyWith(color: s.color)),
@@ -397,7 +398,7 @@ class _Responder extends StatelessWidget {
                     sos.isOpen ? 'Responding' : 'Responded',
                     if (where != null && where.isNotEmpty) 'GoBiker · $where',
                   ].join(' · '),
-                  style: T.meta,
+                  style: T.meta.muted(context),
                 ),
               ],
             ),
@@ -483,7 +484,7 @@ class _HotlineRow extends StatelessWidget {
           hotline.note == null
               ? hotline.description
               : '${hotline.description} · ${hotline.note}',
-          style: T.secondary,
+          style: T.secondary.muted(context),
         ),
         Wrap(
           children: [
@@ -491,7 +492,7 @@ class _HotlineRow extends StatelessWidget {
               QuietButton(
                 label: formatPhone(n),
                 icon: Icons.call_rounded,
-                color: AppColors.redText,
+                color: context.pal.redText,
                 onPressed: () => onCall(n),
               ),
           ],

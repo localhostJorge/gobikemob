@@ -17,7 +17,7 @@ class VisitDetailsScreen extends StatelessWidget {
     final noRemarks = record.remarks.trim().isEmpty;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.pal.background,
       appBar: patientAppBar(context, 'Check-up'),
       body: SafeArea(
         child: ListView(
@@ -33,9 +33,12 @@ class VisitDetailsScreen extends StatelessWidget {
             const SizedBox(height: Sp.xs),
             Text(
               '${formatTime(record.date)} · ${record.place}',
-              style: T.secondary,
+              style: T.secondary.muted(context),
             ),
-            Text('Recorded by ${record.gobikerName}', style: T.secondary),
+            Text(
+              'Recorded by ${record.gobikerName}',
+              style: T.secondary.muted(context),
+            ),
             if (bp != null && bp.urgent) ...[
               const SizedBox(height: Sp.lg),
               _UrgentNote(message: bp.note ?? ''),
@@ -85,7 +88,7 @@ class VisitDetailsScreen extends StatelessWidget {
                 noRemarks
                     ? 'No remarks were recorded for this visit.'
                     : record.remarks,
-                style: noRemarks ? T.secondary : T.body,
+                style: noRemarks ? T.secondary.muted(context) : T.body,
               ),
             ),
             const SizedBox(height: Sp.xl),
@@ -118,23 +121,25 @@ class _UrgentNote extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(Sp.md),
         decoration: BoxDecoration(
-          color: AppColors.redSoft,
+          color: context.pal.redSoft,
           borderRadius: BorderRadius.circular(Rd.control),
-          border: Border.all(color: AppColors.redText.withValues(alpha: 0.4)),
+          border: Border.all(color: context.pal.redText.withValues(alpha: 0.4)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(
+            Icon(
               Icons.warning_amber_rounded,
-              color: AppColors.redText,
+              color: context.pal.redText,
               size: 22,
             ),
             const SizedBox(width: Sp.md),
             Expanded(
               child: Text(
                 message,
-                style: T.label.copyWith(color: const Color(0xFF8E0000)),
+                style: T.label.copyWith(
+                  color: context.pal.readable(const Color(0xFF8E0000)),
+                ),
               ),
             ),
           ],
@@ -157,7 +162,10 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 120, child: Text(label, style: T.secondary)),
+          SizedBox(
+            width: 120,
+            child: Text(label, style: T.secondary.muted(context)),
+          ),
           Expanded(
             child: Text(
               value.isEmpty ? '—' : value,
@@ -199,7 +207,7 @@ class _VitalRow extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: Text(label, style: T.secondary)),
+              Expanded(child: Text(label, style: T.secondary.muted(context))),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -214,7 +222,7 @@ class _VitalRow extends StatelessWidget {
           ),
           if (status?.note != null) ...[
             const SizedBox(height: Sp.sm),
-            Text(status!.note!, style: T.meta),
+            Text(status!.note!, style: T.meta.muted(context)),
           ],
         ],
       ),

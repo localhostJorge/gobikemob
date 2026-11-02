@@ -48,14 +48,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final hasLetter = RegExp(r'[A-Za-z]').hasMatch(p);
     final hasDigit = RegExp(r'\d').hasMatch(p);
     if (p.length < _minLength) {
-      return (label: 'Too short', color: AppColors.redText);
+      return (label: 'Too short', color: context.pal.redText);
     }
     if (p.length >= 10 && hasLetter && hasDigit) {
-      return (label: 'Strong', color: AppColors.greenText);
+      return (label: 'Strong', color: context.pal.greenText);
     }
     return (
       label: 'Okay - use 10+ characters with letters and numbers',
-      color: AppColors.orangeText,
+      color: context.pal.orangeText,
     );
   }
 
@@ -85,7 +85,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Widget _eye(bool shown, VoidCallback onTap) => IconButton(
     icon: Icon(
       shown ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-      color: AppColors.textMuted,
+      color: context.pal.muted,
     ),
     onPressed: onTap,
   );
@@ -95,7 +95,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final strength = _strength();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.pal.background,
       appBar: patientAppBar(
         context,
         _setting ? 'Set a password' : 'Change password',
@@ -125,17 +125,20 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                   'also log in with your email.'
                             : 'Enter your current password, then choose a new '
                                   'one you don\'t use anywhere else.',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: AppColors.textMuted,
+                          color: context.pal.muted,
                         ),
                       ),
                       const SizedBox(height: 18),
                       if (!_setting) ...[
                         TextFormField(
+                          style: T.body.copyWith(color: context.pal.ink),
+                          cursorColor: context.pal.ink,
                           controller: _current,
                           obscureText: !_showCurrent,
                           decoration: inputDecoration(
+                            context,
                             'Current password',
                             Icons.lock_outline,
                             suffix: _eye(
@@ -151,9 +154,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         const SizedBox(height: Sp.lg),
                       ],
                       TextFormField(
+                        style: T.body.copyWith(color: context.pal.ink),
+                        cursorColor: context.pal.ink,
                         controller: _new,
                         obscureText: !_showNew,
                         decoration: inputDecoration(
+                          context,
                           'New password',
                           Icons.lock_reset_outlined,
                           suffix: _eye(
@@ -176,17 +182,22 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           padding: const EdgeInsets.fromLTRB(6, 6, 0, 0),
                           child: Text(
                             strength.label,
-                            style: T.meta.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: strength.color,
-                            ),
+                            style: T.meta
+                                .muted(context)
+                                .copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: strength.color,
+                                ),
                           ),
                         ),
                       const SizedBox(height: Sp.lg),
                       TextFormField(
+                        style: T.body.copyWith(color: context.pal.ink),
+                        cursorColor: context.pal.ink,
                         controller: _confirm,
                         obscureText: !_showConfirm,
                         decoration: inputDecoration(
+                          context,
                           'Confirm new password',
                           Icons.check_circle_outline,
                           suffix: _eye(

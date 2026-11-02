@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../core/theme.dart';
 import 'app_colors.dart';
 import 'notification_settings_screen.dart';
 import 'patient_store.dart';
@@ -31,6 +32,9 @@ class SettingsTab extends StatelessWidget {
                   Sp.xl,
                 ),
                 children: [
+                  const SectionHeader('Appearance'),
+                  const CardGroup(children: [_DarkModeRow()]),
+                  const SizedBox(height: Sp.xl),
                   const SectionHeader('Notifications'),
                   CardGroup(
                     children: [
@@ -55,10 +59,10 @@ class SettingsTab extends StatelessWidget {
                       children: [
                         const Text('Hold time', style: T.rowTitle),
                         const SizedBox(height: 2),
-                        const Text(
+                        Text(
                           'How long you hold the SOS button before it sends. '
                           'A longer hold avoids sending one by accident.',
-                          style: T.secondary,
+                          style: T.secondary.muted(context),
                         ),
                         const SizedBox(height: Sp.lg),
                         SizedBox(
@@ -78,10 +82,10 @@ class SettingsTab extends StatelessWidget {
                               textStyle: T.label.copyWith(
                                 fontFamily: kFontFamily,
                               ),
-                              side: const BorderSide(color: AppColors.line),
-                              selectedBackgroundColor: AppColors.textDark,
-                              selectedForegroundColor: Colors.white,
-                              foregroundColor: AppColors.textDark,
+                              side: BorderSide(color: context.pal.line),
+                              selectedBackgroundColor: context.pal.ink,
+                              selectedForegroundColor: context.pal.card,
+                              foregroundColor: context.pal.ink,
                             ),
                           ),
                         ),
@@ -113,6 +117,35 @@ class SettingsTab extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// The light / dark switch. The same setting the GoBiker profile panel changes, kept
+/// on the phone, so it also applies the next time the app opens.
+class _DarkModeRow extends StatelessWidget {
+  const _DarkModeRow();
+
+  @override
+  Widget build(BuildContext context) {
+    // Listens itself: the row is const, so the screen's rebuild skips it.
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (context, _) => SwitchListTile(
+        value: Theme.of(context).brightness == Brightness.dark,
+        onChanged: (on) => ThemeController.instance.setThemeMode(
+          on ? ThemeMode.dark : ThemeMode.light,
+        ),
+        contentPadding: const EdgeInsets.fromLTRB(Sp.lg, 4, Sp.md, 4),
+        activeTrackColor: context.pal.ink,
+        activeThumbColor: context.pal.card,
+        secondary: Icon(Icons.dark_mode_outlined, color: context.pal.muted),
+        title: const Text('Dark mode', style: T.rowTitle),
+        subtitle: Text(
+          'Easier on the eyes at night',
+          style: T.secondary.muted(context),
+        ),
+      ),
     );
   }
 }

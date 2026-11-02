@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../screens/patient/app_colors.dart';
+
 class AppTheme {
   static const Color navy = Color(0xFF1E1E48);
   static const Color blue = Color(0xFF2E62C8);
@@ -9,10 +11,32 @@ class AppTheme {
   static const Color errorRed = Color(0xFFDC4C4C);
   static const Color infoBlue = Color(0xFF2E62C8);
 
+  /// The toast every SnackBar in the app uses, in both themes: a floating, rounded,
+  /// solid dark bar with white text, lifted clear of the bottom navigation. Without
+  /// it Flutter draws a full-width bar glued to the nav bar, with text in whatever
+  /// colour the text theme gives, which can be dark on dark.
+  static SnackBarThemeData _snackBar(AppPalette pal) => SnackBarThemeData(
+    behavior: SnackBarBehavior.floating,
+    backgroundColor: pal.scrim,
+    elevation: 4,
+    insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    contentTextStyle: const TextStyle(
+      fontFamily: 'Roboto',
+      color: Colors.white,
+      fontSize: 14,
+      height: 1.35,
+      fontWeight: FontWeight.w600,
+    ),
+    actionTextColor: const Color(0xFFFFB4AE),
+    closeIconColor: Colors.white,
+  );
+
   static ThemeData get lightTheme {
     final base = ThemeData(
       useMaterial3: true,
       fontFamily: 'Roboto',
+      extensions: const [AppPalette.light],
       colorScheme: ColorScheme.fromSeed(seedColor: blue, brightness: Brightness.light),
       scaffoldBackgroundColor: const Color(0xFFF5F7FB),
       cardColor: Colors.white,
@@ -22,6 +46,15 @@ class AppTheme {
         foregroundColor: navy,
         elevation: 0,
       ),
+      dialogTheme: const DialogThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+      ),
+      snackBarTheme: _snackBar(AppPalette.light),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: blue,
@@ -74,6 +107,7 @@ class AppTheme {
       useMaterial3: true,
       fontFamily: 'Roboto',
       brightness: Brightness.dark,
+      extensions: const [AppPalette.dark],
       colorScheme: scheme,
       scaffoldBackgroundColor: scheme.surface,
       cardColor: scheme.surfaceContainerLow,
@@ -83,9 +117,15 @@ class AppTheme {
         foregroundColor: Colors.white,
         elevation: 0,
       ),
-      dialogTheme: DialogThemeData(backgroundColor: scheme.surface),
-      bottomSheetTheme: BottomSheetThemeData(backgroundColor: scheme.surface),
-      snackBarTheme: SnackBarThemeData(backgroundColor: scheme.surfaceContainerHigh),
+      dialogTheme: DialogThemeData(
+        backgroundColor: scheme.surfaceContainerLow,
+        surfaceTintColor: Colors.transparent,
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: scheme.surfaceContainerLow,
+        surfaceTintColor: Colors.transparent,
+      ),
+      snackBarTheme: _snackBar(AppPalette.dark),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: blue,

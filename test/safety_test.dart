@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_bike_app/core/hotlines.dart';
 import 'package:go_bike_app/core/resident_sos.dart';
+import 'package:go_bike_app/screens/patient/app_colors.dart';
 import 'package:go_bike_app/screens/patient/safety_tab.dart';
 
 void main() {
@@ -198,7 +199,10 @@ void main() {
     expect(find.text('Mark as resolved'), findsNothing);
     // ...but the resident can withdraw it: one button, and only that one.
     expect(find.text('Cancel SOS'), findsOneWidget);
-    expect(find.byWidgetPredicate((w) => w is ButtonStyleButton), findsOneWidget);
+    expect(
+      find.byWidgetPredicate((w) => w is ButtonStyleButton),
+      findsOneWidget,
+    );
 
     // Requests a resident closed before cancelling existed still read that way.
     await tester.pumpWidget(
@@ -213,7 +217,8 @@ void main() {
   test('a cancelled SOS comes as resolved but reads as cancelled', () {
     final sos = SosEntry.fromJson({
       'id': 5,
-      'status': 'resolved', // what the server sends, for apps that predate cancelling
+      'status':
+          'resolved', // what the server sends, for apps that predate cancelling
       'cancelled': true,
       'status_label': 'Cancelled',
       'resolved_by_resident': true,
@@ -222,12 +227,15 @@ void main() {
 
     expect(sos.isOpen, isFalse);
     expect(sos.cancelled, isTrue);
-    final style = sosStatusStyle(sos);
+    final style = sosStatusStyle(sos, AppPalette.light);
     expect(style.label, 'Cancelled');
     expect(style.help, 'You cancelled this request.');
     // A resolved one is still resolved.
     expect(
-      sosStatusStyle(SosEntry.fromJson({'status': 'resolved'})).label,
+      sosStatusStyle(
+        SosEntry.fromJson({'status': 'resolved'}),
+        AppPalette.light,
+      ).label,
       'Resolved',
     );
   });
@@ -268,7 +276,11 @@ void main() {
     expect(find.text('Cancel SOS'), findsOneWidget);
 
     // Someone is on the way: say they will be told not to come.
-    await open(sos({'responder': {'name': 'Maria Santos'}}));
+    await open(
+      sos({
+        'responder': {'name': 'Maria Santos'},
+      }),
+    );
     expect(
       find.text('Maria Santos is on the way. They will be told not to come.'),
       findsOneWidget,

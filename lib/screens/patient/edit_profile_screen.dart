@@ -101,7 +101,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final barangays = kLocations['Bugallon'] ?? const <String>[];
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.pal.background,
       appBar: patientAppBar(context, 'Edit profile'),
       body: SafeArea(
         child: Column(
@@ -129,15 +129,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ),
                       ),
                       const SizedBox(height: Sp.sm),
-                      const Text(
+                      Text(
                         'Tap the camera to change your photo',
-                        style: T.meta,
+                        style: T.meta.muted(context),
                       ),
                       const SizedBox(height: Sp.xl),
                       TextFormField(
+                        style: T.body.copyWith(color: context.pal.ink),
+                        cursorColor: context.pal.ink,
                         controller: _name,
                         textCapitalization: TextCapitalization.words,
                         decoration: inputDecoration(
+                          context,
                           'Full name',
                           Icons.person_outline,
                         ),
@@ -151,26 +154,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         controller: _email,
                         readOnly: true,
                         enableInteractiveSelection: true,
-                        style: T.body.copyWith(color: AppColors.textMuted),
+                        style: T.body.copyWith(color: context.pal.muted),
                         decoration:
                             inputDecoration(
+                              context,
                               'Email',
                               Icons.email_outlined,
-                              suffix: const Icon(
+                              suffix: Icon(
                                 Icons.lock_outline,
                                 size: 18,
-                                color: AppColors.textMuted,
+                                color: context.pal.muted,
                               ),
                             ).copyWith(
-                              fillColor: AppColors.background,
+                              fillColor: context.pal.background,
                               helperText: "Your email is your login and can't be changed.",
                             ),
                       ),
                       const SizedBox(height: Sp.lg),
                       TextFormField(
+                        style: T.body.copyWith(color: context.pal.ink),
+                        cursorColor: context.pal.ink,
                         controller: _mobile,
                         keyboardType: TextInputType.phone,
                         decoration: inputDecoration(
+                          context,
                           'Mobile number',
                           Icons.phone_outlined,
                         ),
@@ -181,9 +188,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                       const SizedBox(height: Sp.lg),
                       DropdownButtonFormField<String>(
+                        style: T.body.copyWith(color: context.pal.ink),
+                        dropdownColor: context.pal.card,
                         initialValue: _barangay,
                         isExpanded: true,
                         decoration: inputDecoration(
+                          context,
                           'Barangay',
                           Icons.map_outlined,
                         ),

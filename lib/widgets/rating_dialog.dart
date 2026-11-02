@@ -56,7 +56,7 @@ class _RatingDialogState extends State<_RatingDialog> {
   Widget build(BuildContext context) {
     final name = widget.gobikerName;
     return AlertDialog(
-      icon: Icon(widget.icon, color: AppColors.orangeText, size: 36),
+      icon: Icon(widget.icon, color: context.pal.orangeText, size: 36),
       title: Text(widget.title, textAlign: TextAlign.center),
       content: SingleChildScrollView(
         child: Column(
@@ -67,7 +67,7 @@ class _RatingDialogState extends State<_RatingDialog> {
                   ? 'Rate the GoBiker who helped you.'
                   : 'Rate $name, the GoBiker who helped you.',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textMuted),
+              style: TextStyle(color: context.pal.muted),
             ),
             const SizedBox(height: 16),
             Row(
@@ -93,7 +93,7 @@ class _RatingDialogState extends State<_RatingDialog> {
                         i <= _rating
                             ? Icons.star_rounded
                             : Icons.star_outline_rounded,
-                        color: i <= _rating ? _star : AppColors.textMuted,
+                        color: i <= _rating ? _star : context.pal.muted,
                       ),
                     ),
                   ),

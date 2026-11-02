@@ -12,7 +12,7 @@ class NotificationSettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.pal.background,
       appBar: patientAppBar(context, 'Notification settings'),
       body: SafeArea(
         child: ListenableBuilder(
@@ -66,13 +66,13 @@ class NotificationSettingsScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: Sp.lg),
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(horizontal: 4),
                   child: Text(
                     'Notifications arrive even when RondaGo is closed. If none '
                     'arrive, check that notifications are allowed for RondaGo '
                     "in your phone's settings.",
-                    style: T.meta,
+                    style: T.meta.muted(context),
                   ),
                 ),
               ],
@@ -113,10 +113,10 @@ class _Toggle extends StatelessWidget {
           }
         },
         contentPadding: const EdgeInsets.fromLTRB(Sp.lg, 4, Sp.md, 4),
-        activeTrackColor: AppColors.textDark,
-        activeThumbColor: Colors.white,
+        activeTrackColor: context.pal.ink,
+        activeThumbColor: context.pal.card,
         title: Text(title, style: T.rowTitle),
-        subtitle: Text(subtitle, style: T.secondary),
+        subtitle: Text(subtitle, style: T.secondary.muted(context)),
       ),
     );
   }
@@ -173,25 +173,25 @@ class _PhoneStatusState extends State<_PhoneStatus>
             liveRegion: true,
             child: Container(
               padding: const EdgeInsets.fromLTRB(Sp.lg, Sp.xs, Sp.xs, Sp.xs),
-              decoration: cardDecoration(),
+              decoration: cardDecoration(context),
               constraints: const BoxConstraints(minHeight: 56),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.notifications_off_outlined,
-                    color: AppColors.redText,
+                    color: context.pal.redText,
                     size: 22,
                   ),
                   const SizedBox(width: Sp.md),
                   Expanded(
                     child: Text(
                       "Notifications are turned off for RondaGo in your phone's settings.",
-                      style: T.label.copyWith(color: AppColors.redText),
+                      style: T.label.copyWith(color: context.pal.redText),
                     ),
                   ),
-                  const QuietButton(
+                  QuietButton(
                     label: 'Open settings',
-                    color: AppColors.redText,
+                    color: context.pal.redText,
                     onPressed: Geolocator.openAppSettings,
                   ),
                 ],

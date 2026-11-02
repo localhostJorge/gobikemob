@@ -117,7 +117,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.pal.background,
       body: SafeArea(
         child: IndexedStack(
           index: _tab,
@@ -194,17 +194,17 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
                     const SizedBox(height: Sp.xs),
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.place_outlined,
                           size: 16,
-                          color: AppColors.textMuted,
+                          color: context.pal.muted,
                         ),
                         const SizedBox(width: Sp.xs),
                         Flexible(
                           child: Text(
                             place,
                             overflow: TextOverflow.ellipsis,
-                            style: T.secondary,
+                            style: T.secondary.muted(context),
                           ),
                         ),
                       ],
@@ -240,22 +240,24 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
 
   Widget _bottomNav() {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.line)),
+      decoration: BoxDecoration(
+        color: context.pal.card,
+        border: Border(top: BorderSide(color: context.pal.line)),
       ),
       child: BottomNavigationBar(
         currentIndex: _tab,
         onTap: (i) => setState(() => _tab = i),
         type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
+        backgroundColor: context.pal.card,
         elevation: 0,
-        selectedItemColor: AppColors.redText,
-        unselectedItemColor: AppColors.textMuted,
+        selectedItemColor: context.pal.redText,
+        unselectedItemColor: context.pal.muted,
         selectedFontSize: 12,
         unselectedFontSize: 12,
-        selectedLabelStyle: T.meta.copyWith(fontWeight: FontWeight.w700),
-        unselectedLabelStyle: T.meta,
+        selectedLabelStyle: T.meta
+            .muted(context)
+            .copyWith(fontWeight: FontWeight.w700),
+        unselectedLabelStyle: T.meta.muted(context),
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
@@ -330,7 +332,7 @@ class _HealthList extends StatelessWidget {
               ),
               NavRow(
                 icon: Icons.home_outlined,
-                color: AppColors.orangeText,
+                color: context.pal.orangeText,
                 title: 'Home visit',
                 subtitle: visit == null
                     ? 'Ask a GoBiker to check on you at home'

@@ -68,8 +68,8 @@ class _HistoryTabState extends State<HistoryTab> {
           title: 'SOS request',
           subtitle: s.place,
           time: s.createdAt,
-          status: sosStatusStyle(s).label,
-          statusColor: sosStatusStyle(s).color,
+          status: sosStatusStyle(s, context.pal).label,
+          statusColor: sosStatusStyle(s, context.pal).color,
         ),
       for (final a in ResidentAppointments.instance.appointments)
         _Item(
@@ -78,7 +78,7 @@ class _HistoryTabState extends State<HistoryTab> {
           subtitle: 'For ${formatDate(a.preferredDate)} · ${a.barangay}',
           time: a.createdAt,
           status: a.statusLabel,
-          statusColor: a.isOpen ? AppColors.orangeText : AppColors.textMuted,
+          statusColor: a.isOpen ? context.pal.orangeText : context.pal.muted,
         ),
       for (final v in _visits.visits) ...[
         _Item(
@@ -220,9 +220,9 @@ class _HistoryTabState extends State<HistoryTab> {
                       padding: const EdgeInsets.fromLTRB(4, Sp.md, 4, Sp.sm),
                       child: Text(
                         label,
-                        style: T.secondary.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: T.secondary
+                            .muted(context)
+                            .copyWith(fontWeight: FontWeight.w700),
                       ),
                     ),
                     CardGroup(
@@ -261,17 +261,17 @@ class _HistoryTabState extends State<HistoryTab> {
                         label: Text(f.label),
                         selected: _filter == f,
                         showCheckmark: false,
-                        selectedColor: AppColors.textDark,
-                        backgroundColor: Colors.white,
+                        selectedColor: context.pal.ink,
+                        backgroundColor: context.pal.card,
                         side: BorderSide(
                           color: _filter == f
-                              ? AppColors.textDark
-                              : AppColors.line,
+                              ? context.pal.ink
+                              : context.pal.line,
                         ),
                         labelStyle: T.label.copyWith(
                           color: _filter == f
-                              ? Colors.white
-                              : AppColors.textDark,
+                              ? context.pal.card
+                              : context.pal.ink,
                         ),
                         onSelected: (_) => setState(() => _filter = f),
                       ),
@@ -297,9 +297,11 @@ class _Row extends StatelessWidget {
   const _Row({required this.item});
   final _Item item;
 
-  ({IconData icon, Color color}) get _look => switch (item.kind) {
-    _Kind.sos => (icon: Icons.sos_rounded, color: AppColors.redText),
-    _Kind.visit => (icon: Icons.home_outlined, color: AppColors.orangeText),
+  ({IconData icon, Color color}) _look(
+    BuildContext context,
+  ) => switch (item.kind) {
+    _Kind.sos => (icon: Icons.sos_rounded, color: context.pal.redText),
+    _Kind.visit => (icon: Icons.home_outlined, color: context.pal.orangeText),
     _Kind.checkup => (
       icon: Icons.favorite_border_rounded,
       color: AppColors.blue,
@@ -310,7 +312,7 @@ class _Row extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visit = item.visit;
-    final look = _look;
+    final look = _look(context);
 
     return InkWell(
       onTap: visit == null
@@ -341,14 +343,14 @@ class _Row extends StatelessWidget {
                     item.subtitle,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: T.secondary,
+                    style: T.secondary.muted(context),
                   ),
                   if (item.status != null) ...[
                     const SizedBox(height: Sp.xs),
                     Text(
                       item.status!,
                       style: T.label.copyWith(
-                        color: item.statusColor ?? AppColors.textMuted,
+                        color: item.statusColor ?? context.pal.muted,
                       ),
                     ),
                   ],
@@ -356,14 +358,14 @@ class _Row extends StatelessWidget {
               ),
             ),
             const SizedBox(width: Sp.sm),
-            Text(formatTime(item.time), style: T.meta),
+            Text(formatTime(item.time), style: T.meta.muted(context)),
             if (visit != null)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(left: 2),
                 child: Icon(
                   Icons.chevron_right_rounded,
                   size: 20,
-                  color: AppColors.textMuted,
+                  color: context.pal.muted,
                 ),
               ),
           ],

@@ -141,7 +141,7 @@ class StatusChip extends StatelessWidget {
         status.label,
         style: T.meta.copyWith(
           fontWeight: FontWeight.w700,
-          color: status.color,
+          color: context.pal.readable(status.color),
         ),
       ),
     );
@@ -159,7 +159,7 @@ class StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     if (status != null) return StatusChip(status: status!);
     if (!adult) {
-      return const Text('Ask a health worker', style: T.meta);
+      return Text('Ask a health worker', style: T.meta.muted(context));
     }
     return const SizedBox.shrink();
   }
@@ -170,13 +170,13 @@ class ScreeningNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
+    return Padding(
       padding: EdgeInsets.symmetric(horizontal: 4),
       child: Text(
         'These labels are screening readings, not a diagnosis. '
         'Please consult a health worker about your results.',
         textAlign: TextAlign.center,
-        style: T.meta,
+        style: T.meta.muted(context),
       ),
     );
   }

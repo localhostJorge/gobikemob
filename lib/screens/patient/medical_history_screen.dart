@@ -16,7 +16,7 @@ class MedicalHistoryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final store = ResidentVisits.instance;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.pal.background,
       appBar: patientAppBar(context, 'Medical history'),
       body: SafeArea(
         child: ListenableBuilder(
@@ -108,11 +108,14 @@ class _LatestCard extends StatelessWidget {
           Row(
             children: [
               const Expanded(child: Text('Latest check-up', style: T.rowTitle)),
-              Text(formatDate(record.date), style: T.meta),
+              Text(formatDate(record.date), style: T.meta.muted(context)),
             ],
           ),
           const SizedBox(height: Sp.xs),
-          Text('${record.place} · ${record.gobikerName}', style: T.secondary),
+          Text(
+            '${record.place} · ${record.gobikerName}',
+            style: T.secondary.muted(context),
+          ),
           const SizedBox(height: Sp.lg),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,9 +167,9 @@ class _LatestCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: Sp.md),
-          const Align(
+          Align(
             alignment: Alignment.centerRight,
-            child: Text('See all details', style: T.meta),
+            child: Text('See all details', style: T.meta.muted(context)),
           ),
         ],
       ),
@@ -193,13 +196,15 @@ class _Stat extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: T.secondary),
+        Text(label, style: T.secondary.muted(context)),
         const SizedBox(height: 2),
         Text.rich(
           TextSpan(
             text: value,
             style: T.title,
-            children: [TextSpan(text: ' $unit', style: T.secondary)],
+            children: [
+              TextSpan(text: ' $unit', style: T.secondary.muted(context)),
+            ],
           ),
         ),
         if (footer != null) ...[const SizedBox(height: Sp.xs), footer!],
@@ -233,7 +238,7 @@ class _VisitRow extends StatelessWidget {
                     '${record.place} · ${record.gobikerName}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: T.secondary,
+                    style: T.secondary.muted(context),
                   ),
                   const SizedBox(height: Sp.sm),
                   Text(
@@ -246,7 +251,7 @@ class _VisitRow extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+            Icon(Icons.chevron_right_rounded, color: context.pal.muted),
           ],
         ),
       ),

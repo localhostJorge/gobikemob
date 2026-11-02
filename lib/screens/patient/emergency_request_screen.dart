@@ -226,7 +226,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.pal.background,
       appBar: patientAppBar(context, 'SOS request'),
       body: SafeArea(
         child: Column(
@@ -246,17 +246,19 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                   children: [
                     const Text('Tell us what happened', style: T.title),
                     const SizedBox(height: Sp.xs),
-                    const Text(
+                    Text(
                       'The Go Bike admin sees this as soon as you send it.',
-                      style: T.secondary,
+                      style: T.secondary.muted(context),
                     ),
                     const SizedBox(height: Sp.xl),
                     _sectionHeader('Where are you?'),
                     const SizedBox(height: Sp.xs),
-                    Text(_barangayNote(), style: T.meta),
+                    Text(_barangayNote(), style: T.meta.muted(context)),
                     const SizedBox(height: Sp.md),
                     _fieldLabel('Address'),
                     TextField(
+                      style: T.body.copyWith(color: context.pal.ink),
+                      cursorColor: context.pal.ink,
                       controller: _address,
                       textCapitalization: TextCapitalization.words,
                       textInputAction: TextInputAction.next,
@@ -270,6 +272,8 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                     const SizedBox(height: Sp.lg),
                     _fieldLabel('Landmark'),
                     TextField(
+                      style: T.body.copyWith(color: context.pal.ink),
+                      cursorColor: context.pal.ink,
                       controller: _landmark,
                       textCapitalization: TextCapitalization.words,
                       onChanged: (_) => _showErrors ? setState(() {}) : null,
@@ -283,6 +287,8 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                     _sectionHeader('What happened?'),
                     const SizedBox(height: Sp.md),
                     TextField(
+                      style: T.body.copyWith(color: context.pal.ink),
+                      cursorColor: context.pal.ink,
                       controller: _description,
                       maxLines: 4,
                       textCapitalization: TextCapitalization.sentences,
@@ -343,10 +349,10 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                       ],
                     ),
                     const SizedBox(height: Sp.sm),
-                    const Center(
+                    Center(
                       child: Text(
                         'A photo or video helps responders prepare.',
-                        style: T.meta,
+                        style: T.meta.muted(context),
                       ),
                     ),
                     const SizedBox(height: Sp.xl),
@@ -439,19 +445,19 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
         );
     return InputDecoration(
       errorText: error,
-      errorBorder: border(AppColors.redText),
-      focusedErrorBorder: border(AppColors.redText, 1.5),
+      errorBorder: border(context.pal.redText),
+      focusedErrorBorder: border(context.pal.redText, 1.5),
       hintText: hint,
-      hintStyle: T.body.copyWith(color: AppColors.textMuted),
+      hintStyle: T.body.copyWith(color: context.pal.muted),
       prefixIcon: prefix == null
           ? null
-          : Icon(prefix, color: AppColors.textMuted, size: 22),
+          : Icon(prefix, color: context.pal.muted, size: 22),
       filled: true,
-      fillColor: Colors.white,
+      fillColor: context.pal.card,
       contentPadding: const EdgeInsets.all(Sp.lg),
-      border: border(AppColors.line),
-      enabledBorder: border(AppColors.line),
-      focusedBorder: border(AppColors.textDark, 1.5),
+      border: border(context.pal.line),
+      enabledBorder: border(context.pal.line),
+      focusedBorder: border(context.pal.ink, 1.5),
     );
   }
 
@@ -462,10 +468,10 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
       TextSpan(
         text: text,
         style: T.label,
-        children: const [
+        children: [
           TextSpan(
             text: ' *',
-            style: TextStyle(color: AppColors.redText),
+            style: TextStyle(color: context.pal.redText),
           ),
         ],
       ),
@@ -479,19 +485,23 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
     return Container(
       padding: const EdgeInsets.all(Sp.md),
       decoration: BoxDecoration(
-        color: AppColors.redSoft,
+        color: context.pal.redSoft,
         borderRadius: BorderRadius.circular(Rd.control),
       ),
-      child: const Row(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline_rounded, color: AppColors.redText, size: 20),
+          Icon(
+            Icons.info_outline_rounded,
+            color: context.pal.redText,
+            size: 20,
+          ),
           SizedBox(width: Sp.md),
           Expanded(
             child: Text(
               'False reports are punishable by law. Only use this for real '
               'emergencies that need immediate help.',
-              style: T.secondary,
+              style: T.secondary.muted(context),
             ),
           ),
         ],
@@ -574,7 +584,7 @@ class _UploadTile extends StatelessWidget {
       label: label,
       excludeSemantics: true,
       child: Material(
-        color: Colors.white,
+        color: context.pal.card,
         borderRadius: BorderRadius.circular(Rd.control),
         child: InkWell(
           borderRadius: BorderRadius.circular(Rd.control),
@@ -584,12 +594,12 @@ class _UploadTile extends StatelessWidget {
             width: double.infinity,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(Rd.control),
-              border: Border.all(color: AppColors.line),
+              border: Border.all(color: context.pal.line),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, color: AppColors.textDark, size: 24),
+                Icon(icon, color: context.pal.ink, size: 24),
                 const SizedBox(height: Sp.sm),
                 Text(label, style: T.label),
               ],

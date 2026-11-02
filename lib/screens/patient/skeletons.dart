@@ -52,8 +52,7 @@ class _RowsCard extends StatelessWidget {
     child: Column(
       children: [
         for (var i = 0; i < count; i++) ...[
-          if (i > 0)
-            const Divider(height: 1, indent: 52, color: AppColors.divider),
+          if (i > 0) Divider(height: 1, indent: 52, color: context.pal.divider),
           _RowShape(trailing: trailing),
         ],
       ],

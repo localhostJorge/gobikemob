@@ -36,13 +36,15 @@ abstract final class Rd {
 const kFontFamily = 'Roboto';
 
 /// The type scale. Six sizes; weight and color do the rest of the hierarchy.
+///
+/// These styles carry no color, so text takes the theme's (navy in light mode, white in dark).
+/// Secondary text asks for the muted color with `T.secondary.muted(context)`.
 abstract final class T {
   /// Screen heading on the tabs.
   static const title = TextStyle(
     fontSize: 24,
     height: 1.2,
     fontWeight: FontWeight.w800,
-    color: AppColors.textDark,
   );
 
   /// Section headings, dialog titles, page titles.
@@ -50,7 +52,6 @@ abstract final class T {
     fontSize: 17,
     height: 1.3,
     fontWeight: FontWeight.w700,
-    color: AppColors.textDark,
   );
 
   /// The first line of a list row or card.
@@ -58,29 +59,19 @@ abstract final class T {
     fontSize: 15,
     height: 1.3,
     fontWeight: FontWeight.w700,
-    color: AppColors.textDark,
   );
 
   /// Running text.
-  static const body = TextStyle(
-    fontSize: 15,
-    height: 1.4,
-    color: AppColors.textDark,
-  );
+  static const body = TextStyle(fontSize: 15, height: 1.4);
 
   /// Descriptions and supporting lines.
-  static const secondary = TextStyle(
-    fontSize: 13,
-    height: 1.4,
-    color: AppColors.textMuted,
-  );
+  static const secondary = TextStyle(fontSize: 13, height: 1.4);
 
   /// Small facts: times, tab labels, footnotes.
   static const meta = TextStyle(
     fontSize: 12,
     height: 1.3,
     fontWeight: FontWeight.w500,
-    color: AppColors.textMuted,
   );
 
   /// Form labels and statuses.
@@ -88,7 +79,6 @@ abstract final class T {
     fontSize: 13,
     height: 1.3,
     fontWeight: FontWeight.w700,
-    color: AppColors.textDark,
   );
 
   static const button = TextStyle(
@@ -100,14 +90,20 @@ abstract final class T {
   );
 }
 
+/// Secondary text color from the current theme.
+extension MutedText on TextStyle {
+  TextStyle muted(BuildContext context) => copyWith(color: context.pal.muted);
+}
+
 // ---------------------------------------------------------------- surfaces
 
 /// A flat white card with a hairline border: no shadow anywhere in the app.
-BoxDecoration cardDecoration([double radius = Rd.card]) => BoxDecoration(
-  color: AppColors.card,
-  borderRadius: BorderRadius.circular(radius),
-  border: Border.all(color: AppColors.line),
-);
+BoxDecoration cardDecoration(BuildContext context, [double radius = Rd.card]) =>
+    BoxDecoration(
+      color: context.pal.card,
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(color: context.pal.line),
+    );
 
 /// A card, optionally tappable (with a pressed ripple).
 class AppCard extends StatelessWidget {
@@ -128,9 +124,9 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final decoration = cardDecoration().copyWith(
+    final decoration = cardDecoration(context).copyWith(
       border: Border.all(
-        color: borderColor ?? AppColors.line,
+        color: borderColor ?? context.pal.line,
         width: borderColor == null ? 1 : 1.5,
       ),
     );
@@ -159,11 +155,11 @@ class CardGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     // A Material surface (not a painted box), so taps on rows show a ripple.
     return Material(
-      color: AppColors.card,
+      color: context.pal.card,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(Rd.card),
-        side: const BorderSide(color: AppColors.line),
+        side: BorderSide(color: context.pal.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -173,7 +169,7 @@ class CardGroup extends StatelessWidget {
               Divider(
                 height: 1,
                 indent: dividerIndent,
-                color: AppColors.divider,
+                color: context.pal.divider,
               ),
             children[i],
           ],
@@ -192,7 +188,7 @@ class NavRow extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.subtitleWidget,
-    this.color = AppColors.textDark,
+    this.color,
     this.onTap,
   });
 
@@ -202,14 +198,18 @@ class NavRow extends StatelessWidget {
 
   /// Instead of [subtitle], e.g. a skeleton line while a value loads.
   final Widget? subtitleWidget;
-  final Color color;
+
+  /// The icon's color; the theme's text color when null.
+  final Color? color;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final sub =
         subtitleWidget ??
-        (subtitle == null ? null : Text(subtitle!, style: T.secondary));
+        (subtitle == null
+            ? null
+            : Text(subtitle!, style: T.secondary.muted(context)));
     return InkWell(
       onTap: onTap,
       child: ConstrainedBox(
@@ -218,7 +218,7 @@ class NavRow extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(Sp.lg, 14, Sp.md, 14),
           child: Row(
             children: [
-              Icon(icon, size: 22, color: color),
+              Icon(icon, size: 22, color: color ?? context.pal.ink),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -230,10 +230,7 @@ class NavRow extends StatelessWidget {
                 ),
               ),
               if (onTap != null)
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textMuted,
-                ),
+                Icon(Icons.chevron_right_rounded, color: context.pal.muted),
             ],
           ),
         ),
@@ -291,7 +288,7 @@ class TabHeader extends StatelessWidget {
 /// The bar of every pushed page: back arrow and a left-aligned title.
 PreferredSizeWidget patientAppBar(BuildContext context, String title) {
   return AppBar(
-    backgroundColor: AppColors.background,
+    backgroundColor: context.pal.background,
     surfaceTintColor: Colors.transparent,
     elevation: 0,
     scrolledUnderElevation: 0,
@@ -299,7 +296,7 @@ PreferredSizeWidget patientAppBar(BuildContext context, String title) {
     titleSpacing: 0,
     leading: IconButton(
       tooltip: 'Back',
-      icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textDark),
+      icon: Icon(Icons.arrow_back_rounded, color: context.pal.ink),
       onPressed: () => Navigator.maybePop(context),
     ),
     title: Text(title, style: T.heading),
@@ -403,15 +400,15 @@ class SecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = destructive ? AppColors.redText : AppColors.textDark;
+    final color = destructive ? context.pal.redText : context.pal.ink;
     return OutlinedButton(
       onPressed: loading ? null : onPressed,
       style: _buttonStyle(
         background: Colors.transparent,
         foreground: color,
         border: destructive
-            ? AppColors.redText.withValues(alpha: 0.5)
-            : AppColors.textDark.withValues(alpha: 0.25),
+            ? context.pal.redText.withValues(alpha: 0.5)
+            : context.pal.ink.withValues(alpha: 0.25),
       ),
       child: _buttonChild(label, icon, loading, color),
     );
@@ -432,18 +429,20 @@ class QuietButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.icon,
-    this.color = AppColors.textMuted,
+    this.color,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
-  final Color color;
+
+  /// The text color; the theme's secondary text color when null.
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     final style = TextButton.styleFrom(
-      foregroundColor: color,
+      foregroundColor: color ?? context.pal.muted,
       minimumSize: const Size(48, 48),
       padding: const EdgeInsets.symmetric(horizontal: Sp.md),
       textStyle: T.label.copyWith(fontSize: 14, fontFamily: kFontFamily),
@@ -474,7 +473,7 @@ Future<bool> showConfirm(
   final ok = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      backgroundColor: Colors.white,
+      backgroundColor: context.pal.card,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(Rd.sheet),
@@ -493,7 +492,7 @@ Future<bool> showConfirm(
           label: confirmLabel,
           color:
               confirmColor ??
-              (destructive ? AppColors.redText : AppColors.textDark),
+              (destructive ? context.pal.redText : context.pal.ink),
           onPressed: () => Navigator.pop(ctx, true),
         ),
       ],
@@ -526,13 +525,17 @@ class EmptyState extends StatelessWidget {
       children: [
         Text(title, style: T.heading, textAlign: TextAlign.center),
         const SizedBox(height: Sp.xs),
-        Text(message, style: T.secondary, textAlign: TextAlign.center),
+        Text(
+          message,
+          style: T.secondary.muted(context),
+          textAlign: TextAlign.center,
+        ),
         if (actionLabel != null) ...[
           const SizedBox(height: Sp.lg),
           QuietButton(
             label: actionLabel!,
             onPressed: onAction,
-            color: AppColors.redText,
+            color: context.pal.redText,
           ),
         ],
       ],
@@ -554,11 +557,7 @@ class ErrorState extends StatelessWidget {
       liveRegion: true,
       child: Column(
         children: [
-          const Icon(
-            Icons.cloud_off_rounded,
-            size: 32,
-            color: AppColors.textMuted,
-          ),
+          Icon(Icons.cloud_off_rounded, size: 32, color: context.pal.muted),
           const SizedBox(height: Sp.md),
           const Text(
             "Couldn't load this",
@@ -566,7 +565,11 @@ class ErrorState extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: Sp.xs),
-          Text(message, style: T.secondary, textAlign: TextAlign.center),
+          Text(
+            message,
+            style: T.secondary.muted(context),
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: Sp.lg),
           SizedBox(
             width: 180,
@@ -598,7 +601,7 @@ class InlineNotice extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: Sp.md),
       padding: const EdgeInsets.fromLTRB(Sp.lg, Sp.xs, Sp.xs, Sp.xs),
       decoration: BoxDecoration(
-        color: AppColors.redSoft,
+        color: context.pal.redSoft,
         borderRadius: BorderRadius.circular(Rd.control),
       ),
       child: Row(
@@ -606,14 +609,14 @@ class InlineNotice extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: T.secondary.copyWith(color: AppColors.textDark),
+              style: T.secondary.copyWith(color: context.pal.ink),
             ),
           ),
           if (onAction != null)
             QuietButton(
               label: actionLabel,
               onPressed: onAction,
-              color: AppColors.redText,
+              color: context.pal.redText,
             ),
         ],
       ),
@@ -675,10 +678,10 @@ class _SkeletonState extends State<Skeleton>
               shaderCallback: (rect) => LinearGradient(
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
-                colors: const [
-                  AppColors.skeleton,
-                  AppColors.skeletonShine,
-                  AppColors.skeleton,
+                colors: [
+                  context.pal.skeleton,
+                  context.pal.skeletonShine,
+                  context.pal.skeleton,
                 ],
                 stops: const [0.3, 0.5, 0.7],
                 transform: _Sweep(_controller.value),
@@ -735,7 +738,7 @@ class SkeletonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: padding,
-    decoration: cardDecoration(),
+    decoration: cardDecoration(context),
     child: Skeleton(child: child),
   );
 }
@@ -760,7 +763,7 @@ class SkeletonBox extends StatelessWidget {
     width: circle ? height : width,
     height: height,
     decoration: BoxDecoration(
-      color: AppColors.skeleton,
+      color: context.pal.skeleton,
       shape: circle ? BoxShape.circle : BoxShape.rectangle,
       borderRadius: circle ? null : BorderRadius.circular(radius),
     ),
@@ -796,27 +799,32 @@ class LoadSwitcher extends StatelessWidget {
 // ---------------------------------------------------------------- inputs
 
 /// Text fields: one look for every form.
-InputDecoration inputDecoration(String label, IconData icon, {Widget? suffix}) {
+InputDecoration inputDecoration(
+  BuildContext context,
+  String label,
+  IconData icon, {
+  Widget? suffix,
+}) {
   OutlineInputBorder border(Color c, [double width = 1]) => OutlineInputBorder(
     borderRadius: BorderRadius.circular(Rd.control),
     borderSide: BorderSide(color: c, width: width),
   );
   return InputDecoration(
     labelText: label,
-    labelStyle: T.secondary,
-    prefixIcon: Icon(icon, color: AppColors.textMuted, size: 22),
+    labelStyle: T.secondary.muted(context),
+    prefixIcon: Icon(icon, color: context.pal.muted, size: 22),
     suffixIcon: suffix,
     filled: true,
-    fillColor: Colors.white,
+    fillColor: context.pal.card,
     contentPadding: const EdgeInsets.symmetric(
       horizontal: Sp.lg,
       vertical: Sp.lg,
     ),
-    border: border(AppColors.line),
-    enabledBorder: border(AppColors.line),
-    focusedBorder: border(AppColors.textDark, 1.5),
-    errorBorder: border(AppColors.redText),
-    focusedErrorBorder: border(AppColors.redText, 1.5),
-    errorStyle: T.meta.copyWith(color: AppColors.redText),
+    border: border(context.pal.line),
+    enabledBorder: border(context.pal.line),
+    focusedBorder: border(context.pal.ink, 1.5),
+    errorBorder: border(context.pal.redText),
+    focusedErrorBorder: border(context.pal.redText, 1.5),
+    errorStyle: T.meta.copyWith(color: context.pal.redText),
   );
 }

@@ -42,7 +42,7 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.pal.background,
       appBar: patientAppBar(context, 'Profile'),
       body: SafeArea(
         child: ListenableBuilder(
@@ -73,7 +73,11 @@ class ProfileScreen extends StatelessWidget {
                 Text(name, textAlign: TextAlign.center, style: T.title),
                 if (phone.isNotEmpty) ...[
                   const SizedBox(height: Sp.xs),
-                  Text(phone, textAlign: TextAlign.center, style: T.secondary),
+                  Text(
+                    phone,
+                    textAlign: TextAlign.center,
+                    style: T.secondary.muted(context),
+                  ),
                 ],
                 const SizedBox(height: Sp.xl + Sp.sm),
                 CardGroup(
