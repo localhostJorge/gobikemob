@@ -253,7 +253,7 @@ class PushService {
       case 'checkup':
         ResidentVisits.instance.load();
         FeedbackPrompt.instance.check(); // rate the check-up
-      case 'sos_assigned':
+      case 'sos_assigned' || 'sos_cancelled':
         GobikerSos.instance.load();
       case 'appointment_request' || 'appointment_assigned':
         GobikerAppointments.instance.load();

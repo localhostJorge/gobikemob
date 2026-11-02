@@ -20,6 +20,7 @@ class SosEntry {
     this.respondedAt,
     this.resolvedAt,
     this.resolvedByResident = false,
+    this.cancelled = false,
     this.responderName,
     this.responderBarangay,
     this.responderPhotoUrl,
@@ -45,6 +46,11 @@ class SosEntry {
 
   /// The resident closed it themselves (no longer needed help).
   final bool resolvedByResident;
+
+  /// The resident withdrew it. The server reports such a request as `resolved`
+  /// (apps from before cancelling existed would read any other status as still
+  /// open), so this flag is what tells "cancelled" from "resolved".
+  final bool cancelled;
 
   /// The GoBiker the admin sent, or the one who resolved it. Null until the
   /// admin assigns someone.
@@ -78,6 +84,7 @@ class SosEntry {
       respondedAt: date(j['responded_at']),
       resolvedAt: date(j['resolved_at']),
       resolvedByResident: j['resolved_by_resident'] == true,
+      cancelled: j['cancelled'] == true,
       responderName: responder?['name']?.toString().trim(),
       responderBarangay: responder?['barangay']?.toString().trim(),
       responderPhotoUrl: responder?['photo_url']?.toString().trim(),
@@ -182,6 +189,27 @@ class ResidentSos extends ChangeNotifier {
       final sos = SosEntry.fromJson(Map<String, dynamic>.from(raw));
       requests = [for (final r in requests) r.id == sos.id ? sos : r];
       notifyListeners();
+    }
+    return null;
+  }
+
+  /// The resident no longer needs help: withdraws an SOS that is still open,
+  /// even one a GoBiker is already on the way to (they are told not to come).
+  /// Returns null on success, otherwise an error message.
+  Future<String?> cancel(int id) async {
+    final res = await AuthService.instance.callAuthed(
+      'POST',
+      '/resident/sos/$id/cancel',
+    );
+    if (!res.ok) return res.message;
+
+    final raw = res.body['sos'];
+    if (raw is Map) {
+      final sos = SosEntry.fromJson(Map<String, dynamic>.from(raw));
+      requests = [for (final r in requests) r.id == sos.id ? sos : r];
+      notifyListeners();
+    } else {
+      await load();
     }
     return null;
   }

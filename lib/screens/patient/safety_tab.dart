@@ -31,6 +31,13 @@ import 'visit_record.dart' show formatDate, formatTime;
             color: AppColors.orangeText,
             help: '${sos.responderName} is on the way to help you.',
           ),
+  // A cancelled request comes from the server as `resolved`, so tell them apart here.
+  'resolved' when sos.cancelled => (
+    label: 'Cancelled',
+    icon: Icons.cancel_outlined,
+    color: AppColors.textMuted,
+    help: 'You cancelled this request.',
+  ),
   'resolved' => (
     label: 'Resolved',
     icon: Icons.check_circle_rounded,
@@ -258,14 +265,49 @@ class _HomeSosStatusState extends State<HomeSosStatus> with _SosPolling {
   }
 }
 
-/// One open SOS request: its status, what that means, and who is coming.
+/// One open SOS request: its status, what that means, who is coming, and a
+/// button to cancel it.
 ///
-/// There is nothing to press. An emergency stays open until the GoBiker sent
-/// to help, or the admin, ends it, so the resident cannot close it themselves.
-class SosRequestCard extends StatelessWidget {
+/// The resident cannot mark it *resolved*: that is for the GoBiker sent to
+/// help, or the admin. They can only withdraw it, after a confirmation.
+class SosRequestCard extends StatefulWidget {
   const SosRequestCard({super.key, required this.sos});
 
   final SosEntry sos;
+
+  @override
+  State<SosRequestCard> createState() => _SosRequestCardState();
+}
+
+class _SosRequestCardState extends State<SosRequestCard> {
+  bool _cancelling = false;
+
+  SosEntry get sos => widget.sos;
+
+  Future<void> _cancel() async {
+    final responder = sos.responderName;
+    final ok = await showConfirm(
+      context,
+      title: 'Cancel your SOS?',
+      message: responder == null
+          ? 'The admin will be told you no longer need help.'
+          : '$responder is on the way. They will be told not to come.',
+      confirmLabel: 'Cancel SOS',
+      cancelLabel: 'Keep it',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
+
+    // Cancelling takes the card off the screen, so say the result from the
+    // messenger of the page, which outlives it.
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _cancelling = true);
+    final error = await ResidentSos.instance.cancel(sos.id);
+    if (mounted) setState(() => _cancelling = false);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(error ?? 'SOS cancelled.')));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -298,6 +340,16 @@ class SosRequestCard extends StatelessWidget {
             if (sos.responderName != null) ...[
               const SizedBox(height: Sp.md),
               _Responder(sos: sos, color: s.color),
+            ],
+            if (sos.isOpen) ...[
+              const SizedBox(height: Sp.lg),
+              SecondaryButton(
+                label: 'Cancel SOS',
+                icon: Icons.close_rounded,
+                destructive: true,
+                loading: _cancelling,
+                onPressed: _cancel,
+              ),
             ],
           ],
         ),

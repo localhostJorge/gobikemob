@@ -175,12 +175,13 @@ void main() {
     );
   });
 
-  testWidgets('a resident is given no way to close their own emergency', (
+  testWidgets('a resident can cancel their SOS but not mark it resolved', (
     tester,
   ) async {
-    SosEntry sos(String status) => SosEntry.fromJson({
+    SosEntry sos(String status, {bool cancelled = false}) => SosEntry.fromJson({
       'id': 2,
       'status': status,
+      'cancelled': cancelled,
       'municipality': 'Bugallon',
       'barangay': 'Poblacion',
       'landmark': 'Chapel',
@@ -188,22 +189,89 @@ void main() {
       'resolved_by_resident': status == 'resolved',
     });
 
-    // Only the GoBiker sent to help, or the admin, ends an emergency.
+    // Only the GoBiker sent to help, or the admin, ends an emergency as resolved...
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(body: SosRequestCard(sos: sos('sent'))),
       ),
     );
     expect(find.text('Mark as resolved'), findsNothing);
-    // Nothing to press at all: no button of any kind on the card.
-    expect(find.byWidgetPredicate((w) => w is ButtonStyleButton), findsNothing);
+    // ...but the resident can withdraw it: one button, and only that one.
+    expect(find.text('Cancel SOS'), findsOneWidget);
+    expect(find.byWidgetPredicate((w) => w is ButtonStyleButton), findsOneWidget);
 
-    // Requests a resident closed before this changed still read that way.
+    // Requests a resident closed before cancelling existed still read that way.
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(body: SosRequestCard(sos: sos('resolved'))),
       ),
     );
     expect(find.text('You marked this request as resolved.'), findsOneWidget);
+    expect(find.text('Cancel SOS'), findsNothing);
+  });
+
+  test('a cancelled SOS comes as resolved but reads as cancelled', () {
+    final sos = SosEntry.fromJson({
+      'id': 5,
+      'status': 'resolved', // what the server sends, for apps that predate cancelling
+      'cancelled': true,
+      'status_label': 'Cancelled',
+      'resolved_by_resident': true,
+      'created_at': '2026-10-25T03:57:00+00:00',
+    });
+
+    expect(sos.isOpen, isFalse);
+    expect(sos.cancelled, isTrue);
+    final style = sosStatusStyle(sos);
+    expect(style.label, 'Cancelled');
+    expect(style.help, 'You cancelled this request.');
+    // A resolved one is still resolved.
+    expect(
+      sosStatusStyle(SosEntry.fromJson({'status': 'resolved'})).label,
+      'Resolved',
+    );
+  });
+
+  testWidgets('cancelling asks first, and warns when someone is on the way', (
+    tester,
+  ) async {
+    SosEntry sos(Map<String, dynamic> extra) => SosEntry.fromJson({
+      'id': 3,
+      'status': 'responding',
+      'municipality': 'Bugallon',
+      'barangay': 'Poblacion',
+      'landmark': 'Chapel',
+      'created_at': '2026-10-25T03:57:00+00:00',
+      ...extra,
+    });
+    Future<void> open(SosEntry s) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: SosRequestCard(sos: s)),
+        ),
+      );
+      await tester.tap(find.text('Cancel SOS'));
+      await tester.pumpAndSettle();
+    }
+
+    // Nobody sent yet: the admin is the only one told.
+    await open(sos({}));
+    expect(find.text('Cancel your SOS?'), findsOneWidget);
+    expect(
+      find.text('The admin will be told you no longer need help.'),
+      findsOneWidget,
+    );
+    // "Keep it" closes the dialog and leaves the request alone (no network call).
+    await tester.tap(find.text('Keep it'));
+    await tester.pumpAndSettle();
+    expect(find.text('Cancel your SOS?'), findsNothing);
+    expect(find.text('Cancel SOS'), findsOneWidget);
+
+    // Someone is on the way: say they will be told not to come.
+    await open(sos({'responder': {'name': 'Maria Santos'}}));
+    expect(
+      find.text('Maria Santos is on the way. They will be told not to come.'),
+      findsOneWidget,
+    );
   });
 }
