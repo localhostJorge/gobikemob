@@ -14,6 +14,7 @@ import '../core/presence_service.dart';
 import '../core/theme.dart';
 import '../core/tracking_service.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/bottom_gap.dart';
 import '../widgets/confirm_modal.dart';
 import '../widgets/emergency_status_card.dart';
 import '../widgets/fade_in_slide.dart';
@@ -1161,7 +1162,8 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _buildBottomBar(ThemeData theme, Color muted) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      // 12 dp above what the SafeArea leaves, plus the home-gesture strip it does not know about.
+      margin: EdgeInsets.fromLTRB(16, 4, 16, 12 + extraBottomGap(context)),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: _cardDecoration(
         theme,

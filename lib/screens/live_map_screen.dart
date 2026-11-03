@@ -12,6 +12,7 @@ import '../core/live_map.dart';
 import '../core/presence_service.dart';
 import '../core/theme.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/bottom_gap.dart';
 import '../widgets/confirm_modal.dart';
 
 /// SOS colors: red while waiting, yellow while a GoBiker responds, green once
@@ -441,8 +442,17 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                   ],
                 ),
               MarkerLayer(markers: _markers()),
-              const SimpleAttributionWidget(
-                source: Text('Esri, Maxar, Earthstar Geographics'),
+              // The imagery credit has to stay readable: above the phone's gesture strip
+              // (and above the directions bar when it is open), on the left so the
+              // "center on me" button never covers it.
+              Padding(
+                padding: EdgeInsets.only(
+                  bottom: bottomGap(context) + (directions != null ? 92 : 0),
+                ),
+                child: const SimpleAttributionWidget(
+                  source: Text('Esri, Maxar, Earthstar Geographics'),
+                  alignment: Alignment.bottomLeft,
+                ),
               ),
             ],
           ),
@@ -450,7 +460,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
             Positioned(
               left: 12,
               right: 12,
-              bottom: 12,
+              bottom: 12 + bottomGap(context),
               child: _DirectionsBar(
                 residentName: directions.residentName,
                 distance: _distanceToSos,
@@ -472,12 +482,18 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: 'Center on me',
-        backgroundColor: theme.colorScheme.surface,
-        foregroundColor: AppTheme.blue,
-        onPressed: () => _locateMe(),
-        child: const Icon(Icons.my_location_rounded),
+      // Lifted above the imagery credit along the bottom, and above the directions bar.
+      floatingActionButton: Padding(
+        padding: EdgeInsets.only(
+          bottom: extraBottomGap(context) + (directions != null ? 92 : 28),
+        ),
+        child: FloatingActionButton(
+          tooltip: 'Center on me',
+          backgroundColor: theme.colorScheme.surface,
+          foregroundColor: AppTheme.blue,
+          onPressed: () => _locateMe(),
+          child: const Icon(Icons.my_location_rounded),
+        ),
       ),
     );
   }

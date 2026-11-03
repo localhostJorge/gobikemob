@@ -8,6 +8,7 @@ import '../../core/presence_service.dart';
 import '../../core/resident_sos.dart';
 import '../../core/resident_visits.dart';
 import '../live_map_screen.dart';
+import '../../widgets/bottom_gap.dart';
 import 'app_colors.dart';
 import 'appointment_screen.dart';
 import 'emergency_request_screen.dart';
@@ -220,45 +221,53 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
 
   Widget _bottomNav() {
     return Container(
+      // Room for the phone's own navigation area and its home-gesture strip, so the
+      // tabs sit above it instead of down in it (and a tap on one is not a swipe home).
+      padding: EdgeInsets.only(bottom: bottomGap(context) + 4),
       decoration: BoxDecoration(
         color: context.pal.card,
         border: Border(top: BorderSide(color: context.pal.line)),
       ),
-      child: BottomNavigationBar(
-        currentIndex: _tab,
-        onTap: (i) => setState(() => _tab = i),
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: context.pal.card,
-        elevation: 0,
-        selectedItemColor: context.pal.redText,
-        unselectedItemColor: context.pal.muted,
-        selectedFontSize: 12,
-        unselectedFontSize: 12,
-        selectedLabelStyle: T.meta
-            .muted(context)
-            .copyWith(fontWeight: FontWeight.w700),
-        unselectedLabelStyle: T.meta.muted(context),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home_rounded),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history_rounded),
-            label: 'History',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shield_outlined),
-            activeIcon: Icon(Icons.shield_rounded),
-            label: 'Safety',
-          ),
-          BottomNavigationBarItem(
-            icon: NavProfileIcon(selected: false),
-            activeIcon: NavProfileIcon(selected: true),
-            label: 'Profile',
-          ),
-        ],
+      // The gap is already added above; the bar must not add its own as well.
+      child: MediaQuery.removePadding(
+        context: context,
+        removeBottom: true,
+        child: BottomNavigationBar(
+          currentIndex: _tab,
+          onTap: (i) => setState(() => _tab = i),
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: context.pal.card,
+          elevation: 0,
+          selectedItemColor: context.pal.redText,
+          unselectedItemColor: context.pal.muted,
+          selectedFontSize: 12,
+          unselectedFontSize: 12,
+          selectedLabelStyle: T.meta
+              .muted(context)
+              .copyWith(fontWeight: FontWeight.w700),
+          unselectedLabelStyle: T.meta.muted(context),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home_rounded),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.history_rounded),
+              label: 'History',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.shield_outlined),
+              activeIcon: Icon(Icons.shield_rounded),
+              label: 'Safety',
+            ),
+            BottomNavigationBarItem(
+              icon: NavProfileIcon(selected: false),
+              activeIcon: NavProfileIcon(selected: true),
+              label: 'Profile',
+            ),
+          ],
+        ),
       ),
     );
   }
