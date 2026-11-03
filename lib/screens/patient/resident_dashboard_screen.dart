@@ -18,7 +18,6 @@ import 'patient_store.dart';
 import 'profile.dart';
 import 'profile_avatar.dart';
 import 'safety_tab.dart';
-import 'settings_screen.dart';
 import 'skeletons.dart';
 import 'sos_button.dart';
 import 'ui_kit.dart';
@@ -125,7 +124,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
             _home(),
             const HistoryTab(),
             SafetyTab(active: _tab == 2),
-            const SettingsTab(),
+            ProfileTab(currentUser: widget.currentUser),
           ],
         ),
       ),
@@ -139,12 +138,12 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
       onRefresh: _refreshHome,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(Sp.gutter, Sp.lg, Sp.gutter, Sp.xxl),
+        padding: const EdgeInsets.fromLTRB(Sp.gutter, Sp.md, Sp.gutter, Sp.xl),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _header(),
-            const SizedBox(height: Sp.xl + Sp.sm),
+            const SizedBox(height: Sp.lg),
             // The one thing that must be easy to find: first, and biggest.
             Center(
               child: ListenableBuilder(
@@ -167,7 +166,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
             ),
             // An open SOS shows right here, under the button.
             HomeSosStatus(active: _tab == 0),
-            const SizedBox(height: Sp.xl + Sp.sm),
+            const SizedBox(height: Sp.xl),
             const MobileNumberPrompt(),
             const SectionHeader('Your health'),
             const _HealthList(),
@@ -213,25 +212,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
                 ],
               ),
             ),
-            const SizedBox(width: Sp.md),
-            Semantics(
-              button: true,
-              label: 'Your profile',
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        ProfileScreen(currentUser: widget.currentUser),
-                  ),
-                ),
-                child: const Padding(
-                  padding: EdgeInsets.all(2),
-                  child: ProfileAvatar(radius: 22),
-                ),
-              ),
-            ),
           ],
         );
       },
@@ -274,9 +254,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
             label: 'Safety',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings_outlined),
-            activeIcon: Icon(Icons.settings_rounded),
-            label: 'Settings',
+            icon: NavProfileIcon(selected: false),
+            activeIcon: NavProfileIcon(selected: true),
+            label: 'Profile',
           ),
         ],
       ),

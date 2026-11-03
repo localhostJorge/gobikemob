@@ -3,12 +3,16 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_bike_app/core/appointments.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:go_bike_app/core/auth_service.dart';
 import 'package:go_bike_app/core/resident_sos.dart';
 import 'package:go_bike_app/core/resident_visits.dart';
 import 'package:go_bike_app/screens/patient/app_colors.dart';
 import 'package:go_bike_app/screens/patient/history_screen.dart';
-import 'package:go_bike_app/screens/patient/settings_screen.dart';
+import 'package:go_bike_app/screens/patient/resident_dashboard_screen.dart';
+import 'package:go_bike_app/screens/patient/profile.dart';
 import 'package:go_bike_app/screens/patient/skeletons.dart';
+import 'package:go_bike_app/core/theme.dart';
 import 'package:go_bike_app/screens/patient/ui_kit.dart';
 
 double _luminance(Color c) {
@@ -237,14 +241,25 @@ void main() {
       expect(result, isTrue);
     });
 
-    testWidgets('Settings offers 1, 2 and 3 second hold times only', (
+    const resident = AppUser(
+      id: 1,
+      name: 'Ana Reyes',
+      email: 'ana@example.com',
+      role: 'User',
+      mobile: '09170001111',
+      barangay: 'Poblacion',
+    );
+
+    testWidgets('Profile offers 1, 2 and 3 second hold times only', (
       tester,
     ) async {
-      tester.view.physicalSize = const Size(900, 2400);
+      tester.view.physicalSize = const Size(900, 3200);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
 
-      await tester.pumpWidget(_app(const SettingsTab(), reduceMotion: true));
+      await tester.pumpWidget(
+        _app(const ProfileTab(currentUser: resident), reduceMotion: true),
+      );
 
       for (final label in ['1 sec', '2 sec', '3 sec']) {
         expect(find.text(label), findsOneWidget);
@@ -252,6 +267,146 @@ void main() {
       expect(find.text('5 sec'), findsNothing);
       expect(find.text('Emergency SOS'), findsOneWidget);
     });
+
+    testWidgets('Profile holds the account, the settings and Log out', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(900, 3200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        _app(const ProfileTab(currentUser: resident), reduceMotion: true),
+      );
+
+      for (final text in [
+        'Ana Reyes',
+        '09170001111',
+        'Poblacion',
+        'Edit profile',
+        'Dark mode',
+        'Notification settings',
+        'Hold time',
+        'RondaGo',
+        'Log out',
+      ]) {
+        expect(find.text(text), findsOneWidget, reason: text);
+      }
+    });
+
+    testWidgets('Log out asks first, and Cancel leaves the person signed in', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(900, 3200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        _app(const ProfileTab(currentUser: resident), reduceMotion: true),
+      );
+      await tester.tap(find.text('Log out'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Log out?'), findsOneWidget);
+      expect(
+        find.text('You will need to log in again to use the app.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Log out?'), findsNothing);
+      // Still on the Profile tab: nothing was sent to the server and nothing navigated away.
+      expect(find.text('Edit profile'), findsOneWidget);
+    });
+
+    testWidgets('the Dark mode switch flips the app theme', (tester) async {
+      // The choice is saved on the phone; in a test that storage has to be faked.
+      SharedPreferences.setMockInitialValues({});
+      tester.view.physicalSize = const Size(900, 3200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      addTearDown(
+        () => ThemeController.instance.setThemeMode(ThemeMode.system),
+      );
+
+      await tester.pumpWidget(
+        ListenableBuilder(
+          listenable: ThemeController.instance,
+          builder: (context, _) => MaterialApp(
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: ThemeController.instance.themeMode,
+            home: const Scaffold(body: ProfileTab(currentUser: resident)),
+          ),
+        ),
+      );
+      await ThemeController.instance.setThemeMode(ThemeMode.light);
+      // Not pumpAndSettle: the About row's loading shimmer waits for the app version,
+      // which a test never gets, and so never stops animating.
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(
+        Theme.of(tester.element(find.text('Dark mode'))).brightness,
+        Brightness.light,
+      );
+
+      await tester.tap(find.byType(Switch));
+      await tester.pump(); // the theme's fade starts on the next frame
+      // Not pumpAndSettle: the About row's loading shimmer waits for the app version,
+      // which a test never gets, and so never stops animating.
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(ThemeController.instance.themeMode, ThemeMode.dark);
+      expect(
+        Theme.of(tester.element(find.text('Dark mode'))).brightness,
+        Brightness.dark,
+      );
+    });
+
+    testWidgets(
+      'the bar is Home, History, Safety and Profile, with no Settings',
+      (tester) async {
+        tester.view.physicalSize = const Size(1080, 2300);
+        tester.view.devicePixelRatio = 2.5;
+        addTearDown(tester.view.reset);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: const ResidentDashboardScreen(currentUser: resident),
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 300));
+
+        final bar = find.byType(BottomNavigationBar);
+        for (final label in ['Home', 'History', 'Safety', 'Profile']) {
+          expect(
+            find.descendant(of: bar, matching: find.text(label)),
+            findsOneWidget,
+            reason: label,
+          );
+        }
+        expect(
+          find.descendant(of: bar, matching: find.text('Settings')),
+          findsNothing,
+        );
+        expect(tester.widget<BottomNavigationBar>(bar).items, hasLength(4));
+
+        // The old avatar in the Home header is gone: Profile is in the bar now.
+        expect(find.bySemanticsLabel('Your profile'), findsNothing);
+
+        // Opening Profile from the bar shows the settings.
+        await tester.tap(
+          find.descendant(of: bar, matching: find.text('Profile')),
+        );
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text('Dark mode'), findsOneWidget);
+        // Log out is the last thing on the page: on a phone-sized screen it is one scroll away.
+        await tester.scrollUntilVisible(
+          find.text('Log out'),
+          300,
+          scrollable: find.byType(Scrollable).last,
+        );
+        expect(find.text('Log out'), findsOneWidget);
+      },
+    );
   });
 
   test('stores used by the screens start empty', () {

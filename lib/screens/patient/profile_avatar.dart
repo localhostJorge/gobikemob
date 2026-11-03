@@ -80,6 +80,49 @@ class ProfileAvatar extends StatelessWidget {
   }
 }
 
+/// The Profile item's icon in the bottom bar: the person's own photo as a small
+/// circle (a person glyph until they add one). A ring marks it as the current tab,
+/// as well as the red label, so the selection never depends on color alone.
+class NavProfileIcon extends StatelessWidget {
+  const NavProfileIcon({super.key, required this.selected});
+
+  final bool selected;
+
+  /// 24 dp photo plus the ring and the gap inside it: the same footprint as the
+  /// 24 dp icons beside it, so the four labels stay on one line.
+  static const double _photo = 20;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: PatientStore.instance,
+      builder: (context, _) {
+        final path = PatientStore.instance.photoPath;
+        return Container(
+          width: 26,
+          height: 26,
+          padding: const EdgeInsets.all(1.5),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected ? AppColors.red : context.pal.line,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: CircleAvatar(
+            radius: _photo / 2,
+            backgroundColor: context.pal.redSoft,
+            backgroundImage: path == null ? null : FileImage(File(path)),
+            child: path == null
+                ? Icon(Icons.person, size: 14, color: AppColors.red)
+                : null,
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// Bottom sheet: take a photo, choose from gallery, or remove the photo.
 Future<void> changeProfilePhoto(BuildContext context) async {
   final store = PatientStore.instance;
