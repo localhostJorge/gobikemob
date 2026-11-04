@@ -24,7 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _rememberMe = false;
   bool _isLoading = false;
-  bool _isGoogleLoading = false;
+  // bool _isGoogleLoading = false; // Google sign-in is off (see _handleGoogle).
 
   @override
   void dispose() {
@@ -81,16 +81,21 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Future<void> _handleGoogle() async {
-    FocusScope.of(context).unfocus();
-    setState(() => _isGoogleLoading = true);
-
-    final result = await AuthService.instance.signInWithGoogle();
-
-    if (!mounted) return;
-    setState(() => _isGoogleLoading = false);
-    await _finishSignIn(result);
-  }
+  // Google sign-in is switched off for now. To bring it back: uncomment this, the
+  // `_isGoogleLoading` field, the Google button and its divider in build(), and put
+  // `_isGoogleLoading` back in the LoadingOverlay. AuthService.signInWithGoogle and the
+  // server route are untouched.
+  //
+  // Future<void> _handleGoogle() async {
+  //   FocusScope.of(context).unfocus();
+  //   setState(() => _isGoogleLoading = true);
+  //
+  //   final result = await AuthService.instance.signInWithGoogle();
+  //
+  //   if (!mounted) return;
+  //   setState(() => _isGoogleLoading = false);
+  //   await _finishSignIn(result);
+  // }
 
   void _goToSignUp() {
     Navigator.pushReplacement(
@@ -106,8 +111,8 @@ class _LoginScreenState extends State<LoginScreen> {
     final muted = onSurface.withValues(alpha: 0.6);
 
     return LoadingOverlay(
-      isLoading: _isLoading || _isGoogleLoading,
-      message: _isGoogleLoading ? 'Signing in with Google...' : 'Signing in...',
+      isLoading: _isLoading, // Google off: was `_isLoading || _isGoogleLoading`
+      message: 'Signing in...', // Google off: was 'Signing in with Google...' for Google
       child: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: Scaffold(
@@ -234,38 +239,43 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 24),
 
-                      const OrDivider(),
-                      const SizedBox(height: 24),
-
-                      // Secondary action
-                      OutlinedButton(
-                        onPressed: _isGoogleLoading ? null : _handleGoogle,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(52),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Image.asset(
-                              'assets/images/google_logo.png',
-                              height: 22,
-                            ),
-                            const SizedBox(width: 12),
-                            const Text(
-                              'Continue with Google',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
+                      // Google sign-in is switched off for now: uncomment this block (the divider and
+                      // the button) to bring it back, with `_handleGoogle` and `_isGoogleLoading` above.
+                      // const OrDivider(),
+                      // const SizedBox(height: 24),
+                      //
+                      // // Secondary action
+                      // OutlinedButton(
+                      //   onPressed: _isGoogleLoading ? null : _handleGoogle,
+                      //   style: OutlinedButton.styleFrom(
+                      //     minimumSize: const Size.fromHeight(52),
+                      //   ),
+                      //   child: Row(
+                      //     mainAxisAlignment: MainAxisAlignment.center,
+                      //     children: [
+                      //       Image.asset(
+                      //         'assets/images/google_logo.png',
+                      //         height: 22,
+                      //       ),
+                      //       const SizedBox(width: 12),
+                      //       const Text(
+                      //         'Continue with Google',
+                      //         style: TextStyle(
+                      //           fontSize: 15,
+                      //           fontWeight: FontWeight.w600,
+                      //         ),
+                      //       ),
+                      //     ],
+                      //   ),
+                      // ),
+                      // const SizedBox(height: 24),
 
                       // Tertiary action: plain text link
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      // A Wrap, not a Row: on a narrow phone with large text the link drops
+                      // to the next line instead of running off the screen.
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
                             "Don't have an account?",

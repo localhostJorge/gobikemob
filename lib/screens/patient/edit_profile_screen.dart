@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/age.dart';
 import '../../core/auth_service.dart';
+import '../../widgets/birthday_field.dart';
 import 'app_colors.dart';
 import 'emergency_request_screen.dart' show kLocations;
 import 'patient_store.dart';
@@ -19,12 +21,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _mobile = TextEditingController();
+  final _birthday = TextEditingController();
   String? _barangay;
+  DateTime? _birthdate;
 
   // Values as loaded, to know if anything changed.
   String _initName = '';
   String _initMobile = '';
   String? _initBarangay;
+  DateTime? _initBirthdate;
 
   bool _saving = false;
 
@@ -42,6 +47,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _name.dispose();
     _email.dispose();
     _mobile.dispose();
+    _birthday.dispose();
     super.dispose();
   }
 
@@ -61,12 +67,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _email.text = user?.email ?? '';
     _mobile.text = _initMobile;
     _barangay = _initBarangay;
+
+    // Accounts made before the birthday was asked have none; they can add it here.
+    _initBirthdate = user?.birthdate;
+    _birthdate = _initBirthdate;
+    _birthday.text = _birthdate == null ? '' : birthdateLabel(_birthdate!);
+  }
+
+  Future<void> _pickBirthday() async {
+    final picked = await pickBirthday(context, current: _birthdate);
+    if (picked == null || !mounted) return;
+    // Setting the text counts as an edit, so the form checks the new date straight away.
+    _birthday.text = birthdateLabel(picked);
+    setState(() => _birthdate = picked);
   }
 
   bool get _dirty =>
       _name.text.trim() != _initName ||
       _mobile.text.trim() != _initMobile ||
-      _barangay != _initBarangay;
+      _barangay != _initBarangay ||
+      _birthdate != _initBirthdate;
 
   Future<void> _save() async {
     if (!_form.currentState!.validate()) return;
@@ -76,6 +96,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       name: _name.text,
       mobile: _mobile.text,
       barangay: _barangay!,
+      birthdate: _birthdate,
     );
     if (!mounted) return;
     setState(() => _saving = false);
@@ -185,6 +206,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             RegExp(r'^09\d{9}$').hasMatch(v?.trim() ?? '')
                             ? null
                             : 'Use 11 digits starting with 09',
+                      ),
+                      const SizedBox(height: Sp.lg),
+                      // Tapping opens the date picker; the keyboard never opens.
+                      TextFormField(
+                        style: T.body.copyWith(color: context.pal.ink),
+                        controller: _birthday,
+                        readOnly: true,
+                        onTap: _pickBirthday,
+                        decoration: inputDecoration(
+                          context,
+                          'Birthday',
+                          Icons.cake_outlined,
+                          suffix: Icon(
+                            Icons.calendar_today_outlined,
+                            size: 18,
+                            color: context.pal.muted,
+                          ),
+                        ).copyWith(
+                          hintText: 'Select your birthday',
+                          helperText: _birthdate == null
+                              ? null
+                              : 'You are ${ageFromBirthdate(_birthdate!, DateTime.now())} years old.',
+                        ),
+                        validator: (_) =>
+                            birthdayError(_birthdate, required: false),
                       ),
                       const SizedBox(height: Sp.lg),
                       DropdownButtonFormField<String>(

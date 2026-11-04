@@ -55,6 +55,7 @@ class ProfileTab extends StatelessWidget {
               final name = store.fullName ?? currentUser.name;
               final phone = store.mobile ?? currentUser.mobile ?? '';
               final barangay = store.barangay ?? currentUser.barangay ?? '';
+              final age = (AuthService.instance.currentUser ?? currentUser).age;
               final setPassword =
                   AuthService.instance.currentUser?.hasPassword == false;
 
@@ -75,7 +76,11 @@ class ProfileTab extends StatelessWidget {
                   ),
                   const SizedBox(height: Sp.md),
                   Text(name, textAlign: TextAlign.center, style: T.title),
-                  for (final line in [phone, barangay])
+                  for (final line in [
+                    phone,
+                    barangay,
+                    if (age != null) 'Age $age',
+                  ])
                     if (line.isNotEmpty) ...[
                       const SizedBox(height: Sp.xs),
                       Text(

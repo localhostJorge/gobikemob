@@ -12,8 +12,10 @@ import '../screens/legal_screen.dart';
 import '../screens/login_screen.dart';
 import 'app_toast.dart';
 import 'app_text_field.dart';
+import 'birthday_field.dart';
 import 'confirm_modal.dart';
 import 'initials_avatar.dart';
+import 'photo_flow.dart';
 import '../screens/global_state.dart';
 import '../core/ronda_store.dart';
 
@@ -168,16 +170,25 @@ class _ProfilePanelBodyState extends State<_ProfilePanelBody> {
         ),
       ),
     );
-    if (picked == null || !mounted) return;
+    if (picked == null || !mounted || !context.mounted) return;
 
-    final file = await ImagePicker().pickImage(
-      source: picked,
-      maxWidth: 800,
-      imageQuality: 85,
-    );
-    if (file == null || !mounted || !context.mounted) return;
+    // Pick, then crop: the photo is not uploaded until the person has framed it.
+    final String? path;
+    try {
+      path = await pickProfilePhoto(context, picked);
+    } catch (_) {
+      if (mounted && context.mounted) {
+        AppToast.show(
+          context,
+          "Couldn't open the camera or gallery.",
+          type: ToastType.error,
+        );
+      }
+      return;
+    }
+    if (path == null || !mounted || !context.mounted) return;
 
-    final error = await AuthService.instance.uploadProfilePhoto(file.path);
+    final error = await AuthService.instance.uploadProfilePhoto(path);
     if (!mounted || !context.mounted) return;
     if (error == null) setState(() {});
     AppToast.show(
@@ -356,6 +367,13 @@ class _ProfilePanelBodyState extends State<_ProfilePanelBody> {
                                   Icons.location_on_outlined,
                                   'Barangay',
                                   user?.barangay,
+                                ),
+                                _InfoRow(
+                                  Icons.cake_outlined,
+                                  'Age',
+                                  user?.age == null
+                                      ? null
+                                      : '${user!.age} years old',
                                 ),
                                 _InfoRow(
                                   Icons.badge_outlined,
@@ -622,6 +640,8 @@ class _EditGoBikerProfileDialogState extends State<_EditGoBikerProfileDialog> {
   late String? _barangay = _barangays.contains(widget.user.barangay)
       ? widget.user.barangay
       : null;
+  // Accounts made before the birthday was asked have none; they can add it here.
+  late DateTime? _birthdate = widget.user.birthdate;
   bool _saving = false;
 
   @override
@@ -640,6 +660,7 @@ class _EditGoBikerProfileDialogState extends State<_EditGoBikerProfileDialog> {
     final result = await AuthService.instance.updateGoBikerProfile(
       mobile: _mobileController.text,
       barangay: _barangay!,
+      birthdate: _birthdate,
       currentPassword: _currentPasswordController.text,
       newPassword: _newPasswordController.text,
     );
@@ -692,6 +713,12 @@ class _EditGoBikerProfileDialogState extends State<_EditGoBikerProfileDialog> {
                   onChanged: (value) => setState(() => _barangay = value),
                   validator: (value) =>
                       value == null ? 'Select your barangay' : null,
+                ),
+                const SizedBox(height: 16),
+                BirthdayField(
+                  value: _birthdate,
+                  required: false,
+                  onChanged: (date) => setState(() => _birthdate = date),
                 ),
                 const SizedBox(height: 16),
                 const SizedBox(height: 4),

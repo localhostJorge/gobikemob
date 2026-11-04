@@ -8,7 +8,10 @@ import 'package:image_picker/image_picker.dart';
 import '../widgets/app_text_field.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/auth_widgets.dart';
+import '../widgets/birthday_field.dart';
 import '../widgets/loading_overlay.dart';
+import '../widgets/photo_flow.dart';
+import '../core/age.dart';
 import '../core/auth_service.dart';
 import '../core/theme.dart';
 import 'legal_screen.dart';
@@ -20,8 +23,16 @@ const bool _kGoBikerNeedsApproval = true;
 final RegExp _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 final RegExp _mobileRegex = RegExp(r'^09\d{9}$');
 
+/// Chooses and crops a profile photo, returning its path (null if they backed out). The
+/// screen uses [pickProfilePhoto]; a test passes its own, because a test has no camera.
+typedef PhotoChooser =
+    Future<String?> Function(BuildContext context, ImageSource source);
+
 class CreateAccountScreen extends StatefulWidget {
-  const CreateAccountScreen({super.key});
+  const CreateAccountScreen({super.key, this.choosePhoto});
+
+  /// Replaces the camera / gallery / crop flow. Only tests set this.
+  final PhotoChooser? choosePhoto;
 
   @override
   State<CreateAccountScreen> createState() => _CreateAccountScreenState();
@@ -38,8 +49,12 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   String selectedRole = 'Resident';
   String? selectedBarangay;
 
-  /// A GoBiker's profile photo. Required for them, unused for residents.
+  /// Everyone signs up with a profile photo: a GoBiker is sent to people's homes and a
+  /// resident is the person they are sent to, so each has to see who the other is.
   XFile? _photo;
+
+  /// Date of birth: the app is for people of [kMinimumAge] and over.
+  DateTime? _birthdate;
   bool _acceptedTerms = false;
   bool _isLoading = false;
 
@@ -86,8 +101,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       selectedBarangay != null &&
       _passwordController.text.isNotEmpty &&
       _confirmController.text.isNotEmpty &&
-      // A GoBiker is sent to people's homes, so a photo is part of signing up.
-      (!_isGoBiker || _photo != null) &&
+      // A photo and a birthday are part of signing up, for everyone.
+      _photo != null &&
+      _birthdate != null &&
       _acceptedTerms;
 
   @override
@@ -156,12 +172,18 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       );
       return;
     }
-    if (_isGoBiker && _photo == null) {
+    if (_photo == null) {
       AppToast.show(
         context,
-        'Please add a profile photo to register as a GoBiker.',
+        'Please add a profile photo to sign up.',
         type: ToastType.error,
       );
+      return;
+    }
+    // The field already says why; this is the last check before anything is sent.
+    final birthdayProblem = birthdayError(_birthdate, required: true);
+    if (birthdayProblem != null) {
+      AppToast.show(context, birthdayProblem, type: ToastType.error);
       return;
     }
 
@@ -174,7 +196,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       barangay: selectedBarangay!,
       role: selectedRole,
       password: _passwordController.text,
-      photoPath: _isGoBiker ? _photo?.path : null,
+      birthdate: _birthdate,
+      photoPath: _photo?.path,
     );
 
     if (!mounted) return;
@@ -312,18 +335,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                               )
                             : const SizedBox(width: double.infinity),
                       ),
-                      // A GoBiker's photo, so the resident they are sent to
-                      // can see who is coming.
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 200),
-                        curve: Curves.easeOutCubic,
-                        alignment: Alignment.topCenter,
-                        child: _isGoBiker
-                            ? Padding(
-                                padding: const EdgeInsets.only(top: 12),
-                                child: _buildPhotoPicker(onSurface, muted),
-                              )
-                            : const SizedBox(width: double.infinity),
+                      // Everyone's photo: a resident sees who is coming, and the
+                      // GoBiker sees who they are going to.
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: _buildPhotoPicker(onSurface, muted),
                       ),
                       const SizedBox(height: 24),
 
@@ -379,6 +395,12 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           }
                           return null;
                         },
+                      ),
+                      const SizedBox(height: 16),
+
+                      BirthdayField(
+                        value: _birthdate,
+                        onChanged: (date) => setState(() => _birthdate = date),
                       ),
                       const SizedBox(height: 16),
 
@@ -503,8 +525,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      // A Wrap, not a Row: on a narrow phone with large text the link drops
+                      // to the next line instead of running off the screen.
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
                             'Already have an account?',
@@ -541,7 +566,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     );
   }
 
-  /// Lets a GoBiker add their photo, and says what makes a usable one.
+  /// Lets anyone add their photo, and says what makes a usable one. The thumbnail and the
+  /// title sit on top; Camera and Gallery share one row underneath (Camera on the left), so the
+  /// two buttons never wrap onto separate lines in a narrow column.
   Widget _buildPhotoPicker(Color onSurface, Color muted) {
     final photo = _photo;
 
@@ -579,6 +606,17 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                         width: 64,
                         height: 64,
                         fit: BoxFit.cover,
+                        // A photo that cannot be shown must not break the form.
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 64,
+                          height: 64,
+                          color: onSurface.withValues(alpha: 0.06),
+                          child: Icon(
+                            Icons.person_outline_rounded,
+                            color: muted,
+                            size: 30,
+                          ),
+                        ),
                       ),
               ),
               const SizedBox(width: 12),
@@ -599,29 +637,33 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       photo == null ? 'Required' : 'Photo added',
                       style: TextStyle(fontSize: 12, color: muted),
                     ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: () => _pickPhoto(ImageSource.camera),
-                          icon: const Icon(
-                            Icons.photo_camera_outlined,
-                            size: 16,
-                          ),
-                          label: const Text('Camera'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => _pickPhoto(ImageSource.gallery),
-                          icon: const Icon(
-                            Icons.photo_library_outlined,
-                            size: 16,
-                          ),
-                          label: Text(photo == null ? 'Gallery' : 'Change'),
-                        ),
-                      ],
-                    ),
                   ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _pickPhoto(ImageSource.camera),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                  ),
+                  icon: const Icon(Icons.photo_camera_outlined, size: 18),
+                  label: const Text('Camera'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _pickPhoto(ImageSource.gallery),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                  ),
+                  icon: const Icon(Icons.photo_library_outlined, size: 18),
+                  label: Text(photo == null ? 'Gallery' : 'Change'),
                 ),
               ),
             ],
@@ -641,13 +683,12 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
   Future<void> _pickPhoto(ImageSource source) async {
     try {
-      // Small enough to upload on mobile data, still clear enough to recognise.
-      final file = await ImagePicker().pickImage(
-        source: source,
-        maxWidth: 800,
-        imageQuality: 85,
+      // Pick, then crop: nothing is used until the person has framed it.
+      final path = await (widget.choosePhoto ?? pickProfilePhoto)(
+        context,
+        source,
       );
-      if (file != null && mounted) setState(() => _photo = file);
+      if (path != null && mounted) setState(() => _photo = XFile(path));
     } catch (_) {
       if (mounted) {
         AppToast.show(

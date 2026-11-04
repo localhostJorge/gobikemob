@@ -3,9 +3,19 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/auth_service.dart';
+import '../../widgets/photo_flow.dart';
 import 'app_colors.dart';
 import 'patient_store.dart';
 import 'ui_kit.dart';
+
+/// What to draw as someone's picture: the photo saved on this phone, else the one on their
+/// account (so it shows on a new phone, and the admin and GoBiker see the same one), else null.
+ImageProvider? profileImage(String? localPath) {
+  if (localPath != null) return FileImage(File(localPath));
+  final url = AuthService.instance.currentUser?.photoUrl;
+  return (url == null || url.isEmpty) ? null : NetworkImage(url);
+}
 
 /// Circular profile picture. Shows the patient's photo if they added one,
 /// otherwise a person icon. With [showCamera] a small camera badge appears
@@ -40,8 +50,8 @@ class ProfileAvatar extends StatelessWidget {
           child: CircleAvatar(
             radius: radius,
             backgroundColor: context.pal.redSoft,
-            backgroundImage: path == null ? null : FileImage(File(path)),
-            child: path == null
+            backgroundImage: profileImage(path),
+            child: profileImage(path) == null
                 ? Icon(Icons.person, size: radius * 1.1, color: AppColors.red)
                 : null,
           ),
@@ -112,8 +122,8 @@ class NavProfileIcon extends StatelessWidget {
           child: CircleAvatar(
             radius: _photo / 2,
             backgroundColor: context.pal.redSoft,
-            backgroundImage: path == null ? null : FileImage(File(path)),
-            child: path == null
+            backgroundImage: profileImage(path),
+            child: profileImage(path) == null
                 ? Icon(Icons.person, size: 14, color: AppColors.red)
                 : null,
           ),
@@ -148,7 +158,8 @@ Future<void> changeProfilePhoto(BuildContext context) async {
             title: const Text('Choose from gallery', style: T.body),
             onTap: () => Navigator.pop(ctx, 'gallery'),
           ),
-          if (store.photoPath != null)
+          if (store.photoPath != null ||
+              AuthService.instance.currentUser?.photoUrl != null)
             ListTile(
               leading: Icon(
                 Icons.delete_outline_rounded,
@@ -169,13 +180,42 @@ Future<void> changeProfilePhoto(BuildContext context) async {
   if (choice == null) return;
   if (choice == 'remove') {
     await store.removePhoto();
+    // Off the account too, or it would come back from the server on the next login.
+    final error = await AuthService.instance.removeProfilePhoto();
+    store.refreshProfile();
+    if (error != null && context.mounted) {
+      _say(context, "Removed here, but couldn't remove it from your account.");
+    }
     return;
   }
 
-  final file = await ImagePicker().pickImage(
-    source: choice == 'camera' ? ImageSource.camera : ImageSource.gallery,
-    maxWidth: 800,
-    imageQuality: 85,
-  );
-  if (file != null) await store.setPhoto(file.path);
+  if (!context.mounted) return;
+
+  // Pick, then crop: the photo is not used until the person has framed it.
+  final String? path;
+  try {
+    path = await pickProfilePhoto(
+      context,
+      choice == 'camera' ? ImageSource.camera : ImageSource.gallery,
+    );
+  } catch (_) {
+    if (context.mounted) _say(context, "Couldn't open the camera or gallery.");
+    return;
+  }
+  if (path == null) return;
+
+  // Saved on this phone at once (so it shows now, even offline), then sent to the account so
+  // the admin and the GoBiker sent to help can see who they are helping.
+  await store.setPhoto(path);
+  final error = await AuthService.instance.uploadProfilePhoto(path);
+  store.refreshProfile();
+  if (error != null && context.mounted) {
+    _say(context, "Saved on this phone, but couldn't upload it: $error");
+  }
+}
+
+void _say(BuildContext context, String message) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(message)));
 }

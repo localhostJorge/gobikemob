@@ -17,6 +17,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
+import 'age.dart';
 import 'api_config.dart';
 import 'announcements.dart';
 import 'appointments.dart';
@@ -44,6 +45,7 @@ class AppUser {
     required this.role,
     this.mobile,
     this.barangay,
+    this.birthdate,
     this.photoUrl,
     this.hasPassword = true,
     this.notificationPrefs = const {},
@@ -56,9 +58,11 @@ class AppUser {
   final String? mobile;
   final String? barangay;
 
-  /// Their profile photo on the server. Null for accounts made before a
-  /// GoBiker photo was required, and for residents, whose photo stays on
-  /// their own phone.
+  /// Date of birth. Null for accounts made before it was asked.
+  final DateTime? birthdate;
+
+  /// Their profile photo on the server. Null until they add one: accounts made
+  /// before photos were required have none.
   final String? photoUrl;
 
   /// False for a Google sign-in account that never set its own password.
@@ -69,6 +73,10 @@ class AppUser {
 
   bool get hasMobile => (mobile ?? '').trim().isNotEmpty;
 
+  /// Whole years old today, from the birthdate; null when there is none.
+  int? get age =>
+      birthdate == null ? null : ageFromBirthdate(birthdate!, DateTime.now());
+
   factory AppUser.fromJson(Map<String, dynamic> json) => AppUser(
     id: (json['id'] as num?)?.toInt() ?? 0,
     name: (json['name'] ?? '').toString(),
@@ -76,6 +84,7 @@ class AppUser {
     role: (json['role'] ?? 'User').toString(),
     mobile: json['mobile']?.toString(),
     barangay: json['barangay']?.toString(),
+    birthdate: birthdateFromApi(json['birthdate']),
     photoUrl: _text(json['photo_url']),
     hasPassword: json['has_password'] != false,
     notificationPrefs: {
@@ -314,12 +323,14 @@ class AuthService {
   Future<({bool ok, String message})> updateGoBikerProfile({
     required String mobile,
     required String barangay,
+    DateTime? birthdate,
     String? currentPassword,
     String? newPassword,
   }) async {
     final body = <String, dynamic>{
       'mobile': mobile.trim(),
       'barangay': barangay,
+      if (birthdate != null) 'birthdate': birthdateToApi(birthdate),
     };
     if (newPassword != null && newPassword.isNotEmpty) {
       body['current_password'] = currentPassword;
@@ -348,11 +359,12 @@ class AuthService {
     return (ok: true, message: '');
   }
 
-  /// Updates a resident's name, mobile number and barangay.
+  /// Updates a resident's name, mobile number, barangay and, when given, birthdate.
   Future<({bool ok, String message})> updateResidentProfile({
     required String name,
     required String mobile,
     required String barangay,
+    DateTime? birthdate,
   }) async {
     final res = await _request(
       'PUT',
@@ -361,6 +373,7 @@ class AuthService {
         'name': name.trim(),
         'mobile': mobile.trim(),
         'barangay': barangay,
+        if (birthdate != null) 'birthdate': birthdateToApi(birthdate),
       },
       auth: true,
     );
@@ -465,9 +478,11 @@ class AuthService {
 
   /// [role] is "Resident" or "GoBiker".
   ///
-  /// [photoPath] is required for a GoBiker: the resident they are sent to has
-  /// to see who is coming. The photo goes with the form, because signing up
-  /// returns no token to upload it with afterwards.
+  /// [photoPath] is required by the sign-up form for everyone: a GoBiker is sent
+  /// to people's homes and a resident is the person they are sent to, so each
+  /// has to see who the other is. The photo goes with the form, because signing
+  /// up returns no token to upload it with afterwards. [birthdate] is checked
+  /// against the minimum age by the form and again by the server.
   Future<AuthResult> register({
     required String name,
     required String email,
@@ -475,6 +490,7 @@ class AuthService {
     required String barangay,
     required String role,
     required String password,
+    DateTime? birthdate,
     String? photoPath,
   }) async {
     final fields = {
@@ -484,6 +500,7 @@ class AuthService {
       'barangay': barangay,
       'role': role,
       'password': password,
+      if (birthdate != null) 'birthdate': birthdateToApi(birthdate),
     };
 
     final res = photoPath == null
@@ -516,6 +533,17 @@ class AuthService {
       files: {'photo': photoPath},
     );
     if (!res.ok) return res.message;
+
+    final user = res.body['user'];
+    if (user is Map<String, dynamic>) _user = AppUser.fromJson(user);
+    return null;
+  }
+
+  /// Takes the signed-in user's profile photo off the server.
+  /// Returns null, or a message to show.
+  Future<String?> removeProfilePhoto() async {
+    final res = await _request('DELETE', '/mobile/photo', auth: true);
+    if (!res.ok) return res.errorMessage;
 
     final user = res.body['user'];
     if (user is Map<String, dynamic>) _user = AppUser.fromJson(user);
