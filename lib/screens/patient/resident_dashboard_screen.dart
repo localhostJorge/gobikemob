@@ -23,6 +23,7 @@ import 'skeletons.dart';
 import 'sos_button.dart';
 import 'ui_kit.dart';
 import 'visit_record.dart' show formatDate;
+import 'visit_request_screen.dart';
 
 class ResidentDashboardScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -41,9 +42,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
   @override
   void initState() {
     super.initState();
-    PatientStore.instance.load();
+    _loadVisits();
     ResidentVisits.instance.load();
-    ResidentAppointments.instance.load(); // shown in History
     ResidentSos.instance.onStatusChanged = _onSosChanged;
     WidgetsBinding.instance.addObserver(this);
     PresenceService.instance.start(); // on the GoBikers' live map while open
@@ -51,6 +51,19 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => FeedbackPrompt.instance.check(),
     );
+  }
+
+  /// The saved settings first, then the visit requests (shown in History). Whatever the
+  /// GoBikers had already answered before this version is taken as seen, so the History badge
+  /// counts only what is new from now on.
+  Future<void> _loadVisits() async {
+    await PatientStore.instance.load();
+    await ResidentAppointments.instance.load();
+    if (ResidentAppointments.instance.loaded) {
+      await PatientStore.instance.baselineVisits(
+        ResidentAppointments.instance.appointments,
+      );
+    }
   }
 
   @override
@@ -220,57 +233,101 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
   }
 
   Widget _bottomNav() {
-    return Container(
-      // Room for the phone's own navigation area and its home-gesture strip, so the
-      // tabs sit above it instead of down in it (and a tap on one is not a swipe home).
-      padding: EdgeInsets.only(bottom: bottomGap(context) + 4),
-      decoration: BoxDecoration(
-        color: context.pal.card,
-        border: Border(top: BorderSide(color: context.pal.line)),
-      ),
-      // The gap is already added above; the bar must not add its own as well.
-      child: MediaQuery.removePadding(
-        context: context,
-        removeBottom: true,
-        child: BottomNavigationBar(
-          currentIndex: _tab,
-          onTap: (i) => setState(() => _tab = i),
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: context.pal.card,
-          elevation: 0,
-          selectedItemColor: context.pal.redText,
-          unselectedItemColor: context.pal.muted,
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
-          selectedLabelStyle: T.meta
-              .muted(context)
-              .copyWith(fontWeight: FontWeight.w700),
-          unselectedLabelStyle: T.meta.muted(context),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home_rounded),
-              label: 'Home',
+    // Listens itself, so the badge follows the answers as they arrive.
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        ResidentAppointments.instance,
+        PatientStore.instance,
+      ]),
+      builder: (context, _) {
+        final updates = PatientStore.instance.unseenVisitCount(
+          ResidentAppointments.instance.appointments,
+        );
+        return Container(
+          // Room for the phone's own navigation area and its home-gesture strip, so the
+          // tabs sit above it instead of down in it (and a tap on one is not a swipe home).
+          padding: EdgeInsets.only(bottom: bottomGap(context) + 4),
+          decoration: BoxDecoration(
+            color: context.pal.card,
+            border: Border(top: BorderSide(color: context.pal.line)),
+          ),
+          // The gap is already added above; the bar must not add its own as well.
+          child: MediaQuery.removePadding(
+            context: context,
+            removeBottom: true,
+            child: BottomNavigationBar(
+              currentIndex: _tab,
+              onTap: (i) => setState(() => _tab = i),
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: context.pal.card,
+              elevation: 0,
+              selectedItemColor: context.pal.redText,
+              unselectedItemColor: context.pal.muted,
+              selectedFontSize: 12,
+              unselectedFontSize: 12,
+              selectedLabelStyle: T.meta
+                  .muted(context)
+                  .copyWith(fontWeight: FontWeight.w700),
+              unselectedLabelStyle: T.meta.muted(context),
+              items: [
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.home_outlined),
+                  activeIcon: Icon(Icons.home_rounded),
+                  label: 'Home',
+                ),
+                BottomNavigationBarItem(
+                  icon: _historyIcon(updates),
+                  tooltip: updates == 0
+                      ? 'History'
+                      : 'History, $updates new ${updates == 1 ? 'update' : 'updates'}',
+                  label: 'History',
+                ),
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.shield_outlined),
+                  activeIcon: Icon(Icons.shield_rounded),
+                  label: 'Safety',
+                ),
+                const BottomNavigationBarItem(
+                  icon: NavProfileIcon(selected: false),
+                  activeIcon: NavProfileIcon(selected: true),
+                  label: 'Profile',
+                ),
+              ],
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.history_rounded),
-              label: 'History',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.shield_outlined),
-              activeIcon: Icon(Icons.shield_rounded),
-              label: 'Safety',
-            ),
-            BottomNavigationBarItem(
-              icon: NavProfileIcon(selected: false),
-              activeIcon: NavProfileIcon(selected: true),
-              label: 'Profile',
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
+
+  /// The History icon, with a count of the answers the person has not opened yet.
+  Widget _historyIcon(int updates) {
+    const icon = Icon(Icons.history_rounded);
+    if (updates == 0) return icon;
+    return Badge(
+      label: Text('$updates'),
+      backgroundColor: AppColors.redButton,
+      textColor: Colors.white,
+      child: icon,
+    );
+  }
+}
+
+/// The newest declined request that still needs the person's attention on the Home screen:
+/// not hidden, not followed up (asking someone else hides it), and from the last two weeks.
+Appointment? _declinedForHome(List<Appointment> all) {
+  final cutoff = DateTime.now().subtract(const Duration(days: 14));
+  final declined =
+      all
+          .where(
+            (a) =>
+                a.status == 'declined' &&
+                !PatientStore.instance.isDeclineHidden(a.id) &&
+                a.changedAt.isAfter(cutoff),
+          )
+          .toList()
+        ..sort((a, b) => b.changedAt.compareTo(a.changedAt));
+  return declined.firstOrNull;
 }
 
 /// Medical history and home visits as one plain list, each row saying what
@@ -284,6 +341,7 @@ class _HealthList extends StatelessWidget {
       listenable: Listenable.merge([
         ResidentVisits.instance,
         ResidentAppointments.instance,
+        PatientStore.instance, // which declined requests were hidden
       ]),
       builder: (context, _) {
         final visits = ResidentVisits.instance;
@@ -296,7 +354,7 @@ class _HealthList extends StatelessWidget {
         final last = visits.visits.isEmpty
             ? null
             : visits.visits.reduce((a, b) => a.date.isAfter(b.date) ? a : b);
-        final visit = appointments.current;
+        final declined = _declinedForHome(appointments.appointments);
 
         return LoadSwitcher(
           loading: loading,
@@ -323,9 +381,8 @@ class _HealthList extends StatelessWidget {
                 icon: Icons.home_outlined,
                 color: context.pal.orangeText,
                 title: 'Home visit',
-                subtitle: visit == null
-                    ? 'Ask a GoBiker to check on you at home'
-                    : '${visit.statusLabel} · ${formatDate(visit.preferredDate)}',
+                // Always a new request. How the ones already sent stand is in History.
+                subtitle: 'Ask a GoBiker to check on you at home',
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const AppointmentScreen()),
@@ -341,6 +398,24 @@ class _HealthList extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const LiveMapScreen()),
                 ),
               ),
+              // A GoBiker said no: the details show their message and other GoBikers to ask.
+              if (declined != null)
+                NavRow(
+                  icon: Icons.event_busy_outlined,
+                  color: context.pal.redText,
+                  title: 'Visit declined',
+                  subtitle:
+                      '${declined.gobikerName ?? 'A GoBiker'} · '
+                      '${formatDate(declined.preferredDate)}. '
+                      'Tap to ask someone else.',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          VisitRequestScreen(appointmentId: declined.id),
+                    ),
+                  ),
+                ),
             ],
           ),
         );

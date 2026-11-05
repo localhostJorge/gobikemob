@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/appointments.dart';
 import '../../core/auth_service.dart';
 
 enum ActivityType { sos, appointment, checkup, checkupUpdated }
@@ -77,6 +78,11 @@ class PatientStore extends ChangeNotifier {
   Future<SharedPreferences> _p() async =>
       _prefs ??= await SharedPreferences.getInstance();
 
+  /// Forgets the saved-data object this store is holding, so a test that replaces the
+  /// phone's saved data starts from that, not from what an earlier test left behind.
+  @visibleForTesting
+  void debugForgetPreferences() => _prefs = null;
+
   /// Call after login (the dashboard does this in initState).
   Future<void> load() async {
     final p = await _p();
@@ -86,6 +92,7 @@ class PatientStore extends ChangeNotifier {
     final photo = p.getString(_k('photo'));
     photoPath = (photo != null && File(photo).existsSync()) ? photo : null;
     sosHoldSeconds = (p.getInt(_k('sos_hold')) ?? 2).clamp(1, 3);
+    _readSeenVisits(p);
     // The server's copy wins: it is what decides which notifications are sent.
     final server = AuthService.instance.currentUser?.notificationPrefs ?? {};
     for (final e in toggleDefaults.entries) {
@@ -112,6 +119,87 @@ class PatientStore extends ChangeNotifier {
   void refreshProfile() {
     _readProfile();
     notifyListeners();
+  }
+
+  // ---------- answers to home-visit requests ----------
+
+  /// Request id -> the status the person last opened it at. A request is "new" until they
+  /// open it at its current status, so a visit that is accepted and later done is new twice.
+  Map<int, String> _seenVisits = {};
+
+  /// Whether the requests that were already answered when this started have been taken as
+  /// seen, so an update does not show 20 old answers as new.
+  bool _seenVisitsReady = false;
+
+  /// Declined requests the person hid from the Home screen.
+  Set<int> _hiddenDeclines = {};
+
+  static const _answers = {'accepted', 'declined', 'completed'};
+
+  /// An answer from the GoBiker that the person has not opened yet.
+  bool isVisitUnseen(Appointment a) =>
+      _answers.contains(a.status) && _seenVisits[a.id] != a.status;
+
+  int unseenVisitCount(Iterable<Appointment> visits) =>
+      visits.where(isVisitUnseen).length;
+
+  Future<void> markVisitSeen(Appointment a) async {
+    if (!isVisitUnseen(a)) return;
+    _seenVisits[a.id] = a.status;
+    notifyListeners();
+    await _saveSeenVisits();
+  }
+
+  /// Takes every answer that is already there as seen. Done once per account, when the
+  /// first list of requests arrives.
+  Future<void> baselineVisits(Iterable<Appointment> visits) async {
+    if (_seenVisitsReady) return;
+    _seenVisitsReady = true;
+    for (final a in visits) {
+      if (_answers.contains(a.status)) _seenVisits[a.id] = a.status;
+    }
+    notifyListeners();
+    await _saveSeenVisits();
+  }
+
+  bool isDeclineHidden(int id) => _hiddenDeclines.contains(id);
+
+  Future<void> hideDecline(int id) async {
+    if (!_hiddenDeclines.add(id)) return;
+    notifyListeners();
+    final p = await _p();
+    await p.setStringList(
+      _k('hidden_declines'),
+      _hiddenDeclines.map((e) => '$e').toList(),
+    );
+  }
+
+  Future<void> _saveSeenVisits() async {
+    final p = await _p();
+    await p.setString(
+      _k('seen_visits'),
+      jsonEncode({for (final e in _seenVisits.entries) '${e.key}': e.value}),
+    );
+    await p.setBool(_k('seen_visits_ready'), _seenVisitsReady);
+  }
+
+  void _readSeenVisits(SharedPreferences p) {
+    _seenVisits = {};
+    try {
+      final raw = p.getString(_k('seen_visits'));
+      if (raw != null) {
+        for (final e in (jsonDecode(raw) as Map).entries) {
+          _seenVisits[int.parse('${e.key}')] = '${e.value}';
+        }
+      }
+    } catch (_) {
+      _seenVisits = {};
+    }
+    _seenVisitsReady = p.getBool(_k('seen_visits_ready')) ?? false;
+    _hiddenDeclines = {
+      for (final id in p.getStringList(_k('hidden_declines')) ?? const <String>[])
+        ?int.tryParse(id),
+    };
   }
 
   // ---------- settings ----------
@@ -221,6 +309,9 @@ class PatientStore extends ChangeNotifier {
     barangay = null;
     photoPath = null;
     activities = [];
+    _seenVisits = {};
+    _seenVisitsReady = false;
+    _hiddenDeclines = {};
     _uid = 0;
     notifyListeners();
   }

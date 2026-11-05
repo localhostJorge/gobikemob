@@ -13,6 +13,7 @@ import '../screens/patient_management_screen.dart';
 import '../screens/patient/appointment_screen.dart';
 import '../screens/patient/medical_history_screen.dart';
 import '../screens/patient/safety_tab.dart';
+import '../screens/patient/visit_request_screen.dart';
 import '../widgets/app_toast.dart';
 import 'announcements.dart';
 import 'app_navigator.dart';
@@ -274,7 +275,12 @@ class PushService {
 
     final Widget? screen = switch (type) {
       'sos' => const _SafetyScreen(),
-      'appointment' => const AppointmentScreen(),
+      // The answer to a visit request (accepted, declined, done): that request's details.
+      // Without an id (an older server), the request form.
+      'appointment' => switch (int.tryParse('${data['id'] ?? ''}')) {
+        final id? => VisitRequestScreen(appointmentId: id),
+        null => const AppointmentScreen(),
+      },
       'checkup' => const MedicalHistoryScreen(),
       'appointment_request' ||
       'appointment_assigned' => const AppointmentsScreen(),

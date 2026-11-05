@@ -8,9 +8,11 @@ import 'app_colors.dart';
 import 'patient_store.dart';
 import 'safety_tab.dart' show sosStatusStyle;
 import 'skeletons.dart';
+import 'sos_details_screen.dart';
 import 'ui_kit.dart';
 import 'visit_details_screen.dart';
 import 'visit_record.dart';
+import 'visit_request_screen.dart';
 
 enum _Filter { all, checkups, visits, sos }
 
@@ -34,6 +36,8 @@ class _Item {
     this.status,
     this.statusColor,
     this.visit,
+    this.page,
+    this.unseen = false,
   });
 
   final _Kind kind;
@@ -43,6 +47,12 @@ class _Item {
   final String? status;
   final Color? statusColor;
   final VisitRecord? visit;
+
+  /// Opens this item's details, when it has some.
+  final WidgetBuilder? page;
+
+  /// An answer from the GoBiker that the person has not opened yet.
+  final bool unseen;
 }
 
 /// Everything on the resident's account, newest first and grouped by day:
@@ -70,6 +80,7 @@ class _HistoryTabState extends State<HistoryTab> {
           time: s.createdAt,
           status: sosStatusStyle(s, context.pal).label,
           statusColor: sosStatusStyle(s, context.pal).color,
+          page: (_) => SosDetailsScreen(sosId: s.id),
         ),
       for (final a in ResidentAppointments.instance.appointments)
         _Item(
@@ -79,6 +90,8 @@ class _HistoryTabState extends State<HistoryTab> {
           time: a.createdAt,
           status: a.statusLabel,
           statusColor: a.isOpen ? context.pal.orangeText : context.pal.muted,
+          page: (_) => VisitRequestScreen(appointmentId: a.id),
+          unseen: PatientStore.instance.isVisitUnseen(a),
         ),
       for (final v in _visits.visits) ...[
         _Item(
@@ -175,6 +188,7 @@ class _HistoryTabState extends State<HistoryTab> {
         _visits,
         ResidentSos.instance,
         ResidentAppointments.instance,
+        PatientStore.instance, // which answers were opened
       ]),
       builder: (context, _) {
         final items = _items().where(_matches).toList();
@@ -312,15 +326,19 @@ class _Row extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visit = item.visit;
+    final page = item.page;
     final look = _look(context);
+    final opens = visit != null || page != null;
 
     return InkWell(
-      onTap: visit == null
+      onTap: !opens
           ? null
           : () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => VisitDetailsScreen(record: visit),
+                builder: (ctx) => visit != null
+                    ? VisitDetailsScreen(record: visit)
+                    : page!(ctx),
               ),
             ),
       child: Padding(
@@ -337,7 +355,33 @@ class _Row extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item.title, style: T.rowTitle),
+                  Row(
+                    children: [
+                      // New and not opened yet: a dot and a bolder title, so it does not
+                      // depend on colour.
+                      if (item.unseen)
+                        Semantics(
+                          label: 'New update',
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            margin: const EdgeInsets.only(right: Sp.sm),
+                            decoration: BoxDecoration(
+                              color: AppColors.red,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          style: item.unseen
+                              ? T.rowTitle.copyWith(fontWeight: FontWeight.w800)
+                              : T.rowTitle,
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     item.subtitle,
@@ -359,7 +403,7 @@ class _Row extends StatelessWidget {
             ),
             const SizedBox(width: Sp.sm),
             Text(formatTime(item.time), style: T.meta.muted(context)),
-            if (visit != null)
+            if (opens)
               Padding(
                 padding: EdgeInsets.only(left: 2),
                 child: Icon(

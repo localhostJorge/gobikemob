@@ -3,49 +3,14 @@ import 'package:flutter/material.dart';
 import '../../core/appointments.dart';
 import '../../core/auth_service.dart';
 import 'app_colors.dart';
-import 'emergency_request_screen.dart' show kLocations;
-import 'skeletons.dart';
+import 'gobiker_picker.dart';
 import 'ui_kit.dart';
 import 'visit_record.dart' show formatDate;
 
-({IconData icon, Color color, String help}) _statusStyle(
-  Appointment a,
-  AppPalette pal,
-) => switch (a.status) {
-  'accepted' => (
-    icon: Icons.directions_bike_rounded,
-    color: AppColors.blue,
-    help:
-        '${a.gobikerName ?? 'A GoBiker'} will visit you. They may call you first.',
-  ),
-  'completed' => (
-    icon: Icons.check_circle_rounded,
-    color: pal.greenText,
-    help: 'Your visit is done. The check-up is in your Medical History.',
-  ),
-  'declined' => (
-    icon: Icons.block_rounded,
-    color: pal.muted,
-    help:
-        a.declineNote ??
-        'This visit could not be scheduled. You can ask another GoBiker.',
-  ),
-  'cancelled' => (
-    icon: Icons.cancel_outlined,
-    color: pal.muted,
-    help: 'You cancelled this request.',
-  ),
-  _ => (
-    icon: Icons.schedule_rounded,
-    color: pal.orangeText,
-    help: a.gobikerName == null
-        ? 'Waiting for a GoBiker in your barangay to accept it.'
-        : 'Waiting for ${a.gobikerName} to accept. You will get a notification.',
-  ),
-};
-
-/// The resident asks for a GoBiker to visit their home for a check-up,
-/// and follows the request.
+/// The resident asks for a GoBiker to visit their home for a check-up.
+///
+/// It always opens the request form, even while another request is waiting: they can have up
+/// to [ResidentAppointments.maxOpen] open at once, and see each one's answer in History.
 class AppointmentScreen extends StatefulWidget {
   const AppointmentScreen({super.key});
 
@@ -57,42 +22,20 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
   final _store = ResidentAppointments.instance;
   final _formKey = GlobalKey<_RequestFormState>();
   final _sending = ValueNotifier<bool>(false);
-  bool _cancelling = false;
 
   @override
   void initState() {
     super.initState();
-    _store.load();
+    // After the first frame, so the screens below are not told to rebuild mid-build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _store.load(); // to know how many are open
+    });
   }
 
   @override
   void dispose() {
     _sending.dispose();
     super.dispose();
-  }
-
-  Future<void> _cancel(Appointment a) async {
-    final ok = await showConfirm(
-      context,
-      title: 'Cancel this visit?',
-      message: a.gobikerName == null
-          ? 'Your request will be withdrawn.'
-          : '${a.gobikerName} will be told not to come.',
-      confirmLabel: 'Cancel visit',
-      cancelLabel: 'Keep it',
-      destructive: true,
-    );
-    if (!ok || !mounted) return;
-
-    setState(() => _cancelling = true);
-    final error = await _store.cancel(a.id);
-    if (!mounted) return;
-    setState(() => _cancelling = false);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text(error ?? 'Visit request cancelled.')),
-      );
   }
 
   @override
@@ -104,84 +47,54 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
         child: ListenableBuilder(
           listenable: _store,
           builder: (context, _) {
-            final firstLoad = !_store.loaded;
-            if (firstLoad && !_store.loading && _store.error != null) {
-              return ErrorState(message: _store.error!, onRetry: _store.load);
-            }
+            final open = _store.open.length;
+            final atLimit = open >= ResidentAppointments.maxOpen;
 
-            final current = _store.current;
-            final past = _store.appointments.where((a) => !a.isOpen).toList();
-
-            return LoadSwitcher(
-              loading: firstLoad && _store.loading,
-              skeleton: const Padding(
-                padding: EdgeInsets.fromLTRB(
-                  Sp.gutter,
-                  Sp.sm,
-                  Sp.gutter,
-                  Sp.xl,
-                ),
-                child: VisitCardSkeleton(),
-              ),
-              child: Column(
-                children: [
-                  Expanded(
-                    child: RefreshIndicator(
-                      color: AppColors.red,
-                      onRefresh: _store.load,
-                      child: ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(
-                          Sp.gutter,
-                          Sp.sm,
-                          Sp.gutter,
-                          Sp.xl,
-                        ),
-                        keyboardDismissBehavior:
-                            ScrollViewKeyboardDismissBehavior.onDrag,
-                        children: [
-                          if (current != null)
-                            _StatusCard(
-                              appointment: current,
-                              cancelling: _cancelling,
-                              onCancel: () => _cancel(current),
-                            )
-                          else
-                            _RequestForm(key: _formKey, sending: _sending),
-                          if (past.isNotEmpty) ...[
-                            const SizedBox(height: Sp.xl),
-                            const SectionHeader('Past requests'),
-                            CardGroup(
-                              dividerIndent: 52,
-                              children: [
-                                for (final a in past) _PastRow(appointment: a),
-                              ],
-                            ),
-                          ],
-                        ],
+            return Column(
+              children: [
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(
+                      Sp.gutter,
+                      Sp.sm,
+                      Sp.gutter,
+                      Sp.xl,
+                    ),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    children: [
+                      if (open > 0) ...[
+                        _OpenRequestsNote(count: open, atLimit: atLimit),
+                        const SizedBox(height: Sp.lg),
+                      ],
+                      _RequestForm(
+                        key: _formKey,
+                        sending: _sending,
+                        disabledGobikerIds: _store.openGobikerIds,
                       ),
+                    ],
+                  ),
+                ),
+                // The one main action, always in the same spot.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    Sp.gutter,
+                    Sp.xs,
+                    Sp.gutter,
+                    Sp.lg,
+                  ),
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: _sending,
+                    builder: (context, sending, _) => PrimaryButton(
+                      label: 'Request visit',
+                      loading: sending,
+                      onPressed: atLimit
+                          ? null
+                          : () => _formKey.currentState?.submit(),
                     ),
                   ),
-                  // The one main action, always in the same spot.
-                  if (current == null)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        Sp.gutter,
-                        Sp.xs,
-                        Sp.gutter,
-                        Sp.lg,
-                      ),
-                      child: ValueListenableBuilder<bool>(
-                        valueListenable: _sending,
-                        builder: (context, sending, _) => PrimaryButton(
-                          label: 'Request visit',
-                          loading: sending,
-                          onPressed: () => _formKey.currentState?.submit(),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+                ),
+              ],
             );
           },
         ),
@@ -190,114 +103,59 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
   }
 }
 
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({
-    required this.appointment,
-    required this.cancelling,
-    required this.onCancel,
-  });
-  final Appointment appointment;
-  final bool cancelling;
-  final VoidCallback onCancel;
+/// Says that other requests are open and where to find their answers (History), without
+/// getting in the way of sending another.
+class _OpenRequestsNote extends StatelessWidget {
+  const _OpenRequestsNote({required this.count, required this.atLimit});
+
+  final int count;
+  final bool atLimit;
 
   @override
   Widget build(BuildContext context) {
-    final a = appointment;
-    final s = _statusStyle(a, context.pal);
+    final text = atLimit
+        ? 'You have $count open requests, the most you can have. Cancel one in '
+              'History to ask another GoBiker.'
+        : 'You have $count open ${count == 1 ? 'request' : 'requests'}. '
+              'See their answers in History.';
     return Semantics(
       container: true,
       liveRegion: true,
-      child: AppCard(
-        borderColor: s.color.withValues(alpha: 0.5),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(s.icon, color: s.color, size: 22),
-                const SizedBox(width: Sp.sm),
-                Expanded(
-                  child: Text(
-                    a.statusLabel,
-                    style: T.heading.copyWith(color: s.color),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: Sp.sm),
-            Text(s.help, style: T.body),
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: Sp.lg),
-              child: Divider(height: 1, color: context.pal.divider),
-            ),
-            _FactRow(
-              Icons.event_rounded,
-              '${formatDate(a.preferredDate)} · ${a.windowLabel}',
-            ),
-            if (a.gobikerName != null)
-              _FactRow(
-                Icons.directions_bike_rounded,
-                a.gobikerBarangay == null
-                    ? a.gobikerName!
-                    : '${a.gobikerName} · ${a.gobikerBarangay}',
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            atLimit ? Icons.info_rounded : Icons.history_rounded,
+            size: 20,
+            color: atLimit ? context.pal.orangeText : context.pal.muted,
+          ),
+          const SizedBox(width: Sp.md),
+          Expanded(
+            child: Text(
+              text,
+              style: T.secondary.muted(context).copyWith(
+                color: atLimit ? context.pal.orangeText : null,
               ),
-            _FactRow(Icons.home_outlined, '${a.address}, ${a.barangay}'),
-            _FactRow(Icons.notes_rounded, a.reason),
-            const SizedBox(height: Sp.lg),
-            SecondaryButton(
-              label: 'Cancel visit',
-              destructive: true,
-              loading: cancelling,
-              onPressed: onCancel,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _FactRow extends StatelessWidget {
-  const _FactRow(this.icon, this.text);
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: Sp.sm),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: context.pal.muted),
-        const SizedBox(width: Sp.md),
-        Expanded(child: Text(text, style: T.body)),
-      ],
-    ),
-  );
-}
-
-class _PastRow extends StatelessWidget {
-  const _PastRow({required this.appointment});
-  final Appointment appointment;
-
-  @override
-  Widget build(BuildContext context) {
-    final a = appointment;
-    final s = _statusStyle(a, context.pal);
-    return NavRow(
-      icon: s.icon,
-      color: s.color,
-      title: '${a.statusLabel} · ${formatDate(a.preferredDate)}',
-      subtitle: a.status == 'declined' ? s.help : a.reason,
-    );
-  }
-}
-
 class _RequestForm extends StatefulWidget {
-  const _RequestForm({super.key, required this.sending});
+  const _RequestForm({
+    super.key,
+    required this.sending,
+    this.disabledGobikerIds = const {},
+  });
 
   /// The screen's button shows this while the request is being sent.
   final ValueNotifier<bool> sending;
+
+  /// GoBikers who already have a request open from this person: shown, but not choosable.
+  final Set<int> disabledGobikerIds;
 
   @override
   State<_RequestForm> createState() => _RequestFormState();
@@ -314,7 +172,7 @@ class _RequestFormState extends State<_RequestForm> {
   bool _gobikerMissing = false;
   String _window = 'morning';
 
-  static List<String> get _barangays => kLocations['Bugallon'] ?? const [];
+  static List<String> get _barangays => kPickerBarangays;
 
   static String? _homeBarangay() {
     final home = AuthService.instance.currentUser?.barangay;
@@ -346,19 +204,12 @@ class _RequestFormState extends State<_RequestForm> {
   }
 
   Future<void> _pickGobiker() async {
-    final picked = await showModalBottomSheet<GobikerOption>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: context.pal.card,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(Rd.sheet)),
-      ),
-      builder: (_) => _GobikerSheet(
-        // Start with the GoBikers where the visit is; others are one tap away.
-        startBarangay: _barangay ?? _homeBarangay(),
-        selectedId: _gobiker?.id,
-      ),
+    final picked = await showGobikerPicker(
+      context,
+      // Start with the GoBikers where the visit is; others are one tap away.
+      startBarangay: _barangay ?? _homeBarangay(),
+      selectedId: _gobiker?.id,
+      disabledIds: widget.disabledGobikerIds,
     );
     if (picked != null) {
       setState(() {
@@ -398,6 +249,8 @@ class _RequestFormState extends State<_RequestForm> {
           ),
         ),
       );
+    // Sent: back to where they came from. Its answer will show in History.
+    if (error == null) Navigator.of(context).maybePop();
   }
 
   @override
@@ -588,171 +441,6 @@ class _GobikerField extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// The GoBikers of a barangay (the visit's barangay first), with a switch to
-/// look at another barangay. Returns the chosen one.
-class _GobikerSheet extends StatefulWidget {
-  const _GobikerSheet({required this.startBarangay, this.selectedId});
-  final String? startBarangay;
-  final int? selectedId;
-
-  @override
-  State<_GobikerSheet> createState() => _GobikerSheetState();
-}
-
-class _GobikerSheetState extends State<_GobikerSheet> {
-  late String? _barangay = widget.startBarangay;
-  List<GobikerOption> _list = const [];
-  bool _loading = true;
-  String? _error;
-
-  String? get _home => AuthService.instance.currentUser?.barangay;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    final barangay = _barangay;
-    final res = await ResidentAppointments.instance.gobikers(barangay);
-    // A slower answer for a barangay the resident already moved away from.
-    if (!mounted || barangay != _barangay) return;
-    setState(() {
-      _list = res.gobikers;
-      _error = res.error;
-      _loading = false;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: media.size.height * 0.85),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(height: 10),
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: context.pal.line,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(Sp.gutter, Sp.lg, Sp.gutter, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Choose a GoBiker', style: T.heading),
-                const SizedBox(height: Sp.xs),
-                Text(
-                  'GoBikers from your barangay are shown first. You can also '
-                  'choose one from another barangay.',
-                  style: T.secondary.muted(context),
-                ),
-                const SizedBox(height: Sp.lg),
-                DropdownButtonFormField<String>(
-                  style: T.body.copyWith(color: context.pal.ink),
-                  dropdownColor: context.pal.card,
-                  initialValue: _barangay,
-                  isExpanded: true,
-                  decoration: inputDecoration(
-                    context,
-                    'GoBikers from',
-                    Icons.map_outlined,
-                  ),
-                  items: [
-                    for (final b in _RequestFormState._barangays)
-                      DropdownMenuItem(
-                        value: b,
-                        child: Text(b == _home ? '$b (your barangay)' : b),
-                      ),
-                  ],
-                  onChanged: (v) {
-                    if (v == null || v == _barangay) return;
-                    setState(() => _barangay = v);
-                    _load();
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: Sp.md),
-          Flexible(child: _body()),
-          SizedBox(height: Sp.md + media.padding.bottom),
-        ],
-      ),
-    );
-  }
-
-  Widget _body() {
-    if (_loading) {
-      return const Padding(
-        padding: EdgeInsets.all(Sp.xl),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-    if (_error != null) {
-      return EmptyState(
-        title: "Couldn't load the GoBikers",
-        message: _error!,
-        actionLabel: 'Try again',
-        onAction: _load,
-      );
-    }
-    if (_list.isEmpty) {
-      return EmptyState(
-        title: 'No GoBikers in ${_barangay ?? 'your barangay'} yet',
-        message: 'Choose another barangay above to see its GoBikers.',
-      );
-    }
-    return ListView.separated(
-      shrinkWrap: true,
-      padding: const EdgeInsets.symmetric(horizontal: Sp.sm),
-      itemCount: _list.length,
-      separatorBuilder: (_, _) =>
-          Divider(height: 1, indent: 72, color: context.pal.divider),
-      itemBuilder: (context, i) {
-        final g = _list[i];
-        final selected = g.id == widget.selectedId;
-        return ListTile(
-          minVerticalPadding: 12,
-          leading: CircleAvatar(
-            backgroundColor: context.pal.background,
-            foregroundColor: context.pal.ink,
-            child: Text(g.name.isEmpty ? '?' : g.name[0].toUpperCase()),
-          ),
-          title: Text(
-            g.name,
-            style: selected
-                ? T.rowTitle.copyWith(fontWeight: FontWeight.w700)
-                : T.rowTitle,
-          ),
-          subtitle: Text(
-            '${g.barangay} · ${g.visitsDone == 1 ? '1 visit done' : '${g.visitsDone} visits done'}',
-            style: T.secondary.muted(context),
-          ),
-          trailing: selected
-              ? Icon(Icons.check_rounded, color: context.pal.ink)
-              : null,
-          onTap: () => Navigator.pop(context, g),
-        );
-      },
     );
   }
 }

@@ -15,6 +15,8 @@ class Appointment {
     required this.windowLabel,
     required this.reason,
     required this.createdAt,
+    this.updatedAt,
+    this.completedAt,
     this.gobikerId,
     this.gobikerName,
     this.gobikerBarangay,
@@ -39,6 +41,13 @@ class Appointment {
   final String reason;
   final DateTime createdAt;
 
+  /// When the status last changed (when it was declined or cancelled, which have no
+  /// timestamp of their own). Null from a server that does not send it yet.
+  final DateTime? updatedAt;
+
+  /// When the GoBiker marked the visit done.
+  final DateTime? completedAt;
+
   /// The GoBiker the resident chose (or who accepted an older open request).
   final int? gobikerId;
   final String? gobikerName;
@@ -51,6 +60,9 @@ class Appointment {
   final int? patientId;
 
   bool get isOpen => status == 'pending' || status == 'accepted';
+
+  /// When something last happened to it: the newest of the dates it has.
+  DateTime get changedAt => completedAt ?? updatedAt ?? createdAt;
 
   factory Appointment.fromJson(Map<String, dynamic> j) {
     String? text(dynamic v) {
@@ -72,6 +84,8 @@ class Appointment {
       createdAt:
           DateTime.tryParse('${j['created_at'] ?? ''}')?.toLocal() ??
           DateTime.now(),
+      updatedAt: DateTime.tryParse('${j['updated_at'] ?? ''}')?.toLocal(),
+      completedAt: DateTime.tryParse('${j['completed_at'] ?? ''}')?.toLocal(),
       gobikerId: (j['gobiker_id'] as num?)?.toInt(),
       gobikerName: text(j['gobiker_name']),
       gobikerBarangay: text(j['gobiker_barangay']),
@@ -204,7 +218,17 @@ class ResidentAppointments extends _AppointmentStore {
 
   List<Appointment> appointments = const [];
 
-  Appointment? get current => appointments.where((a) => a.isOpen).firstOrNull;
+  /// Requests still waiting for an answer or for the visit. A resident may have up to
+  /// [maxOpen] at once (the server enforces it too).
+  List<Appointment> get open => appointments.where((a) => a.isOpen).toList();
+
+  static const int maxOpen = 3;
+
+  /// The GoBikers with a request open: asking one of them again is refused until they answer.
+  Set<int> get openGobikerIds => {
+    for (final a in open)
+      if (a.gobikerId != null) a.gobikerId!,
+  };
 
   @override
   String get _path => '/resident/appointments';
