@@ -9,11 +9,13 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/auth_service.dart';
 import '../core/live_map.dart';
+import '../core/location_gate.dart';
 import '../core/presence_service.dart';
 import '../core/theme.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/bottom_gap.dart';
 import '../widgets/confirm_modal.dart';
+import '../widgets/location_help.dart';
 
 /// SOS colors: red while waiting, yellow while a GoBiker responds, green once
 /// resolved (the same colors as the admin live map).
@@ -176,23 +178,36 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
     }
   }
 
+  /// Finds the phone and (when [move]) centres the map on it.
+  ///
+  /// [move] is true only when the person tapped the button. Anything else (opening the map)
+  /// stays quiet and never asks the phone for anything while location is off: asking then opens
+  /// Google's "Location Accuracy" dialog, which comes straight back when it is refused. A tap
+  /// with location off or refused gets one message with a way to fix it instead.
   Future<void> _locateMe({bool move = true}) async {
+    var state = await LocationGate.instance.check();
+    if (!mounted) return;
+
+    // They tapped the button: asking for the permission is fine, and the phone's own dialog
+    // closes for good once answered.
+    if (move && state == LocationState.permissionDenied) {
+      state = await LocationGate.instance.requestPermission();
+      if (!mounted) return;
+    }
+    if (state != LocationState.ready) {
+      if (move) showLocationHelp(context, state);
+      return;
+    }
+
     try {
-      final permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        if (move && mounted) {
-          AppToast.show(
-            context,
-            'Allow location access to see yourself on the map.',
-            type: ToastType.error,
-          );
-        }
-        return;
-      }
       final p =
           await Geolocator.getLastKnownPosition() ??
-          await Geolocator.getCurrentPosition();
+          await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              timeLimit: Duration(seconds: 10),
+            ),
+          );
       PresenceService.instance.latest.value ??= p;
       if (move && mounted) {
         _map.move(LatLng(p.latitude, p.longitude), 16);
