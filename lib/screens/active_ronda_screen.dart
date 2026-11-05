@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../core/auth_service.dart';
 import '../core/emergency_flow.dart';
+import '../core/gobiker_history.dart';
 import '../core/theme.dart';
 import '../core/tracking_service.dart';
 import '../widgets/app_text_field.dart';
@@ -144,6 +145,7 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
     await AuthService.instance.logout();
     globalPatients.clear();
     globalRondas.clear();
+    GobikerHistory.instance.reset();
 
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
@@ -167,8 +169,9 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
     _timer?.cancel();
     await TrackingService.instance.stopRonda();
 
-    // Save the completed shift to the history shown on the dashboard.
-    globalRondas.add({
+    // Save the completed shift: in memory for the dashboard, and on the phone so History
+    // (and today's summary) are still there after the app is closed.
+    final finished = {
       'barangay': _barangay ?? 'Not specified',
       'date': DateFormat('MMMM d, yyyy').format(DateTime.now()),
       'startTime': _startTime,
@@ -176,7 +179,12 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
       'endDateTime': DateTime.now(), // used for "minutes ago"
       'patientsCount': _patientsCount,
       'distance': TrackingService.instance.distanceKm, // real GPS distance
-    });
+    };
+    globalRondas.add(finished);
+    await RondaStore.addFinished(
+      AuthService.instance.currentUser?.id ?? 0,
+      finished,
+    );
     return true;
   }
 

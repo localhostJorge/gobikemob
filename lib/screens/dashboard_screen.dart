@@ -25,6 +25,7 @@ import 'active_ronda_screen.dart';
 import 'announcements_screen.dart';
 import 'appointments_screen.dart';
 import 'global_state.dart';
+import 'gobiker_history_screen.dart';
 import 'live_map_screen.dart';
 import 'patient_management_screen.dart';
 import '../core/ronda_store.dart';
@@ -49,6 +50,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadSavedRonda();
+    _loadFinishedRondas(); // today's summary and History, kept across restarts
     FollowUpAlerts.instance.refresh(); // admin decisions about patients
     EmergencyWatcher.instance
         .load(); // an emergency the admin may have answered
@@ -61,6 +63,15 @@ class _DashboardScreenState extends State<DashboardScreen>
       ..load(); // SOS requests the admin assigned to this GoBiker
     PresenceService.instance.start(); // on the live map while the app is open
     _refreshUser(); // the admin may have changed the barangay
+  }
+
+  /// The rondas this GoBiker finished, from the phone. They used to live in memory only, so
+  /// a restart emptied today's summary and the history.
+  Future<void> _loadFinishedRondas() async {
+    final userId = AuthService.instance.currentUser?.id ?? 0;
+    final saved = await RondaStore.loadFinished(userId);
+    if (!mounted) return;
+    setState(() => globalRondas = saved);
   }
 
   void _onAppointmentsChanged() {
@@ -254,6 +265,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  void _openHistory() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const GobikerHistoryScreen()),
+    );
+  }
+
   void _onMap({int? focusSosId}) {
     Navigator.push(
       context,
@@ -381,103 +399,20 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  void _showRondaHistorySheet() {
-    final rondas = globalRondas.reversed.toList(); // newest first
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        final muted = Theme.of(ctx).colorScheme.onSurface
-            .withValues(alpha: 0.6);
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(ctx).size.height * 0.7,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Ronda History',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 16),
-                if (rondas.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 32),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.assignment_outlined,
-                            size: 40,
-                            color: muted,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'No completed rondas yet.',
-                            style: TextStyle(color: muted),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else
-                  Flexible(
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: rondas.length,
-                      separatorBuilder: (_, _) => const Divider(height: 24),
-                      itemBuilder: (context, index) {
-                        final r = rondas[index];
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(
-                              Icons.check_circle_rounded,
-                              color: AppTheme.successGreen,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Brgy. ${r['barangay']}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${r['date']} • ${r['startTime']} - ${r['endTime']}\n'
-                                    'Patients: ${r['patientsCount']} • ${(r['distance'] as double).toStringAsFixed(1)} km',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      height: 1.4,
-                                      color: muted,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+  /// Home visits marked done today that have no check-up linked to them. One with a check-up
+  /// linked is that person's check-up, which a ronda already counts when it was recorded on
+  /// one, so it is not counted a second time.
+  int _homeVisitsDoneToday() {
+    final now = DateTime.now();
+    return GobikerAppointments.instance.mine.where((a) {
+      final done = a.completedAt;
+      return a.status == 'completed' &&
+          a.patientId == null &&
+          done != null &&
+          done.year == now.year &&
+          done.month == now.month &&
+          done.day == now.day;
+    }).length;
   }
 
   String _lastRondaText() {
@@ -517,6 +452,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       0.0,
       (sum, r) => sum + (r['distance'] as double),
     );
+    final int todayVisited = todayPatients + _homeVisitsDoneToday();
 
     return LoadingOverlay(
       isLoading: _starting || _resuming,
@@ -569,7 +505,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                           children: [
                             _sectionTitle("TODAY'S SUMMARY", muted),
                             _summaryStrip(theme, muted, [
-                              ('$todayPatients', 'Visited'),
+                              ('$todayVisited', 'Visited'),
                               (
                                 '${GobikerAppointments.instance.openCount}',
                                 'Appointments',
@@ -664,39 +600,19 @@ class _DashboardScreenState extends State<DashboardScreen>
                       ),
                       const SizedBox(height: 16),
 
-                      // 6) Secondary buttons
+                      // 6) Secondary button (History is in the bottom bar)
                       FadeInSlide(
                         delay: const Duration(milliseconds: 400),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: _showMessageAdminSheet,
-                                icon: const Icon(
-                                  Icons.chat_bubble_outline_rounded,
-                                  size: 20,
-                                ),
-                                label: const Text('Message Admin'),
-                                style: OutlinedButton.styleFrom(
-                                  minimumSize: const Size.fromHeight(50),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: _showRondaHistorySheet,
-                                icon: const Icon(
-                                  Icons.history_rounded,
-                                  size: 20,
-                                ),
-                                label: const Text('Ronda History'),
-                                style: OutlinedButton.styleFrom(
-                                  minimumSize: const Size.fromHeight(50),
-                                ),
-                              ),
-                            ),
-                          ],
+                        child: OutlinedButton.icon(
+                          onPressed: _showMessageAdminSheet,
+                          icon: const Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            size: 20,
+                          ),
+                          label: const Text('Message Admin'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(50),
+                          ),
                         ),
                       ),
                     ],
@@ -1186,6 +1102,13 @@ class _DashboardScreenState extends State<DashboardScreen>
             // Open SOS requests assigned to this GoBiker.
             badge: GobikerSos.instance.open.length,
             onTap: _onMap,
+          ),
+          _NavItem(
+            icon: Icons.history_rounded,
+            label: 'History',
+            selected: false,
+            muted: muted,
+            onTap: _openHistory,
           ),
           _NavItem(
             icon: Icons.person_rounded,

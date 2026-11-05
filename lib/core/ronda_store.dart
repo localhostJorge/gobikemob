@@ -57,6 +57,67 @@ class RondaStore {
     await prefs.remove(_kRonda);
   }
 
+  // ---------- finished rondas ----------
+
+  /// How many finished rondas are kept on the phone for the History screen.
+  static const int maxFinished = 200;
+
+  static String _finishedKey(int userId) => 'ronda.finished.$userId';
+
+  /// The finished rondas this GoBiker has on this phone, oldest first. Each is the map the
+  /// dashboard and History read: barangay, date, startTime, endTime, endDateTime (a
+  /// DateTime), patientsCount and distance (km). The server keeps only when a ronda started
+  /// and ended, so these live here, per account.
+  static Future<List<Map<String, dynamic>>> loadFinished(int userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_finishedKey(userId));
+    if (raw == null) return [];
+    try {
+      final out = <Map<String, dynamic>>[];
+      for (final item in jsonDecode(raw) as List) {
+        final m = Map<String, dynamic>.from(item as Map);
+        final ended = DateTime.tryParse('${m['endDateTime']}');
+        if (ended == null) continue; // not a ronda we can place in time
+        out.add({
+          'barangay': '${m['barangay'] ?? 'Not specified'}',
+          'date': '${m['date'] ?? ''}',
+          'startTime': '${m['startTime'] ?? ''}',
+          'endTime': '${m['endTime'] ?? ''}',
+          'endDateTime': ended,
+          'patientsCount': (m['patientsCount'] as num?)?.toInt() ?? 0,
+          'distance': (m['distance'] as num?)?.toDouble() ?? 0.0,
+        });
+      }
+      return out;
+    } catch (_) {
+      return []; // damaged: better an empty list than a crash
+    }
+  }
+
+  /// Adds a finished ronda (same map as [loadFinished] returns), keeping the newest
+  /// [maxFinished].
+  static Future<void> addFinished(
+    int userId,
+    Map<String, dynamic> ronda,
+  ) async {
+    final all = await loadFinished(userId)
+      ..add(ronda);
+    final kept = all.length > maxFinished
+        ? all.sublist(all.length - maxFinished)
+        : all;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _finishedKey(userId),
+      jsonEncode([
+        for (final r in kept)
+          {
+            ...r,
+            'endDateTime': (r['endDateTime'] as DateTime).toIso8601String(),
+          },
+      ]),
+    );
+  }
+
   /// true = "we still need to tell the server the ronda ended".
   static Future<void> setPendingStop(bool value) async {
     final prefs = await SharedPreferences.getInstance();

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../core/auth_service.dart';
+import '../core/gobiker_history.dart';
 import '../core/theme.dart';
 import '../core/tracking_service.dart';
 import '../screens/legal_screen.dart';
@@ -72,6 +73,7 @@ class ProfilePanel {
     globalPatients
         .clear(); // private health data: never keep it for the next person
     globalRondas.clear();
+    GobikerHistory.instance.reset();
 
     if (!context.mounted) return;
     AppToast.show(context, 'You have been logged out', type: ToastType.success);
