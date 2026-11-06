@@ -1,5 +1,5 @@
-// The hosted Laravel API (Railway) the app uses unless a build says otherwise.
-const String kProductionApiBaseUrl = 'https://gobike.up.railway.app/api';
+// The hosted Laravel API (Hostinger) the app uses unless a build says otherwise.
+const String kProductionApiBaseUrl = 'https://gobikeproject.org/api';
 
 // Base URL of the Laravel API. Set it per build, without editing code:
 //   flutter run --dart-define=API_BASE_URL=http://127.0.0.1:8000/api   (local, over adb reverse)

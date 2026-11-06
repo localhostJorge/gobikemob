@@ -34,7 +34,7 @@ $ErrorActionPreference = 'Stop'
 # Firebase console > Project settings > Your apps > RondaGo (Android) > App ID.
 $FirebaseAppId = '1:519313660154:android:f1dc533472747e19719143'
 $TesterGroups  = 'testers'
-$ApiBaseUrl    = 'https://gobike.up.railway.app/api'
+$ApiBaseUrl    = 'https://gobikeproject.org/api'
 # ---------------------------------------------------------------------------
 
 function Fail([string]$message) {
