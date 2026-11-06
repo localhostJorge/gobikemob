@@ -290,56 +290,86 @@ class _AppointmentCard extends StatelessWidget {
           _line(Icons.notes_rounded, a.reason, muted),
           if (!done) ...[
             const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (onCall != null)
-                  OutlinedButton.icon(
-                    onPressed: onCall,
-                    icon: const Icon(Icons.call_rounded, size: 18),
-                    label: Text(a.residentMobile ?? 'Call'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(48, 48),
+            if (onComplete != null)
+              // An accepted visit: the number to call, and "Mark visit done" to its right.
+              // The label never changes while saving (a spinner shows instead), so nothing
+              // moves when it is tapped.
+              Row(
+                children: [
+                  if (onCall != null) ...[
+                    Flexible(child: _callButton()),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: busy ? null : onComplete,
+                      icon: _icon(Icons.task_alt_rounded),
+                      label: const Text(
+                        'Mark visit done',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        backgroundColor: AppTheme.successGreen,
+                      ),
                     ),
                   ),
-                if (onAccept != null)
-                  FilledButton.icon(
-                    onPressed: busy ? null : onAccept,
-                    icon: const Icon(Icons.check_rounded, size: 18),
-                    label: Text(busy ? 'Saving…' : 'Accept'),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                      backgroundColor: AppTheme.blue,
+                ],
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (onCall != null) _callButton(),
+                  if (onAccept != null)
+                    FilledButton.icon(
+                      onPressed: busy ? null : onAccept,
+                      icon: _icon(Icons.check_rounded),
+                      label: const Text('Accept'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        backgroundColor: AppTheme.blue,
+                      ),
                     ),
-                  ),
-                if (onDecline != null)
-                  OutlinedButton.icon(
-                    onPressed: busy ? null : onDecline,
-                    icon: const Icon(Icons.close_rounded, size: 18),
-                    label: const Text('Decline'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                      foregroundColor: AppTheme.errorRed,
+                  if (onDecline != null)
+                    OutlinedButton.icon(
+                      onPressed: busy ? null : onDecline,
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      label: const Text('Decline'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        foregroundColor: AppTheme.errorRed,
+                      ),
                     ),
-                  ),
-                if (onComplete != null)
-                  FilledButton.icon(
-                    onPressed: busy ? null : onComplete,
-                    icon: const Icon(Icons.task_alt_rounded, size: 18),
-                    label: Text(busy ? 'Saving…' : 'Mark visit done'),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                      backgroundColor: AppTheme.successGreen,
-                    ),
-                  ),
-              ],
-            ),
+                ],
+              ),
           ],
         ],
       ),
     );
   }
+
+  /// The button's icon; a small spinner while saving, the same size so the button keeps its width.
+  Widget _icon(IconData icon) => busy
+      ? const SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        )
+      : Icon(icon, size: 18);
+
+  Widget _callButton() => OutlinedButton.icon(
+    onPressed: onCall,
+    icon: const Icon(Icons.call_rounded, size: 18),
+    label: Text(
+      appointment.residentMobile ?? 'Call',
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    ),
+    style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
+  );
 
   Widget _line(IconData icon, String text, Color muted) => Padding(
     padding: const EdgeInsets.only(top: 4),

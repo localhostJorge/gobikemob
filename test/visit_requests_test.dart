@@ -471,10 +471,10 @@ void main() {
       semantics.dispose();
     });
 
-    testWidgets('an open request can be cancelled from its details', (
+    testWidgets('an accepted request can be cancelled from its details', (
       tester,
     ) async {
-      setRequests([visit(status: 'pending')]);
+      setRequests([visit(status: 'accepted')]);
       await openHistory(tester);
 
       await tester.tap(find.text('Home visit request'));
@@ -494,6 +494,31 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.text('Cancel this request?'), findsNothing);
     });
+
+    testWidgets(
+      'a request still waiting is not in History, an answered one is',
+      (tester) async {
+        setRequests([visit(id: 1, status: 'pending')]);
+        await openHistory(tester);
+        expect(find.text('Home visit request'), findsNothing);
+
+        for (final status in [
+          'accepted',
+          'declined',
+          'completed',
+          'cancelled',
+        ]) {
+          await tester.pumpWidget(const SizedBox());
+          setRequests([visit(id: 1, status: status)]);
+          await openHistory(tester);
+          expect(
+            find.text('Home visit request'),
+            findsOneWidget,
+            reason: status,
+          );
+        }
+      },
+    );
 
     testWidgets('a request that is over has no cancel button', (tester) async {
       setRequests([visit(status: 'completed')]);
@@ -772,13 +797,49 @@ void main() {
           findsOneWidget,
         );
         expect(find.text('Visit declined'), findsOneWidget);
-        expect(find.textContaining('Maria Santos'), findsOneWidget);
         expect(find.textContaining('Tap to ask someone else'), findsOneWidget);
+        // The pending request is on Home too, in its own row.
+        expect(find.text('Home visit request'), findsOneWidget);
+        expect(
+          find.textContaining('Waiting for the GoBiker to accept'),
+          findsOneWidget,
+        );
 
         // Map comes before it.
         final map = tester.getTopLeft(find.text('Map')).dy;
         final declined = tester.getTopLeft(find.text('Visit declined')).dy;
         expect(declined, greaterThan(map));
+      },
+    );
+
+    testWidgets(
+      'lists open requests under Map: waiting and accepted ones, not finished ones',
+      (tester) async {
+        setRequests([
+          visit(id: 1, status: 'pending', gobikerId: 8),
+          visit(id: 2, status: 'accepted', gobikerId: 9),
+          visit(id: 3, status: 'completed', gobikerId: 10),
+          visit(id: 4, status: 'cancelled', gobikerId: 11),
+        ]);
+        await openHome(tester);
+
+        expect(find.text('Home visit request'), findsNWidgets(2));
+        expect(find.textContaining('Accepted'), findsOneWidget);
+        expect(
+          find.textContaining('Waiting for the GoBiker to accept'),
+          findsOneWidget,
+        );
+        final map = tester.getTopLeft(find.text('Map')).dy;
+        expect(
+          tester.getTopLeft(find.text('Home visit request').first).dy,
+          greaterThan(map),
+        );
+
+        // Tapping one opens its details, where it can be cancelled.
+        await tester.tap(find.text('Home visit request').first);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text('Cancel request'), findsOneWidget);
       },
     );
 

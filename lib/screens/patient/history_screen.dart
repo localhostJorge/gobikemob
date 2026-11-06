@@ -82,17 +82,20 @@ class _HistoryTabState extends State<HistoryTab> {
           statusColor: sosStatusStyle(s, context.pal).color,
           page: (_) => SosDetailsScreen(sosId: s.id),
         ),
+      // A request still waiting for an answer is on Home, under Map. History holds what has
+      // happened to it: accepted, declined, done or cancelled.
       for (final a in ResidentAppointments.instance.appointments)
-        _Item(
-          kind: _Kind.visit,
-          title: 'Home visit request',
-          subtitle: 'For ${formatDate(a.preferredDate)} · ${a.barangay}',
-          time: a.createdAt,
-          status: a.statusLabel,
-          statusColor: a.isOpen ? context.pal.orangeText : context.pal.muted,
-          page: (_) => VisitRequestScreen(appointmentId: a.id),
-          unseen: PatientStore.instance.isVisitUnseen(a),
-        ),
+        if (a.status != 'pending')
+          _Item(
+            kind: _Kind.visit,
+            title: 'Home visit request',
+            subtitle: 'For ${formatDate(a.preferredDate)} · ${a.barangay}',
+            time: a.changedAt, // when it was answered, not when it was sent
+            status: a.statusLabel,
+            statusColor: a.isOpen ? context.pal.orangeText : context.pal.muted,
+            page: (_) => VisitRequestScreen(appointmentId: a.id),
+            unseen: PatientStore.instance.isVisitUnseen(a),
+          ),
       for (final v in _visits.visits) ...[
         _Item(
           kind: _Kind.checkup,

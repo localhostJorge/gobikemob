@@ -398,6 +398,24 @@ class _HealthList extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const LiveMapScreen()),
                 ),
               ),
+              // Requests still open (waiting, or accepted and not done yet). Once answered for
+              // good they leave Home and stay in History.
+              for (final a in appointments.open)
+                NavRow(
+                  icon: Icons.home_outlined,
+                  color: context.pal.orangeText,
+                  title: 'Home visit request',
+                  subtitle:
+                      '${a.gobikerName ?? 'A GoBiker'} · '
+                      '${formatDate(a.preferredDate)} · '
+                      '${a.status == 'accepted' ? 'Accepted' : 'Waiting for the GoBiker to accept'}',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => VisitRequestScreen(appointmentId: a.id),
+                    ),
+                  ),
+                ),
               // A GoBiker said no: the details show their message and other GoBikers to ask.
               if (declined != null)
                 NavRow(
