@@ -15,6 +15,7 @@ import 'app_toast.dart';
 import 'app_text_field.dart';
 import 'birthday_field.dart';
 import 'confirm_modal.dart';
+import 'loading_card.dart';
 import 'initials_avatar.dart';
 import 'photo_flow.dart';
 import '../screens/global_state.dart';
@@ -54,17 +55,7 @@ class ProfilePanel {
     if (!context.mounted) return;
     final navigator = Navigator.of(context);
 
-    unawaited(
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        barrierColor: Colors.black.withValues(alpha: 0.35),
-        builder: (_) => const PopScope(
-          canPop: false,
-          child: Center(child: _LoadingCard(message: 'Logging out...')),
-        ),
-      ),
-    );
+    showLoggingOut(context);
 
     await TrackingService.instance.stopRonda();
     await RondaStore.clear(); // a killed ronda must not leak to the next login
@@ -80,34 +71,6 @@ class ProfilePanel {
     navigator.pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
-    );
-  }
-}
-
-class _LoadingCard extends StatelessWidget {
-  const _LoadingCard({required this.message});
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(
-              width: 40,
-              height: 40,
-              child: CircularProgressIndicator(strokeWidth: 3),
-            ),
-            const SizedBox(height: 16),
-            Text(message, style: const TextStyle(fontWeight: FontWeight.w600)),
-          ],
-        ),
-      ),
     );
   }
 }

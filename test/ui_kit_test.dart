@@ -326,7 +326,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       addTearDown(
-        () => ThemeController.instance.setThemeMode(ThemeMode.system),
+        () => ThemeController.instance.setThemeMode(ThemeMode.light),
       );
 
       await tester.pumpWidget(

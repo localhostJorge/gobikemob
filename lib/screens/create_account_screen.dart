@@ -25,11 +25,20 @@ final RegExp _mobileRegex = RegExp(r'^09\d{9}$');
 
 /// Chooses and crops a profile photo, returning its path (null if they backed out). The
 /// screen uses [pickProfilePhoto]; a test passes its own, because a test has no camera.
-typedef PhotoChooser =
-    Future<String?> Function(BuildContext context, ImageSource source);
+typedef PhotoChooser = Future<String?> Function(
+  BuildContext context,
+  ImageSource source,
+);
 
 class CreateAccountScreen extends StatefulWidget {
-  const CreateAccountScreen({super.key, this.choosePhoto});
+  const CreateAccountScreen({
+    super.key,
+    this.choosePhoto,
+    this.fromLogin = false,
+  });
+
+  /// Opened from the Login page: "Log in" (and Back) go back to it instead of replacing this.
+  final bool fromLogin;
 
   /// Replaces the camera / gallery / crop flow. Only tests set this.
   final PhotoChooser? choosePhoto;
@@ -151,6 +160,10 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   );
 
   void _goToLogin() {
+    if (widget.fromLogin) {
+      Navigator.pop(context);
+      return;
+    }
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => const LoginScreen()),

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../core/auth_service.dart';
-import '../welcome_screen.dart';
+import '../../widgets/app_toast.dart';
+import '../../widgets/loading_card.dart';
+import '../login_screen.dart';
 import 'change_password_screen.dart';
 import 'edit_profile_screen.dart';
 import 'notification_settings_screen.dart';
@@ -27,12 +29,17 @@ class ProfileTab extends StatelessWidget {
     );
     if (!ok || !context.mounted) return;
 
+    // The root navigator outlives this tab, which goes away with the stack below.
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showLoggingOut(context, useRootNavigator: true);
+
     await AuthService.instance.logout();
     PatientStore.instance.clearSession();
     if (!context.mounted) return;
 
-    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+    AppToast.show(context, 'You have been logged out', type: ToastType.success);
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
     );
   }

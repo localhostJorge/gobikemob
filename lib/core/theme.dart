@@ -174,7 +174,8 @@ class ThemeController extends ChangeNotifier {
 
   static final ThemeController instance = ThemeController._();
 
-  ThemeMode _themeMode = ThemeMode.system;
+  // Light until the person chooses dark; the phone's own setting is not followed.
+  ThemeMode _themeMode = ThemeMode.light;
 
   ThemeMode get themeMode => _themeMode;
 
@@ -189,7 +190,7 @@ class ThemeController extends ChangeNotifier {
         _themeMode = ThemeMode.dark;
         break;
       default:
-        _themeMode = ThemeMode.system;
+        _themeMode = ThemeMode.light;
         break;
     }
     notifyListeners();

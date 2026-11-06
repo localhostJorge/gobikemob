@@ -1,8 +1,10 @@
-import 'package:flutter/material.dart';
+   import 'package:flutter/material.dart';
 
 import '../core/app_router.dart';
 import '../core/auth_service.dart';
+import '../core/first_run.dart';
 import '../widgets/auth_widgets.dart';
+import 'login_screen.dart';
 import 'welcome_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -38,21 +40,33 @@ class _SplashScreenState extends State<SplashScreen>
     // Check the saved session while the logo is showing (at least 1.8 seconds).
     final minimumWait = Future.delayed(const Duration(milliseconds: 1800));
     final user = await AuthService.instance.restoreSession();
+    // Get Started is for a new user only; everyone else without a session logs in.
+    final seen = await FirstRun.seen();
     await minimumWait;
 
     if (!mounted) return;
 
     final Widget next = (user != null && canUseMobileApp(user))
         ? screenForUser(user)
-        : const WelcomeScreen();
+        : (seen ? const LoginScreen() : const WelcomeScreen());
 
+    // The logo flies to its place on the next screen (Hero) while the rest fades in.
+    final still = MediaQuery.disableAnimationsOf(context);
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 350),
+        transitionDuration: still
+            ? Duration.zero
+            : const Duration(milliseconds: 700),
         pageBuilder: (context, animation, secondaryAnimation) => next,
         transitionsBuilder: (context, animation, secondaryAnimation, child) =>
-            FadeTransition(opacity: animation, child: child),
+            FadeTransition(
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeInOut,
+              ),
+              child: child,
+            ),
       ),
     );
   }
@@ -75,7 +89,10 @@ class _SplashScreenState extends State<SplashScreen>
               opacity: _fade,
               child: ScaleTransition(
                 scale: _scale,
-                child: const AuthLogo(height: 120),
+                child: const Hero(
+                  tag: authLogoHero,
+                  child: AuthLogo(height: 120),
+                ),
               ),
             ),
             const SizedBox(height: 32),

@@ -6,6 +6,7 @@ import '../widgets/auth_widgets.dart';
 import '../widgets/loading_overlay.dart';
 import '../core/app_router.dart';
 import '../core/auth_service.dart';
+import '../core/first_run.dart';
 import 'create_account_screen.dart';
 
 final RegExp _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
@@ -74,6 +75,8 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    await FirstRun.markSeen(); // an existing user is never a new one
+    if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => screenForUser(user)),
@@ -98,9 +101,12 @@ class _LoginScreenState extends State<LoginScreen> {
   // }
 
   void _goToSignUp() {
-    Navigator.pushReplacement(
+    // Pushed, not replaced: Back from Sign up comes back here.
+    Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const CreateAccountScreen()),
+      MaterialPageRoute(
+        builder: (context) => const CreateAccountScreen(fromLogin: true),
+      ),
     );
   }
 
@@ -128,10 +134,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Center(child: AuthLogo(height: 88)),
+                      const Center(
+                        child: Hero(
+                          tag: authLogoHero,
+                          child: AuthLogo(height: 88),
+                        ),
+                      ),
                       const SizedBox(height: 24),
                       Text(
-                        'Welcome back',
+                        'Every Ride Has a Purpose.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 24,
@@ -141,7 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Log in to continue',
+                        'Stay connected. Stay prepared.',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 14, color: muted),
                       ),

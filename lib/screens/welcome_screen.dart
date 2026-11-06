@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/first_run.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/fade_in_slide.dart';
 import 'create_account_screen.dart';
@@ -22,7 +23,8 @@ class WelcomeScreen extends StatelessWidget {
           child: Column(
             children: [
               const Spacer(flex: 3),
-              const FadeInSlide(child: AuthLogo(height: 150)),
+              // A plain Hero, not inside FadeInSlide: the logo glides in from the splash screen.
+              const Hero(tag: authLogoHero, child: AuthLogo(height: 150)),
               const SizedBox(height: 28),
               FadeInSlide(
                 delay: const Duration(milliseconds: 120),
@@ -49,12 +51,15 @@ class WelcomeScreen extends StatelessWidget {
               FadeInSlide(
                 delay: const Duration(milliseconds: 300),
                 child: ElevatedButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
-                    ),
-                  ),
+                  onPressed: () {
+                    FirstRun.markSeen();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LoginScreen(),
+                      ),
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size.fromHeight(52),
                   ),
@@ -67,20 +72,25 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 12),
               FadeInSlide(
                 delay: const Duration(milliseconds: 380),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                // A Wrap, not a Row: with large text the link drops to the next line.
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
                       'New here?',
                       style: TextStyle(fontSize: 14, color: muted),
                     ),
                     TextButton(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const CreateAccountScreen(),
-                        ),
-                      ),
+                      onPressed: () {
+                        FirstRun.markSeen();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const CreateAccountScreen(),
+                          ),
+                        );
+                      },
                       style: TextButton.styleFrom(
                         foregroundColor: kAuthBlue,
                         minimumSize: const Size(0, 48),

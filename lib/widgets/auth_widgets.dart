@@ -21,6 +21,10 @@ BorderSide authCheckboxSide(BuildContext context) {
   );
 }
 
+/// Hero tag shared by the logo on the splash, Get Started and Login screens, so it glides
+/// from one to the next instead of jumping.
+const authLogoHero = 'auth-logo';
+
 /// Logo. In dark mode it sits on a white rounded plate so it stays readable.
 class AuthLogo extends StatelessWidget {
   const AuthLogo({super.key, this.height = 80});
