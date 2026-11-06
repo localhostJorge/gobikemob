@@ -291,7 +291,7 @@ class _AppointmentCard extends StatelessWidget {
           if (!done) ...[
             const SizedBox(height: 10),
             if (onComplete != null)
-              // An accepted visit: the number to call, and "Mark visit done" to its right.
+              // An accepted visit: the number to call, and "visit done" to its right.
               // The label never changes while saving (a spinner shows instead), so nothing
               // moves when it is tapped.
               Row(
@@ -305,7 +305,7 @@ class _AppointmentCard extends StatelessWidget {
                       onPressed: busy ? null : onComplete,
                       icon: _icon(Icons.task_alt_rounded),
                       label: const Text(
-                        'Mark visit done',
+                        'Visit Done',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),

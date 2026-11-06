@@ -14,7 +14,7 @@ import 'visit_record.dart' show formatDate;
     icon: Icons.directions_bike_rounded,
     color: AppColors.blue,
     help:
-        '${a.gobikerName ?? 'A GoBiker'} will visit you. They may call you first.',
+        '${a.gobikerName ?? 'A GoBiker'} will visit you. They can also call you for confirmation or something else.',
   ),
   'completed' => (
     icon: Icons.check_circle_rounded,
