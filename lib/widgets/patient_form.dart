@@ -107,10 +107,19 @@ class PatientForm extends StatelessWidget {
     super.key,
     required this.controllers,
     this.readOnly = false,
+    this.personalDetails = true,
+    this.askAge = false,
   });
 
   final PatientFormControllers controllers;
   final bool readOnly;
+
+  /// False at a home visit: the resident's name, address and contact are already known, so
+  /// only the measurements are asked for.
+  final bool personalDetails;
+
+  /// With [personalDetails] off, still asks for the age (the resident gave no birthdate).
+  final bool askAge;
 
   @override
   Widget build(BuildContext context) {
@@ -121,69 +130,88 @@ class PatientForm extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _SectionHeader('PERSONAL DETAILS', muted),
-        AppTextField(
-          label: 'Full name',
-          hint: 'Juan Dela Cruz',
-          icon: Icons.person_outline_rounded,
-          controller: c.name,
-          readOnly: readOnly,
-          textInputAction: TextInputAction.next,
-          validator: _required,
-        ),
-        const SizedBox(height: 16),
-        AppTextField(
-          label: 'Address',
-          hint: 'House no., street, purok',
-          icon: Icons.home_outlined,
-          controller: c.address,
-          readOnly: readOnly,
-          textInputAction: TextInputAction.next,
-          validator: _required,
-        ),
-        const SizedBox(height: 16),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              flex: 3,
-              child: AppTextField(
-                label: 'Contact number',
-                hint: '09123456789',
-                icon: Icons.phone_outlined,
-                controller: c.contact,
-                readOnly: readOnly,
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.next,
-                inputFormatters: _digits,
-                maxLength: 11,
-                validator: (v) {
-                  final t = (v ?? '').trim();
-                  if (t.isEmpty) return 'Required';
-                  if (t.length < 7) return 'Too short';
-                  return null;
-                },
+        if (!personalDetails && askAge) ...[
+          _SectionHeader('PERSONAL DETAILS', muted),
+          AppTextField(
+            label: 'Age',
+            hint: '45',
+            icon: Icons.cake_outlined,
+            controller: c.age,
+            readOnly: readOnly,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.next,
+            inputFormatters: _digits,
+            maxLength: 3,
+            validator: _range(0, 120),
+            helper: 'Their account has no birthdate.',
+          ),
+          const SizedBox(height: 28),
+        ],
+        if (personalDetails) ...[
+          _SectionHeader('PERSONAL DETAILS', muted),
+          AppTextField(
+            label: 'Full name',
+            hint: 'Juan Dela Cruz',
+            icon: Icons.person_outline_rounded,
+            controller: c.name,
+            readOnly: readOnly,
+            textInputAction: TextInputAction.next,
+            validator: _required,
+          ),
+          const SizedBox(height: 16),
+          AppTextField(
+            label: 'Address',
+            hint: 'House no., street, purok',
+            icon: Icons.home_outlined,
+            controller: c.address,
+            readOnly: readOnly,
+            textInputAction: TextInputAction.next,
+            validator: _required,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: AppTextField(
+                  label: 'Contact number',
+                  hint: '09123456789',
+                  icon: Icons.phone_outlined,
+                  controller: c.contact,
+                  readOnly: readOnly,
+                  keyboardType: TextInputType.phone,
+                  textInputAction: TextInputAction.next,
+                  inputFormatters: _digits,
+                  maxLength: 11,
+                  validator: (v) {
+                    final t = (v ?? '').trim();
+                    if (t.isEmpty) return 'Required';
+                    if (t.length < 7) return 'Too short';
+                    return null;
+                  },
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 2,
-              child: AppTextField(
-                label: 'Age',
-                hint: '45',
-                icon: Icons.cake_outlined,
-                controller: c.age,
-                readOnly: readOnly,
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.next,
-                inputFormatters: _digits,
-                maxLength: 3,
-                validator: _range(0, 120),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: AppTextField(
+                  label: 'Age',
+                  hint: '45',
+                  icon: Icons.cake_outlined,
+                  controller: c.age,
+                  readOnly: readOnly,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.next,
+                  inputFormatters: _digits,
+                  maxLength: 3,
+                  validator: _range(0, 120),
+                ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 28),
+            ],
+          ),
+          const SizedBox(height: 28),
+        ],
         _SectionHeader('VITAL SIGNS', muted),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,

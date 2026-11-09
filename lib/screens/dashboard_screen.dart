@@ -399,15 +399,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  /// Home visits marked done today that have no check-up linked to them. One with a check-up
-  /// linked is that person's check-up, which a ronda already counts when it was recorded on
-  /// one, so it is not counted a second time.
+  /// Home visits finished today. The check-up recorded at a visit is not in any ronda, so each
+  /// one counts here, once.
   int _homeVisitsDoneToday() {
     final now = DateTime.now();
     return GobikerAppointments.instance.mine.where((a) {
       final done = a.completedAt;
       return a.status == 'completed' &&
-          a.patientId == null &&
           done != null &&
           done.year == now.year &&
           done.month == now.month &&

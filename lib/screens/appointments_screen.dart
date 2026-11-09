@@ -3,12 +3,13 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/appointments.dart';
-import '../core/patient_service.dart';
 import '../core/theme.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/visit_note_dialog.dart';
+import 'visit_checkup_screen.dart';
 
 /// Home-visit requests for the GoBiker: the ones residents sent them (to
-/// accept or decline), and the visits they took (to call and mark done).
+/// accept or decline), and the visits they took, where the check-up is recorded.
 class AppointmentsScreen extends StatefulWidget {
   const AppointmentsScreen({super.key});
 
@@ -16,14 +17,22 @@ class AppointmentsScreen extends StatefulWidget {
   State<AppointmentsScreen> createState() => _AppointmentsScreenState();
 }
 
-class _AppointmentsScreenState extends State<AppointmentsScreen> {
+class _AppointmentsScreenState extends State<AppointmentsScreen>
+    with SingleTickerProviderStateMixin {
   final _store = GobikerAppointments.instance;
   final Set<int> _busy = {};
+  late final TabController _tabs = TabController(length: 2, vsync: this);
 
   @override
   void initState() {
     super.initState();
     _store.load();
+  }
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
   }
 
   Future<void> _accept(Appointment a) async {
@@ -37,12 +46,18 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
           'Visit accepted. ${a.residentName ?? 'The resident'} can see you are coming.',
       type: error == null ? ToastType.success : ToastType.error,
     );
+    // It is in My visits now, ready for the check-up: take them there.
+    if (error == null) _tabs.animateTo(1);
   }
 
   Future<void> _decline(Appointment a) async {
-    final note = await showDialog<String>(
-      context: context,
-      builder: (_) => _DeclineDialog(residentName: a.residentName),
+    final note = await showVisitNoteDialog(
+      context,
+      title: 'Decline this visit?',
+      message:
+          '${a.residentName ?? 'The resident'} will be told, and can ask '
+          'another GoBiker.',
+      confirmLabel: 'Decline',
     );
     if (note == null || !mounted) return;
 
@@ -58,24 +73,19 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     );
   }
 
-  Future<void> _complete(Appointment a) async {
-    final choice = await showModalBottomSheet<_DoneChoice>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (_) => _CompleteSheet(appointment: a),
+  /// The check-up at an accepted visit: their details are filled in, saving it finishes the visit.
+  Future<void> _openCheckup(Appointment a) async {
+    final outcome = await Navigator.push<VisitOutcome>(
+      context,
+      MaterialPageRoute(builder: (_) => VisitCheckupScreen(appointment: a)),
     );
-    if (choice == null || !mounted) return;
-
-    setState(() => _busy.add(a.id));
-    final error = await _store.complete(a.id, patientId: choice.patientId);
-    if (!mounted) return;
-    setState(() => _busy.remove(a.id));
+    if (outcome == null || !mounted) return;
     AppToast.show(
       context,
-      error ?? 'Visit marked as done.',
-      type: error == null ? ToastType.success : ToastType.error,
+      outcome == VisitOutcome.recorded
+          ? 'Check-up saved. Visit done.'
+          : '${a.residentName ?? 'The resident'} was told you cannot make it.',
+      type: ToastType.success,
     );
   }
 
@@ -95,44 +105,44 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     return ListenableBuilder(
       listenable: _store,
       builder: (context, _) {
-        final toVisit = _store.mine.where((a) => a.status == 'accepted').length;
+        // Visits that are done are in History; this list is what is still to do.
+        final toDo = _store.mine.where((a) => a.status == 'accepted').toList();
         final toAnswer = _store.requests.length + _store.available.length;
-        return DefaultTabController(
-          length: 2,
-          child: Scaffold(
-            appBar: AppBar(
-              scrolledUnderElevation: 0,
-              centerTitle: true,
-              title: const Text(
-                'Appointments',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              bottom: TabBar(
-                labelStyle: const TextStyle(fontWeight: FontWeight.w700),
-                tabs: [
-                  Tab(text: 'Requests ($toAnswer)'),
-                  Tab(text: 'My visits ($toVisit)'),
-                ],
-              ),
+        return Scaffold(
+          appBar: AppBar(
+            scrolledUnderElevation: 0,
+            centerTitle: true,
+            title: const Text(
+              'Appointments',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
-            body: SafeArea(
-              child: TabBarView(
-                children: [
-                  _list(
-                    _store.requests,
-                    // Older app versions send requests to the whole barangay.
-                    more: _store.available,
-                    moreTitle: 'Open requests in your barangay',
-                    empty: 'No requests for you.',
-                    emptyHint: 'When a resident chooses you for a home check-up, it shows up here.',
-                  ),
-                  _list(
-                    _store.mine,
-                    empty: 'No visits yet.',
-                    emptyHint: 'Requests you accept appear here.',
-                  ),
-                ],
-              ),
+            bottom: TabBar(
+              controller: _tabs,
+              labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+              tabs: [
+                Tab(text: 'Requests ($toAnswer)'),
+                Tab(text: 'My visits (${toDo.length})'),
+              ],
+            ),
+          ),
+          body: SafeArea(
+            child: TabBarView(
+              controller: _tabs,
+              children: [
+                _list(
+                  _store.requests,
+                  // Older app versions send requests to the whole barangay.
+                  more: _store.available,
+                  moreTitle: 'Open requests in your barangay',
+                  empty: 'No requests for you.',
+                  emptyHint: 'When a resident chooses you for a home check-up, it shows up here.',
+                ),
+                _list(
+                  toDo,
+                  empty: 'No visits to do.',
+                  emptyHint: 'Requests you accept appear here. Tap one to record the check-up.',
+                ),
+              ],
             ),
           ),
         );
@@ -150,7 +160,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       onDecline: a.status == 'pending' && a.gobikerId != null
           ? () => _decline(a)
           : null,
-      onComplete: a.status == 'accepted' ? () => _complete(a) : null,
+      onOpen: a.status == 'accepted' ? () => _openCheckup(a) : null,
       onCall: a.residentMobile == null ? null : () => _call(a.residentMobile!),
     ),
   );
@@ -232,7 +242,7 @@ class _AppointmentCard extends StatelessWidget {
     required this.busy,
     this.onAccept,
     this.onDecline,
-    this.onComplete,
+    this.onOpen,
     this.onCall,
   });
 
@@ -240,7 +250,9 @@ class _AppointmentCard extends StatelessWidget {
   final bool busy;
   final VoidCallback? onAccept;
   final VoidCallback? onDecline;
-  final VoidCallback? onComplete;
+
+  /// An accepted visit: opens the check-up (the whole card, and its button).
+  final VoidCallback? onOpen;
   final VoidCallback? onCall;
 
   @override
@@ -248,105 +260,108 @@ class _AppointmentCard extends StatelessWidget {
     final a = appointment;
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurface.withValues(alpha: 0.6);
-    final done = a.status == 'completed';
+    final radius = BorderRadius.circular(16);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Material(
+      color: theme.cardColor,
+      borderRadius: radius,
+      child: InkWell(
+        borderRadius: radius,
+        onTap: onOpen,
+        child: Ink(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(color: theme.dividerColor),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  a.residentName ?? 'Resident',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      a.residentName ?? 'Resident',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
-                ),
+                  if (onOpen != null)
+                    Icon(Icons.chevron_right_rounded, color: muted),
+                ],
               ),
-              if (done)
-                const _Chip(
-                  label: 'Done',
-                  icon: Icons.check_circle_rounded,
-                  color: AppTheme.successGreen,
+              const SizedBox(height: 8),
+              _line(
+                Icons.event_rounded,
+                '${DateFormat('EEE, MMM d').format(a.preferredDate)} · '
+                '${a.window == 'afternoon' ? 'Afternoon' : 'Morning'}',
+                muted,
+              ),
+              _line(Icons.home_outlined, '${a.address}, ${a.barangay}', muted),
+              _line(Icons.notes_rounded, a.reason, muted),
+              const SizedBox(height: 10),
+              if (onOpen != null)
+                // An accepted visit: the number to call, and the check-up to its right. Nothing
+                // here changes while the app works, so nothing moves.
+                Row(
+                  children: [
+                    if (onCall != null) ...[
+                      Flexible(child: _callButton()),
+                      const SizedBox(width: 8),
+                    ],
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: onOpen,
+                        icon: const Icon(
+                          Icons.monitor_heart_outlined,
+                          size: 18,
+                        ),
+                        label: const Text(
+                          'Record check-up',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                          backgroundColor: AppTheme.successGreen,
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (onCall != null) _callButton(),
+                    if (onAccept != null)
+                      FilledButton.icon(
+                        onPressed: busy ? null : onAccept,
+                        icon: _icon(Icons.check_rounded),
+                        label: const Text('Accept'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                          backgroundColor: AppTheme.blue,
+                        ),
+                      ),
+                    if (onDecline != null)
+                      OutlinedButton.icon(
+                        onPressed: busy ? null : onDecline,
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        label: const Text('Decline'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                          foregroundColor: AppTheme.errorRed,
+                        ),
+                      ),
+                  ],
                 ),
             ],
           ),
-          const SizedBox(height: 8),
-          _line(
-            Icons.event_rounded,
-            '${DateFormat('EEE, MMM d').format(a.preferredDate)} · '
-            '${a.window == 'afternoon' ? 'Afternoon' : 'Morning'}',
-            muted,
-          ),
-          _line(Icons.home_outlined, '${a.address}, ${a.barangay}', muted),
-          _line(Icons.notes_rounded, a.reason, muted),
-          if (!done) ...[
-            const SizedBox(height: 10),
-            if (onComplete != null)
-              // An accepted visit: the number to call, and "visit done" to its right.
-              // The label never changes while saving (a spinner shows instead), so nothing
-              // moves when it is tapped.
-              Row(
-                children: [
-                  if (onCall != null) ...[
-                    Flexible(child: _callButton()),
-                    const SizedBox(width: 8),
-                  ],
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: busy ? null : onComplete,
-                      icon: _icon(Icons.task_alt_rounded),
-                      label: const Text(
-                        'Visit Done',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(48, 48),
-                        backgroundColor: AppTheme.successGreen,
-                      ),
-                    ),
-                  ),
-                ],
-              )
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (onCall != null) _callButton(),
-                  if (onAccept != null)
-                    FilledButton.icon(
-                      onPressed: busy ? null : onAccept,
-                      icon: _icon(Icons.check_rounded),
-                      label: const Text('Accept'),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(48, 48),
-                        backgroundColor: AppTheme.blue,
-                      ),
-                    ),
-                  if (onDecline != null)
-                    OutlinedButton.icon(
-                      onPressed: busy ? null : onDecline,
-                      icon: const Icon(Icons.close_rounded, size: 18),
-                      label: const Text('Decline'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(48, 48),
-                        foregroundColor: AppTheme.errorRed,
-                      ),
-                    ),
-                ],
-              ),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -379,37 +394,6 @@ class _AppointmentCard extends StatelessWidget {
         Icon(icon, size: 16, color: muted),
         const SizedBox(width: 8),
         Expanded(child: Text(text, style: const TextStyle(fontSize: 13.5))),
-      ],
-    ),
-  );
-}
-
-class _Chip extends StatelessWidget {
-  const _Chip({required this.label, required this.icon, required this.color});
-  final String label;
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 15, color: color),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: color,
-          ),
-        ),
       ],
     ),
   );
@@ -448,178 +432,4 @@ class _ErrorBanner extends StatelessWidget {
       ),
     ),
   );
-}
-
-/// Asks for an optional reason before declining; returns it ('' for none),
-/// or null when the GoBiker changes their mind.
-class _DeclineDialog extends StatefulWidget {
-  const _DeclineDialog({this.residentName});
-  final String? residentName;
-
-  @override
-  State<_DeclineDialog> createState() => _DeclineDialogState();
-}
-
-class _DeclineDialogState extends State<_DeclineDialog> {
-  final _note = TextEditingController();
-
-  @override
-  void dispose() {
-    _note.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Decline this visit?'),
-    content: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '${widget.residentName ?? 'The resident'} will be told, and can ask '
-          'another GoBiker.',
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _note,
-          maxLength: 300,
-          maxLines: 3,
-          minLines: 2,
-          textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(
-            labelText: 'Reason (optional)',
-            hintText: 'e.g. I am out of town that day',
-            border: OutlineInputBorder(),
-          ),
-        ),
-      ],
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
-        child: const Text('Keep it'),
-      ),
-      FilledButton(
-        onPressed: () => Navigator.pop(context, _note.text.trim()),
-        style: FilledButton.styleFrom(
-          minimumSize: const Size(48, 48),
-          backgroundColor: AppTheme.errorRed,
-        ),
-        child: const Text('Decline'),
-      ),
-    ],
-  );
-}
-
-/// What "Mark visit done" saves: optionally the check-up recorded there.
-class _DoneChoice {
-  const _DoneChoice(this.patientId);
-  final int? patientId;
-}
-
-/// Lets the GoBiker link the check-up they just recorded at this visit.
-class _CompleteSheet extends StatefulWidget {
-  const _CompleteSheet({required this.appointment});
-  final Appointment appointment;
-
-  @override
-  State<_CompleteSheet> createState() => _CompleteSheetState();
-}
-
-class _CompleteSheetState extends State<_CompleteSheet> {
-  List<Map<String, dynamic>>? _recent;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final res = await PatientService.instance.list();
-    if (!mounted) return;
-    final since = DateTime.now().subtract(const Duration(days: 2));
-    setState(() {
-      _error = res.error;
-      // Check-ups from the last two days, newest first (the list is sorted).
-      _recent = (res.data ?? const [])
-          .where((p) {
-            final at = DateTime.tryParse('${p['recorded_at'] ?? ''}');
-            return at != null && at.isAfter(since);
-          })
-          .take(10)
-          .toList();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final muted = Theme.of(context).colorScheme.onSurface
-        .withValues(alpha: 0.6);
-    final recent = _recent;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Mark visit done',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Which check-up did you record for '
-            '${widget.appointment.residentName ?? 'this resident'}?',
-            style: TextStyle(fontSize: 13, color: muted),
-          ),
-          const SizedBox(height: 12),
-          if (recent == null)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else ...[
-            if (_error != null)
-              Text(_error!, style: const TextStyle(color: AppTheme.errorRed)),
-            if (recent.isEmpty && _error == null)
-              Text(
-                'No check-ups recorded in the last 2 days.',
-                style: TextStyle(fontSize: 13, color: muted),
-              ),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  for (final p in recent)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.monitor_heart_outlined),
-                      title: Text('${p['name']}'),
-                      subtitle: Text(
-                        '${p['date']} · ${p['time']} · BP ${p['sys']}/${p['dia']}',
-                      ),
-                      onTap: () => Navigator.pop(
-                        context,
-                        _DoneChoice(int.tryParse('${p['id']}')),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 8),
-          OutlinedButton(
-            onPressed: () => Navigator.pop(context, const _DoneChoice(null)),
-            style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
-            child: const Text('Done without a check-up'),
-          ),
-        ],
-      ),
-    );
-  }
 }

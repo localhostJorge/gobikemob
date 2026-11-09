@@ -23,6 +23,7 @@ class Appointment {
     this.declineNote,
     this.residentName,
     this.residentMobile,
+    this.residentAge,
     this.patientId,
   });
 
@@ -57,6 +58,9 @@ class Appointment {
   // Only sent to GoBikers.
   final String? residentName;
   final String? residentMobile;
+
+  /// From the resident's birthdate; null when they never gave one.
+  final int? residentAge;
   final int? patientId;
 
   bool get isOpen => status == 'pending' || status == 'accepted';
@@ -92,6 +96,7 @@ class Appointment {
       declineNote: text(j['decline_note']),
       residentName: text(j['resident_name']),
       residentMobile: text(j['resident_mobile']),
+      residentAge: (j['resident_age'] as num?)?.toInt(),
       patientId: (j['patient_id'] as num?)?.toInt(),
     );
   }

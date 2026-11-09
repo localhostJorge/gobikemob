@@ -57,6 +57,36 @@ class PatientService {
     return _single(res);
   }
 
+  /// Records the check-up at an accepted home visit and finishes the visit. The person's
+  /// details are the resident's own, filled in by the server, so only what was measured is
+  /// sent (and [age] when the resident has no birthdate).
+  Future<PatientResult<Map<String, dynamic>>> recordVisitCheckup(
+    int appointmentId,
+    Map<String, dynamic> form, {
+    int? age,
+  }) async {
+    String? optional(String key) {
+      final v = '${form[key] ?? ''}'.trim();
+      return v.isEmpty ? null : v;
+    }
+
+    final res = await AuthService.instance.callAuthed(
+      'POST',
+      '/gobiker/appointments/$appointmentId/checkup',
+      body: {
+        'sys': form['sys'],
+        'dia': form['dia'],
+        'pulse': form['pulse'],
+        'resp': form['resp'],
+        'temp': form['temp'],
+        'blood_sugar': optional('blood_sugar'),
+        'remarks': optional('remarks'),
+        'age': ?age,
+      },
+    );
+    return _single(res);
+  }
+
   Future<PatientResult<Map<String, dynamic>>> update(
     String id,
     Map<String, dynamic> form,

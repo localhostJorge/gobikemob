@@ -668,19 +668,14 @@ void main() {
       expect(visited(tester), '0');
     });
 
-    testWidgets(
-      'does not count a visit twice when a check-up is linked to it',
-      (tester) async {
-        GobikerAppointments.instance.mine = [done(1, patientId: 55), done(2)];
-        await openHome(tester);
+    testWidgets('counts a visit finished with a check-up as well, once each', (
+      tester,
+    ) async {
+      // A check-up recorded at a visit is in no ronda, so the visit is the only place it counts.
+      GobikerAppointments.instance.mine = [done(1, patientId: 55), done(2)];
+      await openHome(tester);
 
-        expect(
-          visited(tester),
-          '1',
-          reason:
-              'the linked one is that check-up, counted where it was recorded',
-        );
-      },
-    );
+      expect(visited(tester), '2');
+    });
   });
 }
