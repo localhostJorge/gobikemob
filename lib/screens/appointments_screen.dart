@@ -319,7 +319,7 @@ class _AppointmentCard extends StatelessWidget {
                           size: 18,
                         ),
                         label: const Text(
-                          'Record check-up',
+                          'Record it',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),

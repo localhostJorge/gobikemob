@@ -214,6 +214,9 @@ class ResidentSos extends ChangeNotifier {
     return null;
   }
 
+  /// Where the SOS screen gets the phone's position. A test replaces it, so no real GPS is used.
+  static Future<Position?> Function() positionSource = quickPosition;
+
   /// A position for the request, fast: an SOS must never wait long for GPS.
   /// Returns null when location is off or not allowed.
   static Future<Position?> quickPosition() async {

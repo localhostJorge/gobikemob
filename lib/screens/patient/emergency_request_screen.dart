@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/auth_service.dart';
+import '../../core/location_gate.dart';
 import '../../core/resident_sos.dart';
 
 import 'app_colors.dart';
@@ -63,8 +64,16 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   VideoPlayerController? _videoCtrl;
   bool _sending = false;
 
-  /// Started when the screen opens, so the position is usually ready on Send.
-  late final Future<Position?> _position = ResidentSos.quickPosition();
+  /// Whether the resident lets the admin and the GoBiker see where they are. On unless they
+  /// turn it off: in an emergency a pin is the quickest way to be found.
+  bool _shareLocation = true;
+
+  /// The phone's position, looked up only while sharing (null otherwise). Started when the
+  /// screen opens, so it is usually ready on Send.
+  Future<Position?>? _position;
+
+  /// Why no position can be had on this phone, once the lookup found nothing (else null).
+  LocationState? _locationProblem;
 
   // The server accepts videos up to 50 MB.
   static const int _maxVideoBytes = 50 * 1024 * 1024;
@@ -72,7 +81,30 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   @override
   void initState() {
     super.initState();
-    _position; // start looking for the phone's position now
+    _startLookup(); // start looking for the phone's position now
+  }
+
+  void _startLookup() {
+    final lookup = ResidentSos.positionSource();
+    _position = lookup;
+    lookup.then((position) async {
+      if (position != null || !mounted || !identical(_position, lookup)) return;
+      // Nothing came back: say why, so they can fix it, without asking the phone anything.
+      final state = await LocationGate.instance.check();
+      if (!mounted || !identical(_position, lookup)) return;
+      setState(
+        () => _locationProblem = state == LocationState.ready ? null : state,
+      );
+    });
+  }
+
+  void _setShareLocation(bool share) {
+    setState(() {
+      _shareLocation = share;
+      _locationProblem = null;
+      _position = null; // forget any lookup: a late answer is not used
+    });
+    if (share) _startLookup();
   }
 
   @override
@@ -167,11 +199,14 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
     setState(() => _sending = true);
     final messenger = ScaffoldMessenger.of(context);
 
-    // 1) The request itself: this is what alerts the admin.
-    final position = await _position.timeout(
-      const Duration(seconds: 3),
-      onTimeout: () => null,
-    );
+    // 1) The request itself: this is what alerts the admin. With sharing off there is no
+    // position to wait for or to send.
+    final position = !_shareLocation
+        ? null
+        : await (_position ?? Future<Position?>.value(null)).timeout(
+            const Duration(seconds: 3),
+            onTimeout: () => null,
+          );
     final result = await ResidentSos.instance.send(
       address: _address.text,
       landmark: _landmark.text,
@@ -255,6 +290,8 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                     const SizedBox(height: Sp.xs),
                     Text(_barangayNote(), style: T.meta.muted(context)),
                     const SizedBox(height: Sp.md),
+                    _shareLocationRow(),
+                    const SizedBox(height: Sp.lg),
                     _fieldLabel('Address'),
                     TextField(
                       style: T.body.copyWith(color: context.pal.ink),
@@ -418,6 +455,88 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  /// The choice to share the phone's position with the admin and the GoBiker sent to help.
+  Widget _shareLocationRow() {
+    final problem = _shareLocation ? _locationProblem : null;
+    // A Material, not a decorated box: the row's ripple paints on the nearest Material.
+    return Material(
+      color: context.pal.card,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Rd.control),
+        side: BorderSide(color: context.pal.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SwitchListTile(
+            value: _shareLocation,
+            onChanged: _sending ? null : _setShareLocation,
+            contentPadding: const EdgeInsets.fromLTRB(Sp.lg, 4, Sp.md, 4),
+            activeTrackColor: context.pal.ink,
+            activeThumbColor: context.pal.card,
+            secondary: Icon(
+              _shareLocation
+                  ? Icons.my_location_rounded
+                  : Icons.location_off_outlined,
+              color: context.pal.muted,
+            ),
+            title: const Text('Share my location', style: T.rowTitle),
+            subtitle: Text(
+              _shareLocation
+                  ? 'Responders see a pin where you are. Turn this off if you '
+                        'do not want to share it.'
+                  : 'The admin will see that you did not share your location, '
+                        'so write your address and landmark clearly.',
+              style: T.secondary.muted(context),
+            ),
+          ),
+          if (problem != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(Sp.lg, 0, Sp.lg, Sp.xs),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Icon(
+                          Icons.info_outline_rounded,
+                          size: 18,
+                          color: context.pal.orangeText,
+                        ),
+                      ),
+                      const SizedBox(width: Sp.sm),
+                      Expanded(
+                        child: Text(
+                          problem == LocationState.serviceOff
+                              ? 'Location is off on this phone, so no pin will be sent.'
+                              : 'RondaGo is not allowed to use your location, so no pin will be sent.',
+                          style: T.secondary.muted(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Below the text, so a narrow phone or large text never squeezes it.
+                  TextButton(
+                    onPressed: () =>
+                        LocationGate.instance.openSettingsFor(problem),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                      foregroundColor: context.pal.ink,
+                    ),
+                    child: const Text('Open settings'),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

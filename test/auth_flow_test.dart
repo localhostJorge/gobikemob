@@ -33,7 +33,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: SplashScreen()));
     await tester.pump(const Duration(seconds: 2));
     await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+      () => Future<void>.delayed(const Duration(milliseconds: 1000)),
     );
     await tester.pump();
     await tester.pump(const Duration(seconds: 1)); // the transition

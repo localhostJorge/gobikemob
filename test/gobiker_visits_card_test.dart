@@ -79,7 +79,7 @@ void main() {
   }
 
   group('an accepted visit in My visits', () {
-    testWidgets('has Record check-up to the right of the number, on one row', (
+    testWidgets('has Record it to the right of the number, on one row', (
       tester,
     ) async {
       mine = [visit(1, 'accepted')];
@@ -87,7 +87,7 @@ void main() {
         await openMyVisits(tester);
 
         final call = find.widgetWithText(OutlinedButton, '09170001111');
-        final record = find.widgetWithText(FilledButton, 'Record check-up');
+        final record = find.widgetWithText(FilledButton, 'Record it');
         expect(call, findsOneWidget);
         expect(record, findsOneWidget);
         expect(
@@ -116,7 +116,7 @@ void main() {
           OutlinedButton,
           '+63 917 000 1111 ext. 2345678',
         );
-        final record = find.widgetWithText(FilledButton, 'Record check-up');
+        final record = find.widgetWithText(FilledButton, 'Record it');
         expect(tester.getTopLeft(record).dy, tester.getTopLeft(call).dy);
         expect(tester.getTopRight(record).dx, lessThanOrEqualTo(360));
       }, () => MockClient(handle));
@@ -129,7 +129,7 @@ void main() {
       await http.runWithClient(() async {
         await openMyVisits(tester);
 
-        await tester.tap(find.widgetWithText(FilledButton, 'Record check-up'));
+        await tester.tap(find.widgetWithText(FilledButton, 'Record it'));
         await tester.pumpAndSettle();
         expect(find.text('Home check-up'), findsOneWidget);
         expect(find.text('Ana Reyes'), findsOneWidget);
@@ -163,7 +163,7 @@ void main() {
 
       expect(find.textContaining('My visits (1)'), findsOneWidget);
       expect(
-        find.widgetWithText(FilledButton, 'Record check-up'),
+        find.widgetWithText(FilledButton, 'Record it'),
         findsOneWidget,
       );
       expect(find.text('Done'), findsNothing);
@@ -184,7 +184,7 @@ void main() {
       await openScreen(tester);
       expect(find.text('Accept'), findsOneWidget);
       expect(find.text('Decline'), findsOneWidget);
-      expect(find.text('Record check-up'), findsNothing);
+      expect(find.text('Record it'), findsNothing);
 
       await tester.tap(find.text('Accept'));
       await tester.pump();
@@ -193,7 +193,7 @@ void main() {
 
       // The visit is there, ready for its check-up, without going to look for it.
       expect(
-        find.widgetWithText(FilledButton, 'Record check-up'),
+        find.widgetWithText(FilledButton, 'Record it'),
         findsOneWidget,
       );
       expect(find.text('Accept'), findsNothing);
