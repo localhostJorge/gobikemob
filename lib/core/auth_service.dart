@@ -227,7 +227,13 @@ class AuthService {
               .put(uri, headers: headers, body: jsonEncode(body ?? {}))
               .timeout(_timeout);
         case 'DELETE':
-          res = await http.delete(uri, headers: headers).timeout(_timeout);
+          res = await http
+              .delete(
+                uri,
+                headers: headers,
+                body: body == null ? null : jsonEncode(body),
+              )
+              .timeout(_timeout);
         default:
           res = await http
               .post(uri, headers: headers, body: jsonEncode(body ?? {}))
@@ -673,6 +679,40 @@ class AuthService {
     if (_token != null) {
       await _request('POST', '/mobile/logout', auth: true); // result ignored
     }
+    await _forgetSession();
+  }
+
+  /// "Delete account": deletes the signed-in account on the server, then clears the phone like
+  /// a logout. Accounts with a password send [password]; Google accounts without one send the
+  /// word DELETE as [confirm]. Status 409 means the account recorded check-ups and is closed by
+  /// the admin instead; the message says how.
+  Future<({bool ok, int status, String message})> deleteAccount({
+    String? password,
+    String? confirm,
+  }) async {
+    final res = await _request(
+      'DELETE',
+      '/mobile/account',
+      body: {'password': ?password, 'confirm': ?confirm},
+      auth: true,
+    );
+    if (!res.ok) {
+      return (ok: false, status: res.status, message: res.errorMessage);
+    }
+
+    // The server already removed the account with its device tokens and login.
+    PresenceService.instance.stop();
+    await _forgetSession();
+    return (
+      ok: true,
+      status: res.status,
+      message:
+          res.body['message']?.toString() ?? 'Your account has been deleted.',
+    );
+  }
+
+  /// Forgets the session and everything the signed-in account loaded on this phone.
+  Future<void> _forgetSession() async {
     await _clearLocalSession();
     await EmergencyWatcher.instance
         .reset(); // another account must not inherit it

@@ -180,7 +180,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     if (!_acceptedTerms) {
       AppToast.show(
         context,
-        'You must accept the Terms of Service',
+        'You must accept the Terms & Conditions',
         type: ToastType.error,
       );
       return;
@@ -496,7 +496,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                                   ),
                                   children: [
                                     TextSpan(
-                                      text: 'Terms of Service',
+                                      text: 'Terms & Conditions',
                                       recognizer: _termsTap,
                                       style: const TextStyle(
                                         color: kAuthBlue,

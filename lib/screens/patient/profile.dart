@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth_service.dart';
 import '../../widgets/app_toast.dart';
+import '../../widgets/delete_account_sheet.dart';
 import '../../widgets/loading_card.dart';
+import '../legal_screen.dart';
 import '../login_screen.dart';
+import 'app_colors.dart';
 import 'change_password_screen.dart';
 import 'edit_profile_screen.dart';
 import 'notification_settings_screen.dart';
@@ -38,6 +41,24 @@ class ProfileTab extends StatelessWidget {
     if (!context.mounted) return;
 
     AppToast.show(context, 'You have been logged out', type: ToastType.success);
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  Future<void> _deleteAccount(BuildContext context) async {
+    // The root navigator outlives this tab, which goes away with the stack below.
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final deleted = await showDeleteAccountSheet(context);
+    if (!deleted || !context.mounted) return;
+
+    PatientStore.instance.clearSession();
+    AppToast.show(
+      context,
+      'Your account has been deleted',
+      type: ToastType.success,
+    );
     navigator.pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
@@ -118,6 +139,13 @@ class ProfileTab extends StatelessWidget {
                         onTap: () =>
                             _open(context, const ChangePasswordScreen()),
                       ),
+                      NavRow(
+                        icon: Icons.delete_outline_rounded,
+                        color: context.pal.redText,
+                        title: 'Delete account',
+                        subtitle: 'Permanently remove your account',
+                        onTap: () => _deleteAccount(context),
+                      ),
                     ],
                   ),
                   const SizedBox(height: Sp.xl),
@@ -138,6 +166,30 @@ class ProfileTab extends StatelessWidget {
                   const SizedBox(height: Sp.xl),
                   const SectionHeader('Emergency SOS'),
                   const SosHoldTimeCard(),
+                  const SizedBox(height: Sp.xl),
+                  const SectionHeader('Legal'),
+                  CardGroup(
+                    dividerIndent: 52,
+                    children: [
+                      NavRow(
+                        icon: Icons.description_outlined,
+                        title: 'Terms & Conditions',
+                        onTap: () => _open(
+                          context,
+                          const LegalScreen(type: LegalType.terms),
+                        ),
+                      ),
+                      NavRow(
+                        icon: Icons.privacy_tip_outlined,
+                        title: 'Privacy Policy',
+                        subtitle: 'How we handle your information',
+                        onTap: () => _open(
+                          context,
+                          const LegalScreen(type: LegalType.privacy),
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: Sp.xl),
                   const SectionHeader('About'),
                   const CardGroup(children: [AboutRow()]),

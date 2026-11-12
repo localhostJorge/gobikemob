@@ -45,14 +45,17 @@ class PatientService {
     return PatientResult.success(patients);
   }
 
+  /// [consent]: the GoBiker ticked that the person (or their parent or guardian) agreed to the
+  /// check-up. The forms only save once it is ticked.
   Future<PatientResult<Map<String, dynamic>>> create(
     Map<String, dynamic> form, {
     String? barangay,
+    required bool consent,
   }) async {
     final res = await AuthService.instance.callAuthed(
       'POST',
       '/gobiker/patients',
-      body: _toApi(form, barangay),
+      body: {..._toApi(form, barangay), 'consent': consent},
     );
     return _single(res);
   }
@@ -64,6 +67,7 @@ class PatientService {
     int appointmentId,
     Map<String, dynamic> form, {
     int? age,
+    required bool consent,
   }) async {
     String? optional(String key) {
       final v = '${form[key] ?? ''}'.trim();
@@ -82,6 +86,7 @@ class PatientService {
         'blood_sugar': optional('blood_sugar'),
         'remarks': optional('remarks'),
         'age': ?age,
+        'consent': consent,
       },
     );
     return _single(res);

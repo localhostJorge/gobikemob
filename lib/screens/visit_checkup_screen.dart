@@ -8,6 +8,7 @@ import '../core/theme.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/confirm_modal.dart';
+import '../widgets/consent_field.dart';
 import '../widgets/initials_avatar.dart';
 import '../widgets/loading_overlay.dart';
 import '../widgets/patient_form.dart';
@@ -33,6 +34,7 @@ class _VisitCheckupScreenState extends State<VisitCheckupScreen> {
   final _formKey = GlobalKey<FormState>();
   final PatientFormControllers _c = PatientFormControllers();
   String? _busy; // what is being saved, while something is
+  bool _consent = false;
 
   Appointment get _visit => widget.appointment;
 
@@ -89,6 +91,7 @@ class _VisitCheckupScreenState extends State<VisitCheckupScreen> {
       _visit.id,
       _c.toMap(),
       age: _asksAge ? int.tryParse(_c.age.text.trim()) : null,
+      consent: _consent,
     );
     if (!mounted) return;
 
@@ -172,6 +175,8 @@ class _VisitCheckupScreenState extends State<VisitCheckupScreen> {
                       personalDetails: false,
                       askAge: _asksAge,
                     ),
+                    const SizedBox(height: 24),
+                    ConsentField(onChanged: (v) => _consent = v),
                     const SizedBox(height: 32),
                     ElevatedButton(
                       onPressed: _busy != null ? null : _save,

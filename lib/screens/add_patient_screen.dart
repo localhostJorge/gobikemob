@@ -6,6 +6,7 @@ import '../core/theme.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/confirm_modal.dart';
+import '../widgets/consent_field.dart';
 import '../widgets/loading_overlay.dart';
 import '../widgets/patient_form.dart';
 import 'global_state.dart';
@@ -24,6 +25,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
   final _formKey = GlobalKey<FormState>();
   final PatientFormControllers _c = PatientFormControllers();
   bool _saving = false;
+  bool _consent = false;
 
   @override
   void dispose() {
@@ -73,6 +75,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     final result = await PatientService.instance.create(
       form,
       barangay: widget.barangay,
+      consent: _consent,
     );
     if (!mounted) return;
     setState(() => _saving = false);
@@ -112,6 +115,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     PatientForm(controllers: _c),
+                    const SizedBox(height: 24),
+                    ConsentField(onChanged: (v) => _consent = v),
                     const SizedBox(height: 32),
                     ElevatedButton(
                       onPressed: _saving ? null : _submit,

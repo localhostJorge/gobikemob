@@ -15,6 +15,7 @@ import 'app_toast.dart';
 import 'app_text_field.dart';
 import 'birthday_field.dart';
 import 'confirm_modal.dart';
+import 'delete_account_sheet.dart';
 import 'loading_card.dart';
 import 'initials_avatar.dart';
 import 'photo_flow.dart';
@@ -60,11 +61,7 @@ class ProfilePanel {
     await TrackingService.instance.stopRonda();
     await RondaStore.clear(); // a killed ronda must not leak to the next login
     await AuthService.instance.logout();
-
-    globalPatients
-        .clear(); // private health data: never keep it for the next person
-    globalRondas.clear();
-    GobikerHistory.instance.reset();
+    _clearGobikerData();
 
     if (!context.mounted) return;
     AppToast.show(context, 'You have been logged out', type: ToastType.success);
@@ -72,6 +69,38 @@ class ProfilePanel {
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
     );
+  }
+
+  /// After "Delete account" succeeded (the session is already gone): clears what the GoBiker
+  /// had on this phone and returns to the Login screen. No ronda is running: the sheet asks to
+  /// end it first.
+  static Future<void> leaveAfterAccountDeleted(BuildContext context) async {
+    if (!context.mounted) return;
+    final navigator = Navigator.of(context);
+
+    await RondaStore.clear();
+    await RondaStore.setPendingStop(
+      false,
+    ); // nothing left on the server to stop
+    _clearGobikerData();
+
+    if (!context.mounted) return;
+    AppToast.show(
+      context,
+      'Your account has been deleted',
+      type: ToastType.success,
+    );
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  static void _clearGobikerData() {
+    globalPatients
+        .clear(); // private health data: never keep it for the next person
+    globalRondas.clear();
+    GobikerHistory.instance.reset();
   }
 }
 
@@ -110,6 +139,14 @@ class _ProfilePanelBodyState extends State<_ProfilePanelBody> {
 
     Navigator.of(context).pop(); // close the panel
     await ProfilePanel.logout(widget.rootContext);
+  }
+
+  Future<void> _deleteAccount(BuildContext context) async {
+    final deleted = await showDeleteAccountSheet(context);
+    if (!deleted || !context.mounted) return;
+
+    Navigator.of(context).pop(); // close the panel
+    await ProfilePanel.leaveAfterAccountDeleted(widget.rootContext);
   }
 
   /// Takes or picks a photo and sends it to the server.
@@ -392,7 +429,7 @@ class _ProfilePanelBodyState extends State<_ProfilePanelBody> {
                           _SectionLabel('LEGAL', muted),
                           _LinkRow(
                             icon: Icons.description_outlined,
-                            label: 'Terms of Service',
+                            label: 'Terms & Conditions',
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) =>
@@ -409,6 +446,15 @@ class _ProfilePanelBodyState extends State<_ProfilePanelBody> {
                                     const LegalScreen(type: LegalType.privacy),
                               ),
                             ),
+                          ),
+                          const SizedBox(height: 24),
+
+                          _SectionLabel('ACCOUNT', muted),
+                          _LinkRow(
+                            icon: Icons.delete_outline_rounded,
+                            label: 'Delete account',
+                            color: AppTheme.errorRed,
+                            onTap: () => _deleteAccount(context),
                           ),
                           const SizedBox(height: 24),
 
@@ -522,10 +568,14 @@ class _LinkRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.color,
   });
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+
+  /// The icon and label color, e.g. red for Delete account; muted icon when null.
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -538,14 +588,15 @@ class _LinkRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
-            Icon(icon, size: 22, color: muted),
+            Icon(icon, size: 22, color: color ?? muted),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
+                  color: color,
                 ),
               ),
             ),

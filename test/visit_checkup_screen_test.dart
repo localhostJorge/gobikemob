@@ -143,6 +143,13 @@ void main() {
     await type('36.5', '36.7');
   }
 
+  /// The person agreed to the check-up.
+  Future<void> tickConsent(WidgetTester tester) async {
+    await tester.ensureVisible(find.byType(Checkbox));
+    await tester.tap(find.byType(Checkbox));
+    await tester.pump();
+  }
+
   Future<void> tapSave(WidgetTester tester) async {
     await tester.ensureVisible(find.text('Save check-up'));
     await tester.tap(find.text('Save check-up'));
@@ -201,6 +208,7 @@ void main() {
 
       // Not saved without it.
       await fillVitals(tester);
+      await tickConsent(tester);
       await tapSave(tester);
       expect(find.text('Required'), findsOneWidget);
       expect(server.posts, isEmpty);
@@ -236,6 +244,7 @@ void main() {
         find.widgetWithText(TextField, '95'),
         '105',
       ); // blood sugar
+      await tickConsent(tester);
       await tapSave(tester);
 
       // Asked first: nothing is sent yet.
@@ -255,6 +264,7 @@ void main() {
         'temp': '36.7',
         'blood_sugar': '105',
         'remarks': null,
+        'consent': true,
       });
 
       // Back on the page it was opened from, which is told what happened; the record is kept.
@@ -265,11 +275,34 @@ void main() {
     });
   });
 
+  testWidgets('does not save until the person agreed to the check-up', (
+    tester,
+  ) async {
+    await run(tester, () async {
+      await open(tester);
+      await fillVitals(tester);
+      await tapSave(tester);
+
+      expect(
+        find.text('Ask for their consent before saving the check-up.'),
+        findsOneWidget,
+      );
+      expect(find.text('Save this check-up?'), findsNothing);
+      expect(server.posts, isEmpty);
+
+      await tickConsent(tester);
+      await tapSave(tester);
+      expect(find.text('Save this check-up?'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4)); // the toast
+    });
+  });
+
   testWidgets('keeps everything typed when the server says no', (tester) async {
     server.checkupStatus = 422;
     await run(tester, () async {
       await open(tester);
       await fillVitals(tester);
+      await tickConsent(tester);
       await tapSave(tester);
       await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
