@@ -6,16 +6,18 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'auth_service.dart';
 import 'distance_tracker.dart';
+import 'fix.dart';
 import 'ronda_store.dart';
 
-/// Starts/stops a ronda on the server and sends the GoBiker's position
-/// every 10 seconds while the ronda is active. A foreground service keeps
-/// this running when the screen is locked or the app is in the background.
+/// Starts/stops a ronda on the server and sends the GoBiker's position while
+/// the ronda is active: within 5 seconds of a real move, and every 15 seconds
+/// while standing still. A foreground service keeps this running when the
+/// screen is locked or the app is in the background.
 class TrackingService {
   TrackingService._();
   static final TrackingService instance = TrackingService._();
 
-  static const Duration _interval = Duration(seconds: 10);
+  static const Duration _interval = Duration(seconds: 5);
   static const Duration _freshFor = Duration(seconds: 20);
 
   Timer? _timer;
@@ -23,8 +25,9 @@ class TrackingService {
   bool _active = false;
   bool _sending = false;
   final DistanceTracker _distance = DistanceTracker(); // ignores GPS drift
-  Position? _latest; // newest position from the location stream
-  DateTime? _latestAt;
+  Fix? _latest; // newest reading from the location stream
+  Fix? _sent; // the last reading the server took
+  DateTime? _sentAt;
   DateTime? _startedAt;
   String? rondaBarangay; // set by the Active Ronda screen
   int rondaPatients = 0; // set by the Active Ronda screen
@@ -48,8 +51,8 @@ class TrackingService {
     _sendingEmergency = true;
     try {
       final locError = await prepareEmergencyLocation();
-      final p = _latest;
-      if (locError != null || p == null) {
+      final fix = _latest;
+      if (locError != null || fix == null) {
         return (
           ok: false,
           status: 0,
@@ -59,7 +62,7 @@ class TrackingService {
 
       final res = await AuthService.instance.postAuthed(
         '/gobiker/emergency',
-        body: {'latitude': p.latitude, 'longitude': p.longitude},
+        body: fix.toJson(),
       );
       if (res.ok) {
         return (ok: true, status: res.status, message: '');
@@ -87,9 +90,9 @@ class TrackingService {
     final accessError = await _ensureLocationAccess();
     if (accessError != null) return accessError;
 
-    Position first;
+    Fix first;
     try {
-      first = await _currentPosition();
+      first = await _currentFix();
     } catch (e) {
       debugPrint('startRonda location error: $e');
       return "Couldn't get your location. Move to an open area and try again.";
@@ -102,7 +105,7 @@ class TrackingService {
 
     _distance.reset();
     _latest = first;
-    _latestAt = DateTime.now();
+    _sent = null;
     _active = true;
     _startedAt = DateTime.now();
     await _persist();
@@ -112,7 +115,7 @@ class TrackingService {
     } catch (_) {}
 
     _startStream();
-    _track(first);
+    _track(first.position);
     await _send(first);
     if (!_active) return null; // the server rejected the first location
     _timer = Timer.periodic(_interval, (_) => _tick());
@@ -129,9 +132,9 @@ class TrackingService {
     final accessError = await _ensureLocationAccess();
     if (accessError != null) return accessError;
 
-    Position first;
+    Fix first;
     try {
-      first = await _currentPosition();
+      first = await _currentFix();
     } catch (e) {
       debugPrint('resumeRonda location error: $e');
       return "Couldn't get your location. Move to an open area and try again.";
@@ -142,9 +145,9 @@ class TrackingService {
     _distance.reset(meters: saved.distanceMeters);
     rondaBarangay = saved.barangay;
     rondaPatients = saved.patientsCount;
-    _track(first);
+    _track(first.position);
     _latest = first;
-    _latestAt = DateTime.now();
+    _sent = null;
     _active = true;
 
     try {
@@ -180,24 +183,17 @@ class TrackingService {
   /// Gets a location locally for the emergency flow.
   /// Returns null when a location is available, otherwise an error message.
   Future<String?> prepareEmergencyLocation() async {
-    Position? p;
+    // During a ronda, reuse the position already available to tracking.
+    if (_active && _latest != null) return null;
 
-    if (_active && _latest != null) {
-      // During a ronda, reuse the position already available to tracking.
-      p = _latest;
-    } else {
-      final accessError = await _ensureLocationAccess(forEmergency: true);
-      if (accessError != null) return accessError;
-      try {
-        p = await _currentPosition();
-      } catch (e) {
-        debugPrint('prepareEmergencyLocation error: $e');
-        return "Couldn't get your location. If this is urgent, call 911 directly.";
-      }
+    final accessError = await _ensureLocationAccess(forEmergency: true);
+    if (accessError != null) return accessError;
+    try {
+      _latest = await _currentFix();
+    } catch (e) {
+      debugPrint('prepareEmergencyLocation error: $e');
+      return "Couldn't get your location. If this is urgent, call 911 directly.";
     }
-
-    _latest = p;
-    _latestAt = DateTime.now();
     return null;
   }
 
@@ -242,17 +238,19 @@ class TrackingService {
     return null;
   }
 
-  /// The best position the phone can give right now (also used by the live
+  /// The best reading the phone can give right now (also used by the live
   /// map). Throws when there is none.
-  Future<Position> bestPosition() => _currentPosition();
+  Future<Fix> bestFix() => _currentFix();
 
-  Future<Position> _currentPosition() async {
+  Future<Fix> _currentFix() async {
     // 1) Best accuracy first (works outdoors)
     try {
-      return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 8),
+      return Fix(
+        await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 8),
+          ),
         ),
       );
     } catch (e) {
@@ -261,19 +259,22 @@ class TrackingService {
 
     // 2) Wi-Fi / cell tower location (works indoors)
     try {
-      return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 10),
+      return Fix(
+        await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 10),
+          ),
         ),
       );
     } catch (e) {
       debugPrint('Medium accuracy failed: $e');
     }
 
-    // 3) Last known position, if the phone has one
+    // 3) Last known position, if the phone has one. It can be hours old: it
+    // is sent with its real age, and the server keeps it off the map if so.
     final last = await Geolocator.getLastKnownPosition();
-    if (last != null) return last;
+    if (last != null) return Fix.lastKnown(last);
 
     throw Exception('No location available');
   }
@@ -285,7 +286,7 @@ class TrackingService {
     final settings = AndroidSettings(
       accuracy: LocationAccuracy.high,
       distanceFilter: 0,
-      intervalDuration: const Duration(seconds: 5),
+      intervalDuration: const Duration(seconds: 3),
       foregroundNotificationConfig: const ForegroundNotificationConfig(
         notificationTitle: 'RondaGo: ronda in progress',
         notificationText: 'Sharing your live location with the Go Bike admin.',
@@ -295,9 +296,8 @@ class TrackingService {
     );
     _stream = Geolocator.getPositionStream(locationSettings: settings)
         .listen((p) {
-          _latest = p;
-          _latestAt = DateTime.now();
-          _track(p); // accumulate distance on every stream update (~5s)
+          _latest = Fix(p);
+          _track(p); // accumulate distance on every stream update (~3s)
         }, onError: (Object e) => debugPrint('Location stream error: $e'));
   }
 
@@ -317,18 +317,34 @@ class TrackingService {
     if (!_active || _sending) return;
     _sending = true;
     try {
-      final at = _latestAt;
-      final latest = _latest;
-      final isFresh =
-          latest != null &&
-          at != null &&
-          DateTime.now().difference(at) < _freshFor;
-
-      final Position p = isFresh ? latest : await _currentPosition();
-      // A fresh position was already counted when the stream delivered it.
-      if (!isFresh) _track(p);
+      var fix = _latest;
+      if (fix == null || fix.age >= _freshFor) {
+        // The stream has gone quiet (indoors, or the phone is saving power):
+        // ask the phone directly.
+        try {
+          final asked = await _currentFix();
+          if (fix == null || asked.at.isAfter(fix.at)) {
+            fix = asked;
+            _latest = asked;
+            _track(asked.position);
+          }
+        } catch (e) {
+          // Nothing new. The reading we still have is sent with its real age
+          // below: it no longer moves the dot, but it keeps this GoBiker
+          // online, and so someone the admin can still send to an emergency.
+          debugPrint('No new position: $e');
+        }
+      }
       await _persist();
-      await _send(p);
+      if (fix == null) return;
+
+      final sentAt = _sentAt;
+      final sinceSent = sentAt == null
+          ? Duration.zero
+          : DateTime.now().difference(sentAt);
+      if (Fix.worthSending(fix, sent: _sent, sinceSent: sinceSent)) {
+        await _send(fix);
+      }
     } catch (e) {
       debugPrint('Location update skipped: $e');
     } finally {
@@ -336,12 +352,16 @@ class TrackingService {
     }
   }
 
-  Future<void> _send(Position p) async {
+  Future<void> _send(Fix fix) async {
     final res = await AuthService.instance.postAuthed(
       '/gobiker/location',
-      body: {'latitude': p.latitude, 'longitude': p.longitude},
+      body: fix.toJson(),
     );
-    if (res.ok) return;
+    if (res.ok) {
+      _sent = fix;
+      _sentAt = DateTime.now();
+      return;
+    }
 
     // 401/403: the login expired or the account is not allowed to track.
     if (res.status == 401 || res.status == 403) {

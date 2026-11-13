@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'auth_service.dart';
+import 'fix.dart';
 import 'location_gate.dart';
 import 'tracking_service.dart';
 
@@ -35,6 +36,12 @@ class PresenceService with WidgetsBindingObserver {
   /// The newest position this phone sent (the live map centres on it).
   final ValueNotifier<Position?> latest = ValueNotifier(null);
 
+  /// When [latest] arrived, so the server can be told how old it is.
+  DateTime? _latestAt;
+
+  /// A reading from the map's own stream is used as it is while this recent.
+  static const Duration _freshFor = Duration(seconds: 20);
+
   /// Where live positions come from. Replaced in tests, which have no phone.
   @visibleForTesting
   Stream<Position> Function() positionStream = () =>
@@ -65,6 +72,7 @@ class PresenceService with WidgetsBindingObserver {
     _serviceChanges = null;
     _watchers = 0;
     latest.value = null;
+    _latestAt = null;
     _askedPermission = false;
   }
 
@@ -126,10 +134,10 @@ class PresenceService with WidgetsBindingObserver {
     if (!_wantsWatch || _watch != null) return;
     if (state != LocationState.ready) return;
 
-    _watch = positionStream().listen(
-      (p) => latest.value = p,
-      onError: (Object e) => debugPrint('Position stream error: $e'),
-    );
+    _watch = positionStream().listen((p) {
+      _latestAt = DateTime.now();
+      latest.value = p;
+    }, onError: (Object e) => debugPrint('Position stream error: $e'));
   }
 
   @override
@@ -163,20 +171,49 @@ class PresenceService with WidgetsBindingObserver {
     _sending = true;
     try {
       if (!await _hasPermission()) return;
-      final p = await TrackingService.instance.bestPosition();
-      latest.value = p;
+      final fix = await _currentFix();
+      if (fix == null) return;
       // Residents keep their position to themselves.
       if (!user.isGoBiker) return;
       final res = await AuthService.instance.callAuthed(
         'POST',
         '/gobiker/location',
-        body: {'latitude': p.latitude, 'longitude': p.longitude},
+        body: fix.toJson(),
       );
       if (res.status == 401) stop();
     } catch (e) {
       debugPrint('Presence update skipped: $e');
     } finally {
       _sending = false;
+    }
+  }
+
+  /// The reading to report now.
+  ///
+  /// While a map is open its stream already follows the phone, so that reading
+  /// is used and the phone is not asked again (asking can take many seconds
+  /// indoors, long enough for the GoBiker to drop "offline" in between).
+  /// Otherwise the phone is asked; and if it has nothing new, the last reading
+  /// is reported with its real age, which keeps the GoBiker online without
+  /// claiming they are somewhere they may have left.
+  Future<Fix?> _currentFix() async {
+    Fix? known() {
+      final p = latest.value;
+      final at = _latestAt;
+      return p == null || at == null ? null : Fix(p, at: at);
+    }
+
+    final watched = _watch == null ? null : known();
+    if (watched != null && watched.age < _freshFor) return watched;
+
+    try {
+      final fix = await TrackingService.instance.bestFix();
+      _latestAt = fix.at;
+      latest.value = fix.position;
+      return fix;
+    } catch (e) {
+      debugPrint('No new position: $e');
+      return known();
     }
   }
 

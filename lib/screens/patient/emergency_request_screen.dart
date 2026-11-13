@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/auth_service.dart';
+import '../../core/fix.dart';
 import '../../core/location_gate.dart';
 import '../../core/resident_sos.dart';
 
@@ -72,6 +74,11 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   /// screen opens, so it is usually ready on Send.
   Future<Position?>? _position;
 
+  /// The best reading so far, kept while the form is open: the phone gets surer of where it
+  /// is over the first seconds, and the pin should be the best it managed, not the first.
+  Fix? _best;
+  StreamSubscription<Position>? _updates;
+
   /// Why no position can be had on this phone, once the lookup found nothing (else null).
   LocationState? _locationProblem;
 
@@ -88,27 +95,44 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
     final lookup = ResidentSos.positionSource();
     _position = lookup;
     lookup.then((position) async {
-      if (position != null || !mounted || !identical(_position, lookup)) return;
-      // Nothing came back: say why, so they can fix it, without asking the phone anything.
+      if (!mounted || !identical(_position, lookup)) return;
+      if (position != null) _best = Fix.better(_best, Fix(position));
+      // Only reads the phone's state: it never asks the phone anything.
       final state = await LocationGate.instance.check();
       if (!mounted || !identical(_position, lookup)) return;
-      setState(
-        () => _locationProblem = state == LocationState.ready ? null : state,
+      if (state != LocationState.ready) {
+        // Nothing can come back: say why, so they can fix it.
+        if (position == null) setState(() => _locationProblem = state);
+        return;
+      }
+      // Keep listening while they type the address: a better reading replaces a rougher one.
+      _updates?.cancel();
+      _updates = ResidentSos.positionUpdates().listen(
+        (p) => _best = Fix.better(_best, Fix(p)),
+        onError: (Object e) => debugPrint('[sos] position updates: $e'),
       );
     });
+  }
+
+  void _stopLookup() {
+    _updates?.cancel();
+    _updates = null;
+    _best = null;
+    _position = null; // forget any lookup: a late answer is not used
   }
 
   void _setShareLocation(bool share) {
     setState(() {
       _shareLocation = share;
       _locationProblem = null;
-      _position = null; // forget any lookup: a late answer is not used
+      _stopLookup();
     });
     if (share) _startLookup();
   }
 
   @override
   void dispose() {
+    _updates?.cancel();
     _description.dispose();
     _address.dispose();
     _landmark.dispose();
@@ -201,17 +225,22 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
 
     // 1) The request itself: this is what alerts the admin. With sharing off there is no
     // position to wait for or to send.
-    final position = !_shareLocation
-        ? null
-        : await (_position ?? Future<Position?>.value(null)).timeout(
-            const Duration(seconds: 3),
-            onTimeout: () => null,
-          );
+    Fix? fix;
+    if (_shareLocation) {
+      // Nothing yet: give the first lookup a moment, but never hold an SOS back for the GPS.
+      if (_best == null) {
+        await (_position ?? Future<Position?>.value(null)).timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => null,
+        );
+      }
+      fix = _best;
+    }
     final result = await ResidentSos.instance.send(
       address: _address.text,
       landmark: _landmark.text,
       description: _description.text,
-      position: position,
+      fix: fix,
     );
     if (!mounted) return;
     if (result.error != null) {

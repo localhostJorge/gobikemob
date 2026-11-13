@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'auth_service.dart';
+import 'fix.dart';
 
 /// One SOS request the resident sent, as GET /api/resident/sos returns it.
 class SosEntry {
@@ -142,7 +143,7 @@ class ResidentSos extends ChangeNotifier {
     required String address,
     required String landmark,
     String? description,
-    Position? position,
+    Fix? fix,
   }) async {
     final res = await AuthService.instance.callAuthed(
       'POST',
@@ -152,9 +153,16 @@ class ResidentSos extends ChangeNotifier {
         'landmark': landmark.trim(),
         if (description != null && description.trim().isNotEmpty)
           'description': description.trim(),
-        if (position != null) ...{
-          'latitude': position.latitude,
-          'longitude': position.longitude,
+        // With how precise the pin is and how old, so the admin and the
+        // GoBiker can tell an exact pin from a rough one.
+        if (fix != null) ...{
+          for (final key in const [
+            'latitude',
+            'longitude',
+            'accuracy',
+            'age_seconds',
+          ])
+            key: fix.toJson()[key],
         },
       },
     );
@@ -217,6 +225,23 @@ class ResidentSos extends ChangeNotifier {
   /// Where the SOS screen gets the phone's position. A test replaces it, so no real GPS is used.
   static Future<Position?> Function() positionSource = quickPosition;
 
+  /// Readings that keep coming while the SOS form is open. The first answer is
+  /// often a rough one (indoors, the GPS still warming up), and the phone gets
+  /// surer over the next seconds: the screen keeps the best one for the pin.
+  /// A test replaces it, so no real GPS is used.
+  static Stream<Position> Function() positionUpdates = () =>
+      Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+  /// A "last known" position older than this is not where they are now.
+  static const Duration _lastKnownFor = Duration(minutes: 2);
+
+  static bool _recent(Position p) =>
+      DateTime.now().difference(p.timestamp) < _lastKnownFor;
+
   /// A position for the request, fast: an SOS must never wait long for GPS.
   /// Returns null when location is off or not allowed.
   static Future<Position?> quickPosition() async {
@@ -232,10 +257,7 @@ class ResidentSos extends ChangeNotifier {
       }
 
       final last = await Geolocator.getLastKnownPosition();
-      if (last != null &&
-          DateTime.now().difference(last.timestamp).inMinutes < 2) {
-        return last;
-      }
+      if (last != null && _recent(last)) return last;
       return await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
@@ -245,7 +267,10 @@ class ResidentSos extends ChangeNotifier {
     } catch (e) {
       debugPrint('[sos] no position: $e');
       try {
-        return await Geolocator.getLastKnownPosition();
+        // Only a recent one: a pin from hours ago, somewhere else, would send
+        // the GoBiker to the wrong place. No pin makes them use the address.
+        final last = await Geolocator.getLastKnownPosition();
+        return last != null && _recent(last) ? last : null;
       } catch (_) {
         return null;
       }

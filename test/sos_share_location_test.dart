@@ -49,11 +49,11 @@ class FakePhone implements LocationPlatform {
   }
 }
 
-Position pin() => Position(
-  latitude: 16.04,
+Position pin({double latitude = 16.04, double accuracy = 5}) => Position(
+  latitude: latitude,
   longitude: 120.33,
   timestamp: DateTime.now(),
-  accuracy: 5,
+  accuracy: accuracy,
   altitude: 0,
   altitudeAccuracy: 0,
   heading: 0,
@@ -72,6 +72,10 @@ void main() {
 
   /// What the phone's GPS answers; a test may swap it (a slow GPS never answers).
   late Future<Position?> Function() gps;
+
+  /// The readings that keep coming while the form is open; a test adds to it.
+  late StreamController<Position> updates;
+  final realUpdates = ResidentSos.positionUpdates;
 
   Future<http.Response> handle(http.Request r) async {
     final json = {'content-type': 'application/json'};
@@ -107,10 +111,14 @@ void main() {
       lookups++;
       return gps();
     };
+    updates = StreamController<Position>.broadcast();
+    ResidentSos.positionUpdates = () => updates.stream;
     LocationGate.instance = LocationGate(FakePhone());
   });
 
   tearDown(() {
+    updates.close();
+    ResidentSos.positionUpdates = realUpdates;
     ResidentSos.positionSource = ResidentSos.quickPosition;
     LocationGate.instance = LocationGate();
   });
@@ -189,6 +197,63 @@ void main() {
       expect(posted.single['latitude'], 16.04);
       expect(posted.single['longitude'], 120.33);
       expect(posted.single['landmark'], 'Beside the chapel');
+    });
+  });
+
+  testWidgets('says how precise the pin is and how old', (tester) async {
+    await run(tester, () async {
+      await open(tester);
+      await fillAndSend(tester);
+
+      expect(posted.single['accuracy'], 5);
+      expect(posted.single['age_seconds'], lessThan(60));
+      // Only what the server asks for about an SOS pin.
+      expect(posted.single.containsKey('speed'), isFalse);
+    });
+  });
+
+  testWidgets('sends the best reading it got while the form was open, not the '
+      'first', (tester) async {
+    // Indoors the first answer is a rough guess; the GPS settles a moment later.
+    gps = () async => pin(latitude: 16.05, accuracy: 300);
+    await run(tester, () async {
+      await open(tester);
+      updates.add(pin(latitude: 16.0401, accuracy: 9));
+      updates.add(pin(latitude: 16.07, accuracy: 120)); // a worse one after it
+      await tester.pump();
+
+      await fillAndSend(tester);
+
+      expect(posted.single['latitude'], 16.0401);
+      expect(posted.single['accuracy'], 9);
+    });
+  });
+
+  testWidgets('still sends the first reading when no better one comes', (
+    tester,
+  ) async {
+    gps = () async => pin(accuracy: 300);
+    await run(tester, () async {
+      await open(tester);
+      await fillAndSend(tester);
+
+      expect(posted.single['latitude'], 16.04);
+      expect(posted.single['accuracy'], 300);
+    });
+  });
+
+  testWidgets('stops listening, and sends nothing, once sharing is turned '
+      'off', (tester) async {
+    await run(tester, () async {
+      await open(tester);
+      expect(updates.hasListener, isTrue);
+
+      await toggle(tester);
+      expect(updates.hasListener, isFalse);
+
+      await fillAndSend(tester);
+      expect(posted.single.containsKey('latitude'), isFalse);
+      expect(posted.single.containsKey('accuracy'), isFalse);
     });
   });
 
