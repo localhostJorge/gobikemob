@@ -5,6 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/auth_service.dart';
@@ -57,13 +58,39 @@ class LiveMapScreen extends StatefulWidget {
   State<LiveMapScreen> createState() => _LiveMapScreenState();
 }
 
-class _LiveMapScreenState extends State<LiveMapScreen> {
-  static const Duration _refresh = Duration(seconds: 10);
+class _LiveMapScreenState extends State<LiveMapScreen>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  /// How often the other GoBikers are fetched. Their apps report within five
+  /// seconds of a real move, so this keeps a marker a few seconds behind them.
+  static const Duration _refresh = Duration(seconds: 3);
   // Bugallon, Pangasinan: shown until the phone has a position.
   static const LatLng _fallbackCenter = LatLng(15.9566, 120.1866);
 
+  /// The satellite pictures stop at this zoom over Bugallon. Past it the
+  /// server sends "Map data not yet available" tiles, so one more level is
+  /// shown by enlarging these.
+  static const int _imageryZoom = 18;
+  static const double _maxZoom = 19;
+
+  /// The phone's own position is drawn with a circle once it is rougher than this.
+  static const double _myRoughAccuracy = 20;
+  static const String _satelliteKey = 'live_map_satellite';
+
   final _map = MapController();
+  final _glide = MarkerGlide();
+
+  /// Runs from 0 to 1 over one refresh: how far the markers are on their way
+  /// from the positions last shown to the ones just fetched.
+  late final AnimationController _glideClock = AnimationController(
+    vsync: this,
+    duration: _refresh,
+  );
   Timer? _timer;
+  bool _loading = false;
+
+  /// Satellite shows the roofs and paths a GoBiker rides by; streets has the
+  /// road names. Their choice is remembered.
+  bool _satellite = true;
   LiveMapData _data = const LiveMapData();
   bool _loaded = false;
   String? _error;
@@ -83,14 +110,50 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
     _locateMe(move: false);
     _load();
     _timer = Timer.periodic(_refresh, (_) => _load());
+    WidgetsBinding.instance.addObserver(this);
+    _restoreMapStyle();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    _glideClock.dispose();
     PresenceService.instance.latest.removeListener(_onMyPosition);
     PresenceService.instance.unwatch();
     super.dispose();
+  }
+
+  /// Nothing is fetched while the app is not on screen; coming back catches
+  /// up at once.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _timer?.cancel();
+    _timer = null;
+    if (state != AppLifecycleState.resumed) return;
+    _load();
+    _timer = Timer.periodic(_refresh, (_) => _load());
+  }
+
+  Future<void> _restoreMapStyle() async {
+    try {
+      final saved = (await SharedPreferences.getInstance()).getBool(
+        _satelliteKey,
+      );
+      if (saved != null && mounted) setState(() => _satellite = saved);
+    } catch (_) {
+      // Not remembered this time: the satellite view it opened with stays.
+    }
+  }
+
+  Future<void> _toggleMapStyle() async {
+    setState(() => _satellite = !_satellite);
+    try {
+      await (await SharedPreferences.getInstance()).setBool(
+        _satelliteKey,
+        _satellite,
+      );
+    } catch (_) {}
   }
 
   Position? get _me => PresenceService.instance.latest.value;
@@ -224,8 +287,27 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
   }
 
   Future<void> _load() async {
-    final result = await LiveMapData.fetch();
+    // A slow answer must not pile up behind the next tick.
+    if (_loading) return;
+    _loading = true;
+    final ({LiveMapData? data, String? error}) result;
+    try {
+      result = await LiveMapData.fetch();
+    } finally {
+      _loading = false; // whatever happened, the next tick may try again
+    }
     if (!mounted) return;
+    final data = result.data;
+    if (data != null) {
+      // Each marker sets off from where it is drawn now, towards where its
+      // GoBiker is. Placed at once for people who turned animations off.
+      _glide.retarget(
+        data.gobikers,
+        progress: _glideClock.value,
+        animate: !MediaQuery.disableAnimationsOf(context),
+      );
+      _glideClock.forward(from: 0);
+    }
     setState(() {
       _loaded = true;
       _error = result.error;
@@ -296,6 +378,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
       markers.add(
         _personMarker(
           g,
+          point: _glide.at(g.id, _glideClock.value) ?? g.point,
           icon: Icons.pedal_bike_rounded,
           color: gobikerColor(g.status),
           size: 36,
@@ -336,7 +419,9 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
           height: 52,
           child: Semantics(
             button: true,
-            label: 'SOS from ${s.residentName}, ${s.status}',
+            label:
+                'SOS from ${s.residentName}, ${s.status}'
+                '${s.isApproximate ? ', approximate location' : ''}',
             child: GestureDetector(
               onTap: () => _openSos(s),
               child: Container(
@@ -366,14 +451,50 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
     return markers;
   }
 
+  /// The circles around rough positions: the person may be anywhere inside.
+  /// Drawn stronger over the satellite picture, where a faint tint is lost.
+  List<CircleMarker> _rings() {
+    CircleMarker ring(LatLng point, double metres, Color color) => CircleMarker(
+      point: point,
+      radius: metres,
+      useRadiusInMeter: true,
+      color: color.withValues(alpha: _satellite ? 0.22 : 0.12),
+      borderColor: color.withValues(alpha: _satellite ? 0.95 : 0.6),
+      borderStrokeWidth: _satellite ? 2 : 1,
+    );
+
+    final me = _me;
+    return [
+      for (final s in _data.sos.where((s) => s.isRough))
+        ring(
+          LatLng(s.latitude!, s.longitude!),
+          s.accuracy!,
+          sosColor(s.status),
+        ),
+      for (final g in _data.gobikers.where((g) => g.isRough))
+        ring(
+          _glide.at(g.id, _glideClock.value) ?? g.point,
+          g.accuracy!,
+          gobikerColor(g.status),
+        ),
+      if (me != null && me.accuracy > _myRoughAccuracy)
+        ring(
+          LatLng(me.latitude, me.longitude),
+          me.accuracy,
+          const Color(0xFF1A73E8),
+        ),
+    ];
+  }
+
   Marker _personMarker(
     MapPerson p, {
+    required LatLng point,
     required IconData icon,
     required Color color,
     required double size,
   }) {
     return Marker(
-      point: LatLng(p.latitude, p.longitude),
+      point: point,
       width: size,
       height: size,
       child: Tooltip(
@@ -419,27 +540,38 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                   ? LatLng(me.latitude, me.longitude)
                   : _fallbackCenter,
               initialZoom: me != null ? 16 : 13,
+              maxZoom: _maxZoom,
               interactionOptions: const InteractionOptions(
                 flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
               ),
             ),
             children: [
               // Satellite imagery: a GoBiker finds a house by its roof and the
-              // road to it, not by a street name. Esri serves both the pictures
-              // and the labels on top, so this stays one provider.
-              TileLayer(
-                urlTemplate:
-                    'https://server.arcgisonline.com/ArcGIS/rest/services/'
-                    'World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                userAgentPackageName: 'com.rondago.app',
-                maxZoom: 19,
-              ),
-              TileLayer(
-                urlTemplate:
-                    'https://server.arcgisonline.com/ArcGIS/rest/services/'
-                    'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-                userAgentPackageName: 'com.rondago.app',
-                maxZoom: 19,
+              // road to it, not by a street name. Esri serves the pictures and
+              // the roads and names on top, so this stays one provider.
+              if (_satellite)
+                for (final service in const [
+                  'World_Imagery',
+                  'Reference/World_Transportation',
+                  'Reference/World_Boundaries_and_Places',
+                ])
+                  TileLayer(
+                    urlTemplate:
+                        'https://server.arcgisonline.com/ArcGIS/rest/services/'
+                        '$service/MapServer/tile/{z}/{y}/{x}',
+                    userAgentPackageName: 'com.rondago.app',
+                    maxNativeZoom: _imageryZoom,
+                    maxZoom: _maxZoom,
+                  )
+              else
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.rondago.app',
+                  maxZoom: _maxZoom,
+                ),
+              AnimatedBuilder(
+                animation: _glideClock,
+                builder: (context, _) => CircleLayer(circles: _rings()),
               ),
               if (directions != null && me != null)
                 PolylineLayer(
@@ -456,7 +588,12 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                     ),
                   ],
                 ),
-              MarkerLayer(markers: _markers()),
+              // Rebuilt on every frame of a move, and only this: the tiles and
+              // the cards around the map are left alone.
+              AnimatedBuilder(
+                animation: _glideClock,
+                builder: (context, _) => MarkerLayer(markers: _markers()),
+              ),
               // The imagery credit has to stay readable: above the phone's gesture strip
               // (and above the directions bar when it is open), on the left so the
               // "center on me" button never covers it.
@@ -464,8 +601,12 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                 padding: EdgeInsets.only(
                   bottom: bottomGap(context) + (directions != null ? 92 : 0),
                 ),
-                child: const SimpleAttributionWidget(
-                  source: Text('Esri, Maxar, Earthstar Geographics'),
+                child: SimpleAttributionWidget(
+                  source: Text(
+                    _satellite
+                        ? 'Esri, Maxar, Earthstar Geographics'
+                        : 'OpenStreetMap contributors',
+                  ),
                   alignment: Alignment.bottomLeft,
                 ),
               ),
@@ -502,12 +643,29 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
         padding: EdgeInsets.only(
           bottom: extraBottomGap(context) + (directions != null ? 92 : 28),
         ),
-        child: FloatingActionButton(
-          tooltip: 'Center on me',
-          backgroundColor: theme.colorScheme.surface,
-          foregroundColor: AppTheme.blue,
-          onPressed: () => _locateMe(),
-          child: const Icon(Icons.my_location_rounded),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            FloatingActionButton.small(
+              heroTag: null, // two buttons on one screen: only one may fly
+              tooltip: _satellite ? 'Show the street map' : 'Show satellite',
+              backgroundColor: theme.colorScheme.surface,
+              foregroundColor: AppTheme.blue,
+              onPressed: _toggleMapStyle,
+              child: Icon(
+                _satellite ? Icons.map_outlined : Icons.satellite_alt_outlined,
+              ),
+            ),
+            const SizedBox(height: 12),
+            FloatingActionButton(
+              tooltip: 'Center on me',
+              backgroundColor: theme.colorScheme.surface,
+              foregroundColor: AppTheme.blue,
+              onPressed: () => _locateMe(),
+              child: const Icon(Icons.my_location_rounded),
+            ),
+          ],
         ),
       ),
     );
@@ -729,6 +887,16 @@ class _SosSheet extends StatelessWidget {
             const SizedBox(height: 12),
             if (sos.place.isNotEmpty)
               _line(theme, Icons.place_outlined, sos.place),
+            // A rough pin must not be ridden to as if it were exact.
+            if (sos.isApproximate)
+              _line(
+                theme,
+                Icons.gps_not_fixed_rounded,
+                'Approximate pin: they may be up to '
+                '${formatDistance(sos.accuracy!)} from it. '
+                'Go by the address and landmark.',
+                color: const Color(0xFF9A4A06),
+              ),
             if (sos.description != null)
               _line(theme, Icons.notes_rounded, sos.description!),
             if (sos.createdAt != null)
@@ -784,15 +952,23 @@ class _SosSheet extends StatelessWidget {
     );
   }
 
-  Widget _line(ThemeData theme, IconData icon, String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 6),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: theme.hintColor),
-        const SizedBox(width: 8),
-        Expanded(child: Text(text)),
-      ],
-    ),
-  );
+  Widget _line(ThemeData theme, IconData icon, String text, {Color? color}) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18, color: color ?? theme.hintColor),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                text,
+                style: color == null
+                    ? null
+                    : TextStyle(color: color, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      );
 }

@@ -1,6 +1,20 @@
 import 'package:flutter/foundation.dart';
+import 'package:latlong2/latlong.dart';
 
 import 'auth_service.dart';
+
+/// A position rougher than this (metres) is drawn with a circle around it
+/// showing how far out it may be.
+const double roughAccuracy = 30;
+
+/// An SOS pin rougher than this is called approximate: the address and the
+/// landmark are then the better guide.
+const double approximateAccuracy = 50;
+
+double? _metres(dynamic v) {
+  final m = (v as num?)?.toDouble();
+  return m != null && m.isFinite && m >= 0 ? m : null;
+}
 
 /// A person on the live map: a GoBiker.
 class MapPerson {
@@ -10,12 +24,20 @@ class MapPerson {
     required this.latitude,
     required this.longitude,
     this.status = 'active',
+    this.accuracy,
   });
 
   final int id;
   final String name;
   final double latitude;
   final double longitude;
+
+  /// How far out the position may be, in metres (null when the server does
+  /// not know).
+  final double? accuracy;
+
+  bool get isRough => (accuracy ?? 0) > roughAccuracy;
+  LatLng get point => LatLng(latitude, longitude);
 
   /// GoBikers: active, emergency or responding.
   final String status;
@@ -31,6 +53,7 @@ class MapPerson {
       latitude: lat,
       longitude: lng,
       status: '${j['status'] ?? 'active'}',
+      accuracy: _metres(j['accuracy']),
     );
   }
 }
@@ -47,6 +70,7 @@ class AssignedSos {
     this.description,
     this.latitude,
     this.longitude,
+    this.accuracy,
     this.createdAt,
   });
 
@@ -61,10 +85,18 @@ class AssignedSos {
   final String? description;
   final double? latitude;
   final double? longitude;
+
+  /// How far out the pin may be, in metres (null when it was not reported).
+  final double? accuracy;
   final DateTime? createdAt;
 
   bool get isOpen => status != 'resolved';
   bool get hasPosition => latitude != null && longitude != null;
+  bool get isRough => hasPosition && (accuracy ?? 0) > roughAccuracy;
+
+  /// The pin is only roughly where the resident is.
+  bool get isApproximate =>
+      hasPosition && (accuracy ?? 0) > approximateAccuracy;
 
   String get place =>
       [address, landmark].where((s) => s.trim().isNotEmpty).join(' · ');
@@ -85,8 +117,57 @@ class AssignedSos {
       description: text(j['description']),
       latitude: (j['latitude'] as num?)?.toDouble(),
       longitude: (j['longitude'] as num?)?.toDouble(),
+      accuracy: _metres(j['accuracy']),
       createdAt: DateTime.tryParse('${j['created_at'] ?? ''}')?.toLocal(),
     );
+  }
+}
+
+/// Where each GoBiker's marker is drawn while it moves from the position the
+/// map last showed to the one the server now reports, so a GoBiker is seen
+/// riding along and not hopping from point to point.
+///
+/// [progress] runs from 0 (still at the old position) to 1 (arrived).
+class MarkerGlide {
+  /// A step longer than this is not a ride between two refreshes: a first
+  /// position after a gap, shown at once.
+  static const double maxGlideMetres = 400;
+
+  final Map<int, LatLng> _from = {};
+  final Map<int, LatLng> _to = {};
+
+  /// Where the marker of GoBiker [id] is at [progress]; null if unknown.
+  LatLng? at(int id, double progress) {
+    final to = _to[id];
+    final from = _from[id];
+    if (to == null || from == null) return to;
+    final t = progress.clamp(0.0, 1.0);
+    return LatLng(
+      from.latitude + (to.latitude - from.latitude) * t,
+      from.longitude + (to.longitude - from.longitude) * t,
+    );
+  }
+
+  /// New positions arrived while the markers were at [progress] of their last
+  /// move: each one now starts from where it is drawn. With [animate] off
+  /// (reduced motion) every marker is placed at once.
+  void retarget(
+    Iterable<MapPerson> people, {
+    required double progress,
+    bool animate = true,
+  }) {
+    final drawn = {for (final id in _to.keys) id: at(id, progress)!};
+    _from.clear();
+    _to.clear();
+    for (final p in people) {
+      final shown = drawn[p.id];
+      final far =
+          shown != null &&
+          const Distance().as(LengthUnit.Meter, shown, p.point) >
+              maxGlideMetres;
+      _to[p.id] = p.point;
+      _from[p.id] = shown == null || far || !animate ? p.point : shown;
+    }
   }
 }
 
