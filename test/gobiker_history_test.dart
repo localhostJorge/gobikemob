@@ -13,6 +13,8 @@ import 'package:go_bike_app/core/ronda_store.dart';
 import 'package:go_bike_app/screens/dashboard_screen.dart';
 import 'package:go_bike_app/screens/global_state.dart';
 import 'package:go_bike_app/screens/gobiker_history_screen.dart';
+import 'package:go_bike_app/widgets/profile_panel.dart';
+import 'package:go_bike_app/widgets/ronda_nav_bar.dart';
 
 DateTime ago({int days = 0, int hours = 0}) =>
     DateTime.now().subtract(Duration(days: days, hours: hours));
@@ -618,6 +620,55 @@ void main() {
         expect(find.byType(GobikerHistoryScreen), findsOneWidget);
       },
     );
+
+    testWidgets(
+      'History and Profile are tabs: the bar stays, and Back goes to Home',
+      (tester) async {
+        await openHome(tester);
+
+        Future<void> tap(String label) => inServer(() async {
+          await tester.tap(
+            find.descendant(
+              of: find.byType(RondaNavBar),
+              matching: find.text(label),
+            ),
+          );
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 500));
+        });
+
+        await tap('History');
+        expect(find.byType(GobikerHistoryScreen), findsOneWidget);
+        expect(find.byType(RondaNavBar), findsOneWidget);
+        // A tab, not a page pushed on top: nothing to go back to.
+        expect(find.byTooltip('Back'), findsNothing);
+        expect(tester.widget<RondaNavBar>(find.byType(RondaNavBar)).selectedIndex, 2);
+
+        await tap('Profile');
+        expect(find.byType(GobikerProfileTab), findsOneWidget);
+        expect(find.byType(RondaNavBar), findsOneWidget);
+        expect(tester.widget<RondaNavBar>(find.byType(RondaNavBar)).selectedIndex, 3);
+
+        // Android Back from a tab returns to Home instead of leaving the app.
+        await inServer(() async {
+          await tester.binding.handlePopRoute();
+          await tester.pump();
+        });
+        expect(tester.widget<RondaNavBar>(find.byType(RondaNavBar)).selectedIndex, 0);
+        expect(find.byType(DashboardScreen), findsOneWidget);
+      },
+    );
+
+    testWidgets('Home can be pulled down to refresh', (tester) async {
+      await openHome(tester);
+      expect(
+        find.descendant(
+          of: find.byType(DashboardScreen),
+          matching: find.byType(RefreshIndicator),
+        ),
+        findsOneWidget,
+      );
+    });
 
     testWidgets(
       'no longer has a Ronda History button, and Message Admin takes the width',

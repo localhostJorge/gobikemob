@@ -59,24 +59,44 @@ class RondaNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pal = context.pal;
-    return Container(
-      padding: EdgeInsets.only(top: 6, bottom: 6 + bottomInset),
-      decoration: BoxDecoration(
-        color: pal.card,
-        border: Border(top: BorderSide(color: pal.line)),
+    final light = Theme.of(context).brightness == Brightness.light;
+    // A floating card above the page: margins on the sides, room for the phone's own
+    // navigation area underneath, and a soft shadow in light mode.
+    return Padding(
+      padding: EdgeInsets.fromLTRB(12, 8, 12, 10 + bottomInset),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        decoration: BoxDecoration(
+          color: pal.card,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: pal.line),
+          boxShadow: light
+              ? [
+                  BoxShadow(
+                    color: AppColors.navy.withValues(alpha: 0.10),
+                    blurRadius: 20,
+                    offset: const Offset(0, 6),
+                  ),
+                ]
+              : null,
+        ),
+        child: _row(),
       ),
-      child: Row(
-        children: [
-          for (var i = 0; i < items.length; i++)
-            Expanded(
-              child: _Tab(
-                item: items[i],
-                selected: i == selectedIndex,
-                onTap: () => onTap(i),
-              ),
+    );
+  }
+
+  Widget _row() {
+    return Row(
+      children: [
+        for (var i = 0; i < items.length; i++)
+          Expanded(
+            child: _Tab(
+              item: items[i],
+              selected: i == selectedIndex,
+              onTap: () => onTap(i),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 }

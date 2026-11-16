@@ -130,205 +130,228 @@ class _LoginScreenState extends State<LoginScreen> {
           resizeToAvoidBottomInset: true,
           backgroundColor: authBackground(context),
           body: SafeArea(
-            child: SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-              child: AutofillGroup(
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // The full RondaGo logo, as the brand video ends: icon, then wordmark.
-                      const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Hero(tag: authLogoHero, child: AuthLogo(height: 60)),
-                          SizedBox(width: 14),
-                          // On a very narrow phone the wordmark shrinks to fit.
-                          Flexible(
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: RondaGoWordmark(fontSize: 32),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 28),
-                      Text(
-                        'Every Ride Has a Purpose.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 22,
-                          height: 1.25,
-                          fontWeight: FontWeight.w600,
-                          color: onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Stay connected. Stay prepared.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 14, color: muted),
-                      ),
-                      const SizedBox(height: 32),
-
-                      AppTextField(
-                        label: 'Email address',
-                        hint: 'name@email.com',
-                        icon: Icons.mail_outline_rounded,
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        autofillHints: const [AutofillHints.email],
-                        validator: (v) {
-                          final value = (v ?? '').trim();
-                          if (value.isEmpty) return 'Enter your email';
-                          if (!_emailRegex.hasMatch(value)) {
-                            return 'Enter a valid email';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      AppTextField(
-                        label: 'Password',
-                        hint: 'Enter your password',
-                        icon: Icons.lock_outline_rounded,
-                        controller: _passwordController,
-                        obscure: true,
-                        textInputAction: TextInputAction.done,
-                        autofillHints: const [AutofillHints.password],
-                        validator: (v) => (v == null || v.isEmpty)
-                            ? 'Enter your password'
-                            : null,
-                        onSubmitted: (_) => _handleLogin(),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Remember me (label now uses theme colors, so it is always visible)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(8),
-                          onTap: () =>
-                              setState(() => _rememberMe = !_rememberMe),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+            // The logo and form sit in the middle of the screen, and still scroll
+            // when the keyboard is up or the text is large.
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: (constraints.maxHeight - 48).clamp(
+                      0,
+                      double.infinity,
+                    ),
+                  ),
+                  child: Center(
+                    child: AutofillGroup(
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // The full RondaGo logo, as the brand video ends: icon, then wordmark.
+                            const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: Checkbox(
-                                    value: _rememberMe,
-                                    activeColor: kAuthBlue,
-                                    side: authCheckboxSide(context),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    onChanged: (v) => setState(
-                                      () => _rememberMe = v ?? false,
-                                    ),
-                                  ),
+                                Hero(
+                                  tag: authLogoHero,
+                                  child: AuthLogo(height: 60),
                                 ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  'Remember me',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: onSurface,
+                                SizedBox(width: 14),
+                                // On a very narrow phone the wordmark shrinks to fit.
+                                Flexible(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: RondaGoWordmark(fontSize: 32),
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Primary action
-                      ElevatedButton(
-                        onPressed: _isLoading ? null : _handleLogin,
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(52),
-                        ),
-                        child: const Text(
-                          'Login',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Google sign-in is switched off for now: uncomment this block (the divider and
-                      // the button) to bring it back, with `_handleGoogle` and `_isGoogleLoading` above.
-                      // const OrDivider(),
-                      // const SizedBox(height: 24),
-                      //
-                      // // Secondary action
-                      // OutlinedButton(
-                      //   onPressed: _isGoogleLoading ? null : _handleGoogle,
-                      //   style: OutlinedButton.styleFrom(
-                      //     minimumSize: const Size.fromHeight(52),
-                      //   ),
-                      //   child: Row(
-                      //     mainAxisAlignment: MainAxisAlignment.center,
-                      //     children: [
-                      //       Image.asset(
-                      //         'assets/images/google_logo.png',
-                      //         height: 22,
-                      //       ),
-                      //       const SizedBox(width: 12),
-                      //       const Text(
-                      //         'Continue with Google',
-                      //         style: TextStyle(
-                      //           fontSize: 15,
-                      //           fontWeight: FontWeight.w600,
-                      //         ),
-                      //       ),
-                      //     ],
-                      //   ),
-                      // ),
-                      // const SizedBox(height: 24),
-
-                      // Tertiary action: plain text link
-                      // A Wrap, not a Row: on a narrow phone with large text the link drops
-                      // to the next line instead of running off the screen.
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Text(
-                            "Don't have an account?",
-                            style: TextStyle(fontSize: 14, color: muted),
-                          ),
-                          TextButton(
-                            onPressed: _goToSignUp,
-                            style: TextButton.styleFrom(
-                              foregroundColor: kAuthBlue,
-                              minimumSize: const Size(0, 48),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                              ),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: const Text(
-                              'Sign Up',
+                            const SizedBox(height: 28),
+                            Text(
+                              'Every Ride Has a Purpose.',
+                              textAlign: TextAlign.center,
                               style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Poppins',
+                                fontSize: 22,
+                                height: 1.25,
+                                fontWeight: FontWeight.w600,
+                                color: onSurface,
                               ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 8),
+                            Text(
+                              'Stay connected. Stay prepared.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 14, color: muted),
+                            ),
+                            const SizedBox(height: 32),
+
+                            AppTextField(
+                              label: 'Email address',
+                              hint: 'name@email.com',
+                              icon: Icons.mail_outline_rounded,
+                              controller: _emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              autofillHints: const [AutofillHints.email],
+                              validator: (v) {
+                                final value = (v ?? '').trim();
+                                if (value.isEmpty) return 'Enter your email';
+                                if (!_emailRegex.hasMatch(value)) {
+                                  return 'Enter a valid email';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+
+                            AppTextField(
+                              label: 'Password',
+                              hint: 'Enter your password',
+                              icon: Icons.lock_outline_rounded,
+                              controller: _passwordController,
+                              obscure: true,
+                              textInputAction: TextInputAction.done,
+                              autofillHints: const [AutofillHints.password],
+                              validator: (v) => (v == null || v.isEmpty)
+                                  ? 'Enter your password'
+                                  : null,
+                              onSubmitted: (_) => _handleLogin(),
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Remember me (label now uses theme colors, so it is always visible)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: () =>
+                                    setState(() => _rememberMe = !_rememberMe),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 6,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        height: 24,
+                                        width: 24,
+                                        child: Checkbox(
+                                          value: _rememberMe,
+                                          activeColor: kAuthBlue,
+                                          side: authCheckboxSide(context),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                          ),
+                                          onChanged: (v) => setState(
+                                            () => _rememberMe = v ?? false,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        'Remember me',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: onSurface,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+
+                            // Primary action
+                            ElevatedButton(
+                              onPressed: _isLoading ? null : _handleLogin,
+                              style: ElevatedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(52),
+                              ),
+                              child: const Text(
+                                'Login',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+
+                            // Google sign-in is switched off for now: uncomment this block (the divider and
+                            // the button) to bring it back, with `_handleGoogle` and `_isGoogleLoading` above.
+                            // const OrDivider(),
+                            // const SizedBox(height: 24),
+                            //
+                            // // Secondary action
+                            // OutlinedButton(
+                            //   onPressed: _isGoogleLoading ? null : _handleGoogle,
+                            //   style: OutlinedButton.styleFrom(
+                            //     minimumSize: const Size.fromHeight(52),
+                            //   ),
+                            //   child: Row(
+                            //     mainAxisAlignment: MainAxisAlignment.center,
+                            //     children: [
+                            //       Image.asset(
+                            //         'assets/images/google_logo.png',
+                            //         height: 22,
+                            //       ),
+                            //       const SizedBox(width: 12),
+                            //       const Text(
+                            //         'Continue with Google',
+                            //         style: TextStyle(
+                            //           fontSize: 15,
+                            //           fontWeight: FontWeight.w600,
+                            //         ),
+                            //       ),
+                            //     ],
+                            //   ),
+                            // ),
+                            // const SizedBox(height: 24),
+
+                            // Tertiary action: plain text link
+                            // A Wrap, not a Row: on a narrow phone with large text the link drops
+                            // to the next line instead of running off the screen.
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  "Don't have an account?",
+                                  style: TextStyle(fontSize: 14, color: muted),
+                                ),
+                                TextButton(
+                                  onPressed: _goToSignUp,
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: kAuthBlue,
+                                    minimumSize: const Size(0, 48),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text(
+                                    'Sign Up',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),

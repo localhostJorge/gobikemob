@@ -46,7 +46,17 @@ class _DashboardScreenState extends State<DashboardScreen>
   final SlideToStartController _slider = SlideToStartController();
   bool _starting = false;
   bool _resuming = false;
-  bool _profileOpen = false;
+
+  /// The open tab: 0 Home, 1 Map, 2 History, 3 Profile.
+  int _tab = 0;
+
+  /// An SOS to show when the Map tab opens (from the Assigned SOS card).
+  int? _mapFocus;
+
+  /// History and Profile are built the first time they are opened, then kept, so
+  /// their scroll position and filters survive switching tabs.
+  bool _historyOpened = false;
+  bool _profileOpened = false;
   SavedRonda? _savedRonda; // a ronda that was left open (app was closed/killed)
 
   @override
@@ -193,10 +203,32 @@ class _DashboardScreenState extends State<DashboardScreen>
     AppToast.show(context, 'Ronda ended.', type: ToastType.success);
   }
 
-  Future<void> _openProfile() async {
-    setState(() => _profileOpen = true);
-    await ProfilePanel.show(context);
-    if (mounted) setState(() => _profileOpen = false);
+  /// Switches tabs: no slide, the bottom bar stays.
+  void _selectTab(int tab, {int? mapFocus}) {
+    if (tab == _tab && mapFocus == null) return;
+    // Leaving the map: catch up on the SOS requests it may have changed.
+    if (_tab == 1 && tab != 1) GobikerSos.instance.load();
+    setState(() {
+      _tab = tab;
+      if (tab == 1) _mapFocus = mapFocus;
+      if (tab == 2) _historyOpened = true;
+      if (tab == 3) _profileOpened = true;
+    });
+  }
+
+  /// Everything Home shows, fetched again (pull down to refresh).
+  Future<void> _refreshHome() async {
+    await Future.wait([
+      FollowUpAlerts.instance.refresh(),
+      Announcements.instance.refresh(),
+      GobikerAppointments.instance.load(),
+      GobikerSos.instance.load(),
+      _refreshUser(),
+      _loadSavedRonda(),
+      _loadFinishedRondas(),
+      if (EmergencyWatcher.instance.isOpen) EmergencyWatcher.instance.check(),
+    ]);
+    if (mounted) setState(() {});
   }
 
   void _openPatients() {
@@ -269,19 +301,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  void _openHistory() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const GobikerHistoryScreen()),
-    );
-  }
-
-  void _onMap({int? focusSosId}) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => LiveMapScreen(focusSosId: focusSosId)),
-    ).then((_) => GobikerSos.instance.load());
-  }
+  void _onMap({int? focusSosId}) => _selectTab(1, mapFocus: focusSosId);
 
   Future<void> _resolveSos(AssignedSos sos) async {
     var confirmed = false;
@@ -459,178 +479,222 @@ class _DashboardScreenState extends State<DashboardScreen>
     return LoadingOverlay(
       isLoading: _starting || _resuming,
       message: _resuming ? 'Resuming ronda...' : 'Starting ronda...',
-      child: Scaffold(
-        // The bottom bar reserves the phone's navigation area itself (bottomGap).
-        // The navy header runs up under the status bar and the bottom bar reserves
-        // the phone's navigation area itself, so no SafeArea here.
-        body: Column(
-          children: [
-            // 1) Greeting header
-            _buildHeader(user?.firstName ?? 'there', barangay),
-
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(
-                  Sp.gutter,
-                  Sp.xl,
-                  Sp.gutter,
-                  Sp.xl,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // The admin's answer to an emergency alert, if one was sent
-                    const EmergencyStatusCard(),
-
-                    // SOS requests the admin sent this GoBiker to
-                    _buildAssignedSos(theme, muted),
-
-                    // 2) Today's assignment (primary)
-                    FadeInSlide(
-                      delay: const Duration(milliseconds: 80),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (_savedRonda != null) ...[
-                            _sectionTitle('Open ronda', muted),
-                            _buildResumeCard(theme, muted),
-                            const SizedBox(height: 24),
-                          ],
-                          _sectionTitle("Today's assignment", muted),
-                          _buildAssignmentCard(theme, muted, barangay),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // 3) Today's summary
-                    FadeInSlide(
-                      delay: const Duration(milliseconds: 160),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _sectionTitle("Today's summary", muted),
-                          _summaryStrip(theme, muted, [
-                            ('$todayVisited', 'Visited'),
-                            (
-                              '${GobikerAppointments.instance.openCount}',
-                              'Appointments',
-                            ),
-                            (
-                              '${todayDistance.toStringAsFixed(1)} km',
-                              'Distance',
-                            ),
-                          ]),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // 4) Quick actions
-                    FadeInSlide(
-                      delay: const Duration(milliseconds: 240),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _sectionTitle('Quick actions', muted),
-                          ListenableBuilder(
-                            listenable: FollowUpAlerts.instance,
-                            builder: (context, _) =>
-                                _followUpNotice(theme, muted),
-                          ),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ListenableBuilder(
-                                  listenable: FollowUpAlerts.instance,
-                                  builder: (context, _) => _quickAction(
-                                    theme,
-                                    icon: Icons.people_alt_rounded,
-                                    color: AppTheme.blue,
-                                    label: 'Patients',
-                                    badge: FollowUpAlerts.instance.count,
-                                    onTap: _openPatients,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _quickAction(
-                                  theme,
-                                  icon: Icons.warning_amber_rounded,
-                                  color: AppTheme.errorRed,
-                                  label: 'Emergency',
-                                  onTap: _onEmergency,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _quickAction(
-                                  theme,
-                                  icon: Icons.calendar_month_rounded,
-                                  color: AppTheme.blue,
-                                  label: 'Appointments',
-                                  badge:
-                                      GobikerAppointments
-                                          .instance
-                                          .requests
-                                          .length +
-                                      GobikerAppointments
-                                          .instance
-                                          .available
-                                          .length,
-                                  onTap: _onAppointments,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // 5) Announcements
-                    FadeInSlide(
-                      delay: const Duration(milliseconds: 320),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _sectionTitle('Announcements', muted),
-                          ListenableBuilder(
-                            listenable: Announcements.instance,
-                            builder: (context, _) =>
-                                _announcementsSection(theme, muted),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // 6) Secondary button (History is in the bottom bar)
-                    FadeInSlide(
-                      delay: const Duration(milliseconds: 400),
-                      child: OutlinedButton.icon(
-                        onPressed: _showMessageAdminSheet,
-                        icon: const Icon(
-                          Icons.chat_bubble_outline_rounded,
-                          size: 20,
-                        ),
-                        label: const Text('Message Admin'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(50),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+      // Back on Map, History or Profile goes to Home first, not out of the app.
+      child: PopScope(
+        canPop: _tab == 0,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _selectTab(0);
+        },
+        child: Scaffold(
+          // The floating bottom bar reserves the phone's navigation area itself.
+          bottomNavigationBar: _buildBottomBar(),
+          body: IndexedStack(
+            index: _tab,
+            children: [
+              _buildHome(
+                theme,
+                muted,
+                user?.firstName ?? 'there',
+                barangay,
+                todayVisited,
+                todayDistance,
               ),
-            ),
-
-            // Bottom bar (Profile at the far right)
-            _buildBottomBar(),
-          ],
+              // The map runs (GPS, refreshing every few seconds) only while it is open.
+              _tab == 1
+                  ? LiveMapScreen(
+                      key: ValueKey('map-$_mapFocus'),
+                      focusSosId: _mapFocus,
+                    )
+                  : const SizedBox.shrink(),
+              _historyOpened
+                  ? const GobikerHistoryScreen()
+                  : const SizedBox.shrink(),
+              _profileOpened
+                  ? const SafeArea(bottom: false, child: GobikerProfileTab())
+                  : const SizedBox.shrink(),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  /// Home: the navy header, then the day's work. Pull down to refresh.
+  Widget _buildHome(
+    ThemeData theme,
+    Color muted,
+    String firstName,
+    String barangay,
+    int todayVisited,
+    double todayDistance,
+  ) {
+    return Column(
+      children: [
+        // 1) Greeting header
+        _buildHeader(firstName, barangay),
+
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _refreshHome,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                Sp.gutter,
+                Sp.xl,
+                Sp.gutter,
+                Sp.xl,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // The admin's answer to an emergency alert, if one was sent
+                  const EmergencyStatusCard(),
+
+                  // SOS requests the admin sent this GoBiker to
+                  _buildAssignedSos(theme, muted),
+
+                  // 2) Today's assignment (primary)
+                  FadeInSlide(
+                    delay: const Duration(milliseconds: 80),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_savedRonda != null) ...[
+                          _sectionTitle('Open ronda', muted),
+                          _buildResumeCard(theme, muted),
+                          const SizedBox(height: 24),
+                        ],
+                        _sectionTitle("Today's assignment", muted),
+                        _buildAssignmentCard(theme, muted, barangay),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 3) Today's summary
+                  FadeInSlide(
+                    delay: const Duration(milliseconds: 160),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _sectionTitle("Today's summary", muted),
+                        _summaryStrip(theme, muted, [
+                          ('$todayVisited', 'Visited'),
+                          (
+                            '${GobikerAppointments.instance.openCount}',
+                            'Appointments',
+                          ),
+                          (
+                            '${todayDistance.toStringAsFixed(1)} km',
+                            'Distance',
+                          ),
+                        ]),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 4) Quick actions
+                  FadeInSlide(
+                    delay: const Duration(milliseconds: 240),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _sectionTitle('Quick actions', muted),
+                        ListenableBuilder(
+                          listenable: FollowUpAlerts.instance,
+                          builder: (context, _) =>
+                              _followUpNotice(theme, muted),
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ListenableBuilder(
+                                listenable: FollowUpAlerts.instance,
+                                builder: (context, _) => _quickAction(
+                                  theme,
+                                  icon: Icons.people_alt_rounded,
+                                  color: AppTheme.blue,
+                                  label: 'Patients',
+                                  badge: FollowUpAlerts.instance.count,
+                                  onTap: _openPatients,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _quickAction(
+                                theme,
+                                icon: Icons.warning_amber_rounded,
+                                color: AppTheme.errorRed,
+                                label: 'Emergency',
+                                onTap: _onEmergency,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _quickAction(
+                                theme,
+                                icon: Icons.calendar_month_rounded,
+                                color: AppTheme.blue,
+                                label: 'Appointments',
+                                badge:
+                                    GobikerAppointments
+                                        .instance
+                                        .requests
+                                        .length +
+                                    GobikerAppointments
+                                        .instance
+                                        .available
+                                        .length,
+                                onTap: _onAppointments,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 5) Announcements
+                  FadeInSlide(
+                    delay: const Duration(milliseconds: 320),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _sectionTitle('Announcements', muted),
+                        ListenableBuilder(
+                          listenable: Announcements.instance,
+                          builder: (context, _) =>
+                              _announcementsSection(theme, muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 6) Secondary button (History is in the bottom bar)
+                  FadeInSlide(
+                    delay: const Duration(milliseconds: 400),
+                    child: OutlinedButton.icon(
+                      onPressed: _showMessageAdminSheet,
+                      icon: const Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        size: 20,
+                      ),
+                      label: const Text('Message Admin'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(50),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1010,21 +1074,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildBottomBar() {
-    // Home is the only real tab: Map and History open their own screens, and
-    // Profile slides in a panel (while it is open, Profile shows as selected).
+    // Four tabs; the bar stays on every one of them.
     return RondaNavBar(
-      selectedIndex: _profileOpen ? 3 : 0,
+      selectedIndex: _tab,
       bottomInset: bottomGap(context),
-      onTap: (i) {
-        switch (i) {
-          case 1:
-            _onMap();
-          case 2:
-            _openHistory();
-          case 3:
-            _openProfile();
-        }
-      },
+      onTap: _selectTab,
       items: [
         const RondaNavItem(
           label: 'Home',

@@ -220,7 +220,11 @@ class AppDropdownField extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppTheme.radiusControl),
         dropdownColor: Theme.of(context).colorScheme.surface,
         icon: Icon(Icons.keyboard_arrow_down_rounded, color: _hint(context)),
-        style: TextStyle(color: onSurface, fontSize: 15),
+        style: TextStyle(
+          fontFamily: AppTheme.bodyFont,
+          color: onSurface,
+          fontSize: 15,
+        ),
         hint: Text(hint, style: TextStyle(color: _hint(context), fontSize: 15)),
         decoration: _decoration(
           context,
