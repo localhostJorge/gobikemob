@@ -117,6 +117,36 @@ void main() {
   });
 
   group('the Login page', () {
+    testWidgets('and the splash stay light when the app is in dark mode', (
+      tester,
+    ) async {
+      await phone(tester);
+      for (final home in const [SplashScreen(), LoginScreen()]) {
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: ThemeMode.dark,
+            home: home,
+          ),
+        );
+        await tester.pump();
+        final scaffold = find.byType(Scaffold).first;
+        expect(
+          Theme.of(tester.element(scaffold)).brightness,
+          Brightness.light,
+          reason: '${home.runtimeType}',
+        );
+        expect(
+          tester.widget<Scaffold>(scaffold).backgroundColor,
+          Colors.white,
+          reason: '${home.runtimeType}',
+        );
+        await tester.pump(const Duration(seconds: 3));
+      }
+    });
+
     testWidgets('says what the app is for, not "Welcome back"', (tester) async {
       await phone(tester);
       await tester.pumpWidget(const MaterialApp(home: LoginScreen()));

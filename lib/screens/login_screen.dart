@@ -111,8 +111,12 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // Always the light page, whatever the app's dark-mode setting.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      AlwaysLight(child: Builder(builder: _page));
+
+  Widget _page(BuildContext context) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
     final muted = onSurface.withValues(alpha: 0.6);
@@ -156,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontFamily: 'Poppins',
-                          fontSize: 24,
+                          fontSize: 22,
                           height: 1.25,
                           fontWeight: FontWeight.w600,
                           color: onSurface,

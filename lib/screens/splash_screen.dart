@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../core/app_router.dart';
@@ -186,16 +185,11 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     };
 
-    final onWhite = _show != _Show.logo;
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      // Dark status-bar icons on the white video page, even in dark mode.
-      value: onWhite
-          ? SystemUiOverlayStyle.dark
-          : (Theme.of(context).brightness == Brightness.dark
-                ? SystemUiOverlayStyle.light
-                : SystemUiOverlayStyle.dark),
+    // Always white with dark status-bar icons, as the video is, whatever the app's
+    // dark-mode setting.
+    return AlwaysLight(
       child: Scaffold(
-        backgroundColor: onWhite ? Colors.white : authBackground(context),
+        backgroundColor: Colors.white,
         body: Semantics(
           label: 'RondaGo is starting',
           container: true,

@@ -1,10 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../core/theme.dart';
 import '../screens/patient/app_colors.dart';
 import 'brand.dart';
 
 /// The brand blue on the sign-in pages (see [AppColors.blue]).
 const Color kAuthBlue = AppColors.blue;
+
+/// Shows [child] in the light theme whatever the app's setting, with dark status-bar
+/// icons: the splash and the Login page always look the same, white with the logo.
+class AlwaysLight extends StatelessWidget {
+  const AlwaysLight({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
+    value: SystemUiOverlayStyle.dark,
+    child: Theme(data: AppTheme.lightTheme, child: child),
+  );
+}
 
 /// White page in light mode, the theme's dark background in dark mode.
 Color authBackground(BuildContext context) {
