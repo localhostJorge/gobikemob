@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../screens/patient/app_colors.dart';
+
 enum ToastType { success, error, info }
 
 class AppToast {
@@ -101,7 +103,7 @@ class _ToastWidgetState extends State<_ToastWidget> {
       case ToastType.error:
         return const Color(0xFFDC4C4C);
       case ToastType.info:
-        return const Color(0xFF2E62C8);
+        return AppColors.blue;
     }
   }
 

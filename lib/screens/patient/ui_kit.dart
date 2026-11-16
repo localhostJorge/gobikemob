@@ -29,28 +29,44 @@ abstract final class Rd {
   static const double card = 16;
 
   /// Dialogs and sheets.
-  static const double sheet = 20;
+  static const double sheet = 24;
 }
 
-/// The app font. Named where a widget (a button) replaces the inherited style.
+/// The body font. Named where a widget (a button) replaces the inherited style.
 const kFontFamily = 'Roboto';
 
-/// The type scale. Six sizes; weight and color do the rest of the hierarchy.
+/// The heading font: Poppins, as in the RondaGo wordmark. Titles, headings and big
+/// numbers only; running text stays in [kFontFamily].
+const kHeadingFont = 'Poppins';
+
+/// The type scale for the whole app. Weight, font and color do the rest of the
+/// hierarchy.
 ///
-/// These styles carry no color, so text takes the theme's (navy in light mode, white in dark).
-/// Secondary text asks for the muted color with `T.secondary.muted(context)`.
+/// These styles carry no color, so text takes the theme's (ink in light mode,
+/// near-white in dark). Secondary text asks for the muted color with
+/// `T.secondary.muted(context)`.
 abstract final class T {
   /// Screen heading on the tabs.
   static const title = TextStyle(
+    fontFamily: kHeadingFont,
     fontSize: 24,
-    height: 1.2,
-    fontWeight: FontWeight.w800,
+    height: 1.25,
+    fontWeight: FontWeight.w700,
   );
 
   /// Section headings, dialog titles, page titles.
   static const heading = TextStyle(
-    fontSize: 17,
+    fontFamily: kHeadingFont,
+    fontSize: 18,
     height: 1.3,
+    fontWeight: FontWeight.w600,
+  );
+
+  /// Big numbers: counts and stats.
+  static const stat = TextStyle(
+    fontFamily: kHeadingFont,
+    fontSize: 24,
+    height: 1.1,
     fontWeight: FontWeight.w700,
   );
 
@@ -58,7 +74,7 @@ abstract final class T {
   static const rowTitle = TextStyle(
     fontSize: 15,
     height: 1.3,
-    fontWeight: FontWeight.w700,
+    fontWeight: FontWeight.w600,
   );
 
   /// Running text.
@@ -85,7 +101,7 @@ abstract final class T {
     // A button's text style replaces the inherited one, so name the font.
     fontFamily: kFontFamily,
     fontSize: 16,
-    fontWeight: FontWeight.w700,
+    fontWeight: FontWeight.w600,
     letterSpacing: 0.1,
   );
 }

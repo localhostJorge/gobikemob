@@ -2,28 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/theme.dart';
+import '../screens/patient/app_colors.dart';
 
-// Brand tokens used by the form widgets.
-const Color _kBlue = Color(0xFF2E62C8);
-const Color _kError = Color(0xFFD93025);
+// The form widgets take every colour from the app palette, so they follow the theme.
+Color _brand(BuildContext c) => c.pal.brand;
+Color _error(BuildContext c) => c.pal.redText;
 
-// Dark mode takes its surfaces from the theme's colour scheme, the same ones
-// the cards and the profile panel use.
+// A field sits a shade off the page in light mode and on the card colour in dark mode.
 Color _fill(BuildContext c) => Theme.of(c).brightness == Brightness.dark
-    ? Theme.of(c).colorScheme.surfaceContainerLow
-    : const Color(0xFFF5F7FB);
+    ? c.pal.card
+    : c.pal.background;
 
-Color _border(BuildContext c) => Theme.of(c).brightness == Brightness.dark
-    ? AppTheme.darkLine
-    : const Color(0xFFE2E6EE);
+Color _border(BuildContext c) => c.pal.line;
 
-Color _hint(BuildContext c) => Theme.of(c).brightness == Brightness.dark
-    ? Theme.of(c).colorScheme.onSurfaceVariant
-    : const Color(0xFF8A94A6);
+Color _hint(BuildContext c) => c.pal.muted;
 
 OutlineInputBorder _outline(Color color, {double width = 1}) =>
     OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(AppTheme.radiusControl),
       borderSide: BorderSide(color: color, width: width),
     );
 
@@ -45,14 +41,14 @@ InputDecoration _decoration(
     fillColor: _fill(context),
     counterText: '',
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-    prefixIcon: Icon(icon, size: 22, color: focused ? _kBlue : _hint(context)),
+    prefixIcon: Icon(icon, size: 22, color: focused ? _brand(context) : _hint(context)),
     suffixIcon: suffix,
-    errorStyle: const TextStyle(color: _kError, fontSize: 12, height: 1.3),
+    errorStyle: TextStyle(color: _error(context), fontSize: 12, height: 1.3),
     enabledBorder: _outline(_border(context)),
     disabledBorder: _outline(_border(context)),
-    focusedBorder: _outline(_kBlue, width: 1.5),
-    errorBorder: _outline(_kError),
-    focusedErrorBorder: _outline(_kError, width: 1.5),
+    focusedBorder: _outline(_brand(context), width: 1.5),
+    errorBorder: _outline(_error(context)),
+    focusedErrorBorder: _outline(_error(context), width: 1.5),
   );
 }
 
@@ -168,7 +164,7 @@ class _AppTextFieldState extends State<AppTextField> {
           onFieldSubmitted: widget.onSubmitted,
           autovalidateMode: AutovalidateMode.onUserInteraction,
           style: TextStyle(color: onSurface, fontSize: 15),
-          cursorColor: _kBlue,
+          cursorColor: _brand(context),
           decoration: _decoration(
             context,
             hint: widget.hint,
@@ -218,7 +214,7 @@ class AppDropdownField extends StatelessWidget {
         validator: validator,
         onChanged: onChanged,
         autovalidateMode: AutovalidateMode.onUserInteraction,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppTheme.radiusControl),
         dropdownColor: Theme.of(context).colorScheme.surface,
         icon: Icon(Icons.keyboard_arrow_down_rounded, color: _hint(context)),
         style: TextStyle(color: onSurface, fontSize: 15),

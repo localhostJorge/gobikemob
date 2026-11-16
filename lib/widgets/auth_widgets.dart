@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
-const Color kAuthBlue = Color(0xFF2E62C8);
+import '../screens/patient/app_colors.dart';
+import 'brand.dart';
+
+/// The brand blue on the sign-in pages (see [AppColors.blue]).
+const Color kAuthBlue = AppColors.blue;
 
 /// White page in light mode, the theme's dark background in dark mode.
 Color authBackground(BuildContext context) {
@@ -25,26 +29,15 @@ BorderSide authCheckboxSide(BuildContext context) {
 /// from one to the next instead of jumping.
 const authLogoHero = 'auth-logo';
 
-/// Logo. In dark mode it sits on a white rounded plate so it stays readable.
+/// The RondaGo icon on the sign-in pages. It carries its own blue background, so it
+/// needs no plate in dark mode.
 class AuthLogo extends StatelessWidget {
   const AuthLogo({super.key, this.height = 80});
 
   final double height;
 
   @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final logo = Image.asset('assets/images/logo.png', height: height);
-    if (!dark) return logo;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: logo,
-    );
-  }
+  Widget build(BuildContext context) => RondaGoIcon(size: height);
 }
 
 /// Thin lines with a small "or" in the middle.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/first_run.dart';
 import '../widgets/auth_widgets.dart';
+import '../widgets/brand.dart';
 import '../widgets/fade_in_slide.dart';
 import 'create_account_screen.dart';
 import 'login_screen.dart';
@@ -24,15 +25,20 @@ class WelcomeScreen extends StatelessWidget {
             children: [
               const Spacer(flex: 3),
               // A plain Hero, not inside FadeInSlide: the logo glides in from the splash screen.
-              const Hero(tag: authLogoHero, child: AuthLogo(height: 150)),
-              const SizedBox(height: 28),
+              const Hero(tag: authLogoHero, child: AuthLogo(height: 112)),
+              const SizedBox(height: 18),
+              const FadeInSlide(
+                delay: Duration(milliseconds: 60),
+                child: RondaGoWordmark(fontSize: 36),
+              ),
+              const SizedBox(height: 24),
               FadeInSlide(
                 delay: const Duration(milliseconds: 120),
                 child: Text(
                   'Saving lives one ride at a time',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 22,
                     fontWeight: FontWeight.w700,
                     color: onSurface,
                   ),

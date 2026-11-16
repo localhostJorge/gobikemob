@@ -1,46 +1,63 @@
 import 'package:flutter/material.dart';
 
-/// The resident app's fixed colors: brand fills, big shapes and icons. They look
-/// the same in light and dark mode. Everything that has to change with the theme
-/// (pages, cards, text, lines, the readable status shades) lives in [AppPalette].
+/// The RondaGo colors that look the same in light and dark mode: the brand (from the
+/// logo, the app icon and the splash video) and the emergency red. Everything that has
+/// to change with the theme (pages, cards, text, lines, readable status shades) lives
+/// in [AppPalette].
+///
+/// Brand rules:
+/// - [blue] is the brand: buttons, links, active states. White text on it is 5.6:1.
+/// - [navy] is for headings and the big brand surfaces (home header, ronda card).
+/// - [orange] is an accent only: dots, badges, highlights, the "Go". White text on it
+///   is 2.6:1, so it never sits behind white text; orange words use `orangeText`.
+/// - [red] means emergency (SOS) and danger, nothing else.
 class AppColors {
   // Brand
+  static const blue = Color(0xFF1667C2);
+  static const navy = Color(0xFF0B3D78);
+  static const orange = Color(0xFFF58220);
+
+  /// Blue a step darker, for a pressed button.
+  static const bluePressed = Color(0xFF0F4F9A);
+
+  // Emergency
   static const red = Color(0xFFE53935);
 
-  /// Fill for buttons with white labels: one shade deeper than [red] so the
-  /// label passes 4.5:1 contrast.
+  /// Fill for SOS and danger buttons with white labels: one shade deeper than [red]
+  /// so the label passes 4.5:1 contrast.
   static const redButton = Color(0xFFD32F2F);
 
-  // Accents (fills, icons)
-  static const blue = Color(0xFF3B5BDB);
-  static const orange = Color(0xFFF2711C);
   static const green = Color(0xFF2E9E5B);
 
   // The light theme's colors. Read these through `context.pal`, which switches
   // to the dark ones; they stay here for places with no context (const styles).
+  static const blueSoft = Color(0xFFEAF2FC);
   static const redSoft = Color(0xFFFDE8E8);
-  static const textDark = Color(0xFF1B1F3B); // navy
-  static const background = Color(0xFFF8F5F5);
+  static const textDark = Color(0xFF13233D); // ink
+  static const background = Color(0xFFF5F8FC);
   static const card = Colors.white;
-  static const textMuted = Color(0xFF656B79);
-  static const line = Color(0xFFECE7E7); // card borders
-  static const divider = Color(0xFFF0ECEC); // rules inside a card
+  static const textMuted = Color(0xFF5B6577);
+  static const line = Color(0xFFE3E9F2); // card borders
+  static const divider = Color(0xFFEEF2F7); // rules inside a card
   static const redText = Color(0xFFC62828);
   static const orangeText = Color(0xFFC2410C);
   static const greenText = Color(0xFF1B7F4B);
-  static const skeleton = Color(0xFFE6E0E0);
-  static const skeletonShine = Color(0xFFF4F0F0);
+  static const skeleton = Color(0xFFE4EAF2);
+  static const skeletonShine = Color(0xFFF2F5FA);
 }
 
 /// The colors that change with the theme. The `*Text` colors are shades dark
 /// enough (light mode) or light enough (dark mode) to keep small text readable,
 /// 4.5:1 or better on [card] and [background].
 ///
-/// Dark mode is the same palette the GoBiker screens use (see `AppTheme`): a
-/// near-black page, slightly lighter cards, and a navy outline.
+/// One palette for the whole app, GoBiker and resident screens alike.
 @immutable
 class AppPalette extends ThemeExtension<AppPalette> {
   const AppPalette({
+    required this.brand,
+    required this.brandSoft,
+    required this.heading,
+    required this.accent,
     required this.background,
     required this.card,
     required this.line,
@@ -55,6 +72,20 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.skeletonShine,
     required this.scrim,
   });
+
+  /// Brand blue as text, icons and outlines: links, active tabs, selected states.
+  /// Buttons are filled with [AppColors.blue] in both themes (white text on it is
+  /// 5.6:1); this is the readable shade for the current page.
+  final Color brand;
+
+  /// A pale brand tint: selected pills, icon tiles, info panels.
+  final Color brandSoft;
+
+  /// Page and section titles: navy on light pages, near-white on dark ones.
+  final Color heading;
+
+  /// The orange accent for dots, badges and highlights (never behind text).
+  final Color accent;
 
   /// The page behind everything.
   final Color background;
@@ -88,6 +119,10 @@ class AppPalette extends ThemeExtension<AppPalette> {
   final Color scrim;
 
   static const light = AppPalette(
+    brand: AppColors.blue,
+    brandSoft: AppColors.blueSoft,
+    heading: AppColors.navy,
+    accent: AppColors.orange,
     background: AppColors.background,
     card: AppColors.card,
     line: AppColors.line,
@@ -100,23 +135,29 @@ class AppPalette extends ThemeExtension<AppPalette> {
     redSoft: AppColors.redSoft,
     skeleton: AppColors.skeleton,
     skeletonShine: AppColors.skeletonShine,
-    scrim: Color(0xFF2B2F4A),
+    scrim: Color(0xFF102A4C),
   );
 
+  /// Dark mode: a deep blue-black page, slightly lighter cards, a navy outline, and
+  /// the brand blue lifted so it stays readable as text.
   static const dark = AppPalette(
-    background: Color(0xFF121318),
-    card: Color(0xFF1A1B21),
-    line: Color(0xFF2A3752),
-    divider: Color(0xFF262A38),
-    ink: Color(0xFFE2E2E9),
-    muted: Color(0xFFB0B4C3),
+    brand: Color(0xFF6EA8EE),
+    brandSoft: Color(0xFF16294A),
+    heading: Color(0xFFF2F5FA),
+    accent: AppColors.orange,
+    background: Color(0xFF0B1220),
+    card: Color(0xFF131C2E),
+    line: Color(0xFF24324A),
+    divider: Color(0xFF1C2840),
+    ink: Color(0xFFE6EBF3),
+    muted: Color(0xFFA9B4C6),
     redText: Color(0xFFFF8F89),
     orangeText: Color(0xFFFFB27A),
     greenText: Color(0xFF6FD3A0),
     redSoft: Color(0xFF3A2024),
-    skeleton: Color(0xFF26282F),
-    skeletonShine: Color(0xFF30323B),
-    scrim: Color(0xFF2E3140),
+    skeleton: Color(0xFF1C2638),
+    skeletonShine: Color(0xFF26324A),
+    scrim: Color(0xFF1E2B42),
   );
 
   /// A fixed status color (picked to read on light cards) as text in this theme:
@@ -127,6 +168,10 @@ class AppPalette extends ThemeExtension<AppPalette> {
 
   @override
   AppPalette copyWith({
+    Color? brand,
+    Color? brandSoft,
+    Color? heading,
+    Color? accent,
     Color? background,
     Color? card,
     Color? line,
@@ -141,6 +186,10 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? skeletonShine,
     Color? scrim,
   }) => AppPalette(
+    brand: brand ?? this.brand,
+    brandSoft: brandSoft ?? this.brandSoft,
+    heading: heading ?? this.heading,
+    accent: accent ?? this.accent,
     background: background ?? this.background,
     card: card ?? this.card,
     line: line ?? this.line,
@@ -161,6 +210,10 @@ class AppPalette extends ThemeExtension<AppPalette> {
     if (other is! AppPalette) return this;
     Color mix(Color a, Color b) => Color.lerp(a, b, t)!;
     return AppPalette(
+      brand: mix(brand, other.brand),
+      brandSoft: mix(brandSoft, other.brandSoft),
+      heading: mix(heading, other.heading),
+      accent: mix(accent, other.accent),
       background: mix(background, other.background),
       card: mix(card, other.card),
       line: mix(line, other.line),
@@ -179,7 +232,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
 }
 
 extension AppPaletteContext on BuildContext {
-  /// The resident palette for the current theme (light if none is set).
+  /// The app palette for the current theme (light if none is set).
   AppPalette get pal =>
       Theme.of(this).extension<AppPalette>() ?? AppPalette.light;
 }

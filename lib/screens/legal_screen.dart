@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/api_config.dart';
 import '../core/theme.dart';
+import 'patient/app_colors.dart';
 import '../widgets/auth_widgets.dart';
 
 enum LegalType { terms, privacy }
@@ -483,9 +484,7 @@ class _LegalTextState extends State<_LegalText> {
       height: 1.55,
       color: onSurface.withValues(alpha: 0.72),
     );
-    final linkColor = Theme.of(context).brightness == Brightness.dark
-        ? const Color(0xFF8AB4FF)
-        : AppTheme.blue;
+    final linkColor = context.pal.brand;
 
     TextSpan span(_Block block) => TextSpan(
       style: base,

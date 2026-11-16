@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../widgets/app_text_field.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/auth_widgets.dart';
+import '../widgets/brand.dart';
 import '../widgets/loading_overlay.dart';
 import '../core/app_router.dart';
 import '../core/auth_service.dart';
@@ -134,13 +135,25 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Center(
-                        child: Hero(
-                          tag: authLogoHero,
-                          child: AuthLogo(height: 88),
-                        ),
+                      // The full RondaGo logo, as the brand video ends: icon, then wordmark.
+                      const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Hero(
+                            tag: authLogoHero,
+                            child: AuthLogo(height: 60),
+                          ),
+                          SizedBox(width: 14),
+                          // On a very narrow phone the wordmark shrinks to fit.
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: RondaGoWordmark(fontSize: 32),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 28),
                       Text(
                         'Every Ride Has a Purpose.',
                         textAlign: TextAlign.center,

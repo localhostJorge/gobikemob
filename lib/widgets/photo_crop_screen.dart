@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:flutter/material.dart';
 
+import '../screens/patient/app_colors.dart';
 import 'app_toast.dart';
 
 /// Lets the person frame their profile photo before it is used: drag and pinch the picture
@@ -23,7 +24,7 @@ class PhotoCropScreen extends StatefulWidget {
 
 class _PhotoCropScreenState extends State<PhotoCropScreen> {
   static const _backdrop = Color(0xFF0B0C10);
-  static const _brandBlue = Color(0xFF2E62C8);
+  static const _brandBlue = AppColors.blue;
 
   final _controller = CropController();
 

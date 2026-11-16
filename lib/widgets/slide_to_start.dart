@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../screens/patient/app_colors.dart';
+
 /// Lets the dashboard move the thumb back to the left (for example after Cancel).
 class SlideToStartController {
   _SlideToStartState? _state;
@@ -28,7 +30,7 @@ class _SlideToStartState extends State<SlideToStart>
   static const double _height = 54;
   static const double _thumb = 46;
   static const double _pad = 4;
-  static const Color _blue = Color(0xFF2E62C8);
+  static const Color _blue = AppColors.blue;
 
   double _drag = 0;
   bool _dragging = false;

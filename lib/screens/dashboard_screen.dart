@@ -12,9 +12,11 @@ import '../core/greeting.dart';
 import '../core/live_map.dart';
 import '../core/presence_service.dart';
 import '../core/theme.dart';
+import 'patient/app_colors.dart';
 import '../core/tracking_service.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/bottom_gap.dart';
+import '../widgets/brand.dart';
 import '../widgets/confirm_modal.dart';
 import '../widgets/emergency_status_card.dart';
 import '../widgets/fade_in_slide.dart';
@@ -685,7 +687,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildHeader(ThemeData theme, Color muted, String firstName) {
-    final isDark = theme.brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: BoxDecoration(
@@ -694,24 +695,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
       child: Row(
         children: [
-          Container(
-            padding: isDark
-                ? const EdgeInsets.symmetric(horizontal: 8, vertical: 4)
-                : EdgeInsets.zero,
-            decoration: BoxDecoration(
-              color: isDark ? Colors.white : Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Image.asset(
-              'assets/images/logo.png',
-              height: 36,
-              errorBuilder: (context, error, stackTrace) => const Icon(
-                Icons.directions_bike_rounded,
-                color: AppTheme.blue,
-                size: 32,
-              ),
-            ),
-          ),
+          const RondaGoIcon(size: 40),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -1142,7 +1126,7 @@ class _NavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     // The brand blue is too dark to read against a dark bar, so dark mode lifts it.
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final accent = isDark ? const Color(0xFF7FA6F0) : AppTheme.blue;
+    final accent = context.pal.brand;
     final color = selected ? accent : muted;
     return Expanded(
       child: InkWell(

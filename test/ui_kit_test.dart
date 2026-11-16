@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -65,6 +66,90 @@ void main() {
         _contrast(AppColors.textMuted, AppColors.background),
         greaterThanOrEqualTo(4.5),
       );
+    });
+
+    test('every text color is readable on cards and pages, in both themes', () {
+      for (final theme in {
+        'light': AppPalette.light,
+        'dark': AppPalette.dark,
+      }.entries) {
+        final p = theme.value;
+        for (final c in {
+          'ink': p.ink,
+          'muted': p.muted,
+          'heading': p.heading,
+          'brand': p.brand,
+          'redText': p.redText,
+          'orangeText': p.orangeText,
+          'greenText': p.greenText,
+        }.entries) {
+          for (final bg in {'card': p.card, 'background': p.background}.entries) {
+            expect(
+              _contrast(c.value, bg.value),
+              greaterThanOrEqualTo(4.5),
+              reason: '${theme.key} ${c.key} on ${bg.key}',
+            );
+          }
+        }
+        expect(
+          _contrast(p.brand, p.brandSoft),
+          greaterThanOrEqualTo(4.5),
+          reason: '${theme.key} brand on its soft tint (a selected pill)',
+        );
+        expect(
+          _contrast(Colors.white, p.scrim),
+          greaterThanOrEqualTo(4.5),
+          reason: '${theme.key} toast text',
+        );
+      }
+    });
+
+    test('white labels on the brand fills are readable (4.5:1)', () {
+      for (final c in {
+        'blue': AppColors.blue,
+        'bluePressed': AppColors.bluePressed,
+        'navy': AppColors.navy,
+      }.entries) {
+        expect(
+          _contrast(Colors.white, c.value),
+          greaterThanOrEqualTo(4.5),
+          reason: c.key,
+        );
+      }
+    });
+
+    test('the brand colors are the RondaGo logo colors', () {
+      expect(AppColors.blue, const Color(0xFF1667C2));
+      expect(AppColors.orange, const Color(0xFFF58220));
+      expect(AppColors.navy, const Color(0xFF0B3D78));
+      expect(AppTheme.blue, AppColors.blue);
+      expect(AppTheme.orange, AppColors.orange);
+      expect(AppTheme.navy, AppColors.navy);
+    });
+
+    test('the theme is built on the brand: buttons, links and fields', () {
+      for (final theme in [AppTheme.lightTheme, AppTheme.darkTheme]) {
+        final pal = theme.extension<AppPalette>()!;
+        final filled = theme.elevatedButtonTheme.style!;
+        expect(filled.backgroundColor!.resolve({}), AppColors.blue);
+        expect(filled.foregroundColor!.resolve({}), Colors.white);
+        expect(theme.colorScheme.primary, pal.brand);
+        expect(theme.scaffoldBackgroundColor, pal.background);
+        expect(theme.textTheme.titleLarge!.fontFamily, AppTheme.headingFont);
+        expect(theme.textTheme.bodyMedium!.fontFamily, AppTheme.bodyFont);
+      }
+    });
+
+    test('the old GoBike blue and navy are gone from the app', () {
+      final old = RegExp(r'0xFF(2E62C8|1E1E48|3B5BDB|7FA6F0|8AB4FF)');
+      final offenders = [
+        for (final f in Directory('lib').listSync(recursive: true))
+          if (f is File &&
+              f.path.endsWith('.dart') &&
+              old.hasMatch(f.readAsStringSync()))
+            f.path,
+      ];
+      expect(offenders, isEmpty);
     });
   });
 
