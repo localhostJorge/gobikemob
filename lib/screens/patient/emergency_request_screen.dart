@@ -438,6 +438,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
               child: PrimaryButton(
                 label: 'Send SOS',
                 icon: Icons.send_rounded,
+                danger: true,
                 loading: _sending,
                 onPressed: _send,
               ),

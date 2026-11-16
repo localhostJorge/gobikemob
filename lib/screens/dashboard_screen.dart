@@ -12,10 +12,10 @@ import '../core/greeting.dart';
 import '../core/live_map.dart';
 import '../core/presence_service.dart';
 import '../core/theme.dart';
-import 'patient/app_colors.dart';
 import '../core/tracking_service.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/bottom_gap.dart';
+import '../widgets/ronda_nav_bar.dart';
 import '../widgets/brand.dart';
 import '../widgets/confirm_modal.dart';
 import '../widgets/emergency_status_card.dart';
@@ -458,7 +458,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       isLoading: _starting || _resuming,
       message: _resuming ? 'Resuming ronda...' : 'Starting ronda...',
       child: Scaffold(
+        // The bottom bar reserves the phone's navigation area itself (bottomGap).
         body: SafeArea(
+          bottom: false,
           child: Column(
             children: [
               // 1) Greeting header
@@ -621,11 +623,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
 
               // Bottom bar (Profile at the far right)
-              FadeInSlide(
-                delay: const Duration(milliseconds: 480),
-                offset: const Offset(0, 24),
-                child: _buildBottomBar(theme, muted),
-              ),
+              _buildBottomBar(),
             ],
           ),
         ),
@@ -1058,113 +1056,45 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _buildBottomBar(ThemeData theme, Color muted) {
-    return Container(
-      // 12 dp above what the SafeArea leaves, plus the home-gesture strip it does not know about.
-      margin: EdgeInsets.fromLTRB(16, 4, 16, 12 + extraBottomGap(context)),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: _cardDecoration(
-        theme,
-        shadow: true,
-      ).copyWith(borderRadius: BorderRadius.circular(20)),
-      child: Row(
-        children: [
-          _NavItem(
-            icon: Icons.home_rounded,
-            label: 'Home',
-            selected: !_profileOpen,
-            muted: muted,
-            onTap: () {},
-          ),
-          _NavItem(
-            icon: Icons.map_rounded,
-            label: 'Map',
-            selected: false,
-            muted: muted,
-            // Open SOS requests assigned to this GoBiker.
-            badge: GobikerSos.instance.open.length,
-            onTap: _onMap,
-          ),
-          _NavItem(
-            icon: Icons.history_rounded,
-            label: 'History',
-            selected: false,
-            muted: muted,
-            onTap: _openHistory,
-          ),
-          _NavItem(
-            icon: Icons.person_rounded,
-            label: 'Profile',
-            selected: _profileOpen,
-            muted: muted,
-            onTap: _openProfile,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.muted,
-    required this.onTap,
-    this.badge = 0,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final Color muted;
-  final VoidCallback onTap;
-  final int badge;
-
-  @override
-  Widget build(BuildContext context) {
-    // The brand blue is too dark to read against a dark bar, so dark mode lifts it.
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final accent = context.pal.brand;
-    final color = selected ? accent : muted;
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: selected
-                ? accent.withValues(alpha: isDark ? 0.18 : 0.10)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Icon(icon, size: 26, color: color),
-                  if (badge > 0)
-                    Positioned(top: -4, right: -10, child: _CountBadge(badge)),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
+  Widget _buildBottomBar() {
+    // Home is the only real tab: Map and History open their own screens, and
+    // Profile slides in a panel (while it is open, Profile shows as selected).
+    return RondaNavBar(
+      selectedIndex: _profileOpen ? 3 : 0,
+      bottomInset: bottomGap(context),
+      onTap: (i) {
+        switch (i) {
+          case 1:
+            _onMap();
+          case 2:
+            _openHistory();
+          case 3:
+            _openProfile();
+        }
+      },
+      items: [
+        const RondaNavItem(
+          label: 'Home',
+          icon: Icons.home_outlined,
+          selectedIcon: Icons.home_rounded,
         ),
-      ),
+        RondaNavItem(
+          label: 'Map',
+          icon: Icons.map_outlined,
+          selectedIcon: Icons.map_rounded,
+          // Open SOS requests assigned to this GoBiker.
+          badge: GobikerSos.instance.open.length,
+          semanticLabel: GobikerSos.instance.open.isEmpty
+              ? 'Map'
+              : 'Map, ${GobikerSos.instance.open.length} open SOS',
+        ),
+        const RondaNavItem(label: 'History', icon: Icons.history_rounded),
+        const RondaNavItem(
+          label: 'Profile',
+          icon: Icons.person_outline_rounded,
+          selectedIcon: Icons.person_rounded,
+        ),
+      ],
     );
   }
 }

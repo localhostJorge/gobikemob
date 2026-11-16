@@ -29,6 +29,10 @@ class AppColors {
 
   static const green = Color(0xFF2E9E5B);
 
+  // Status fills (icons, tints). As text, read them through `context.pal.tone(...)`.
+  static const success = Color(0xFF2E9D67);
+  static const danger = Color(0xFFDC4C4C);
+
   // The light theme's colors. Read these through `context.pal`, which switches
   // to the dark ones; they stay here for places with no context (const styles).
   static const blueSoft = Color(0xFFEAF2FC);
@@ -165,6 +169,21 @@ class AppPalette extends ThemeExtension<AppPalette> {
   Color readable(Color c) => background.computeLuminance() < 0.2
       ? Color.lerp(c, Colors.white, 0.55)!
       : c;
+
+  /// The shade of a brand or status color to use for text and icons in this theme,
+  /// readable (4.5:1) on cards and on a pale tint of the same color. The orange and
+  /// green fills are too light for text, so they map to their text shades.
+  Color tone(Color c) {
+    if (c == AppColors.orange) return orangeText;
+    if (c == AppColors.success || c == AppColors.green) return greenText;
+    if (c == AppColors.danger ||
+        c == AppColors.red ||
+        c == AppColors.redButton) {
+      return redText;
+    }
+    if (c == AppColors.blue) return brand;
+    return readable(c);
+  }
 
   @override
   AppPalette copyWith({

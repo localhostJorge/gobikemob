@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme.dart';
+import '../screens/patient/app_colors.dart';
 
 /// Someone's profile photo, or a round badge with their initials when there
 /// is none.
@@ -49,7 +50,7 @@ class InitialsAvatar extends StatelessWidget {
       style: TextStyle(
         fontSize: fontSize ?? radius * 0.66,
         fontWeight: FontWeight.w700,
-        color: color,
+        color: context.pal.tone(color),
       ),
     );
 

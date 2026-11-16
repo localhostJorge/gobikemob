@@ -9,6 +9,7 @@ import '../../core/resident_sos.dart';
 import '../../core/resident_visits.dart';
 import '../live_map_screen.dart';
 import '../../widgets/bottom_gap.dart';
+import '../../widgets/ronda_nav_bar.dart';
 import 'app_colors.dart';
 import 'appointment_screen.dart';
 import 'emergency_request_screen.dart';
@@ -243,72 +244,40 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
         final updates = PatientStore.instance.unseenVisitCount(
           ResidentAppointments.instance.appointments,
         );
-        return Container(
+        return RondaNavBar(
+          selectedIndex: _tab,
+          onTap: (i) => setState(() => _tab = i),
           // Room for the phone's own navigation area and its home-gesture strip, so the
           // tabs sit above it instead of down in it (and a tap on one is not a swipe home).
-          padding: EdgeInsets.only(bottom: bottomGap(context) + 4),
-          decoration: BoxDecoration(
-            color: context.pal.card,
-            border: Border(top: BorderSide(color: context.pal.line)),
-          ),
-          // The gap is already added above; the bar must not add its own as well.
-          child: MediaQuery.removePadding(
-            context: context,
-            removeBottom: true,
-            child: BottomNavigationBar(
-              currentIndex: _tab,
-              onTap: (i) => setState(() => _tab = i),
-              type: BottomNavigationBarType.fixed,
-              backgroundColor: context.pal.card,
-              elevation: 0,
-              selectedItemColor: context.pal.redText,
-              unselectedItemColor: context.pal.muted,
-              selectedFontSize: 12,
-              unselectedFontSize: 12,
-              selectedLabelStyle: T.meta
-                  .muted(context)
-                  .copyWith(fontWeight: FontWeight.w700),
-              unselectedLabelStyle: T.meta.muted(context),
-              items: [
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.home_outlined),
-                  activeIcon: Icon(Icons.home_rounded),
-                  label: 'Home',
-                ),
-                BottomNavigationBarItem(
-                  icon: _historyIcon(updates),
-                  tooltip: updates == 0
-                      ? 'History'
-                      : 'History, $updates new ${updates == 1 ? 'update' : 'updates'}',
-                  label: 'History',
-                ),
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.shield_outlined),
-                  activeIcon: Icon(Icons.shield_rounded),
-                  label: 'Safety',
-                ),
-                const BottomNavigationBarItem(
-                  icon: NavProfileIcon(selected: false),
-                  activeIcon: NavProfileIcon(selected: true),
-                  label: 'Profile',
-                ),
-              ],
+          bottomInset: bottomGap(context),
+          items: [
+            const RondaNavItem(
+              label: 'Home',
+              icon: Icons.home_outlined,
+              selectedIcon: Icons.home_rounded,
             ),
-          ),
+            RondaNavItem(
+              label: 'History',
+              icon: Icons.history_rounded,
+              badge: updates,
+              // New answers are news, not an emergency: brand blue.
+              badgeColor: AppColors.blue,
+              semanticLabel: updates == 0
+                  ? 'History'
+                  : 'History, $updates new ${updates == 1 ? 'update' : 'updates'}',
+            ),
+            const RondaNavItem(
+              label: 'Safety',
+              icon: Icons.shield_outlined,
+              selectedIcon: Icons.shield_rounded,
+            ),
+            RondaNavItem(
+              label: 'Profile',
+              iconBuilder: (selected) => NavProfileIcon(selected: selected),
+            ),
+          ],
         );
       },
-    );
-  }
-
-  /// The History icon, with a count of the answers the person has not opened yet.
-  Widget _historyIcon(int updates) {
-    const icon = Icon(Icons.history_rounded);
-    if (updates == 0) return icon;
-    return Badge(
-      label: Text('$updates'),
-      backgroundColor: AppColors.redButton,
-      textColor: Colors.white,
-      child: icon,
     );
   }
 }

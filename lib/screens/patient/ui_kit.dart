@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/confirm_modal.dart';
 import 'app_colors.dart';
 
-/// The resident app's shared design tokens and building blocks. Every screen
-/// uses these instead of its own sizes, so the app reads as one thing.
+/// The RondaGo design tokens and building blocks, for GoBiker and resident screens
+/// alike. Every screen uses these instead of its own sizes, so the app reads as one
+/// thing.
 
 // ---------------------------------------------------------------- tokens
 
@@ -195,7 +197,33 @@ class CardGroup extends StatelessWidget {
   }
 }
 
-/// One row of a [CardGroup]: icon, title, a supporting line, and a chevron
+/// A small rounded tile holding an icon, tinted with the icon's color: the way the
+/// app marks a row, a quick action or an empty state.
+class IconTile extends StatelessWidget {
+  const IconTile(this.icon, {super.key, this.color, this.size = 40});
+
+  final IconData icon;
+
+  /// The brand blue when null.
+  final Color? color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.pal.tone(color ?? AppColors.blue);
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(size * 0.3),
+      ),
+      child: Icon(icon, size: size * 0.55, color: c),
+    );
+  }
+}
+
+/// One row of a [CardGroup]: icon tile, title, a supporting line, and a chevron
 /// when it opens something. 64 dp tall, so it is an easy target.
 class NavRow extends StatelessWidget {
   const NavRow({
@@ -215,7 +243,7 @@ class NavRow extends StatelessWidget {
   /// Instead of [subtitle], e.g. a skeleton line while a value loads.
   final Widget? subtitleWidget;
 
-  /// The icon's color; the theme's text color when null.
+  /// The icon tile's color; the brand blue when null.
   final Color? color;
   final VoidCallback? onTap;
 
@@ -231,11 +259,11 @@ class NavRow extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 64),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(Sp.lg, 14, Sp.md, 14),
+          padding: const EdgeInsets.fromLTRB(Sp.md, 12, Sp.md, 12),
           child: Row(
             children: [
-              Icon(icon, size: 22, color: color ?? context.pal.ink),
-              const SizedBox(width: 14),
+              IconTile(icon, color: color),
+              const SizedBox(width: Sp.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -267,7 +295,12 @@ class SectionHeader extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(4, 0, 4, Sp.sm),
     child: Row(
       children: [
-        Expanded(child: Text(text, style: T.heading)),
+        Expanded(
+          child: Text(
+            text,
+            style: T.heading.copyWith(color: context.pal.heading),
+          ),
+        ),
         ?trailing,
       ],
     ),
@@ -292,7 +325,12 @@ class TabHeader extends StatelessWidget {
     ),
     child: Row(
       children: [
-        Expanded(child: Text(title, style: T.title)),
+        Expanded(
+          child: Text(
+            title,
+            style: T.title.copyWith(color: context.pal.heading),
+          ),
+        ),
         ?trailing,
       ],
     ),
@@ -301,8 +339,14 @@ class TabHeader extends StatelessWidget {
 
 // ---------------------------------------------------------------- app bar
 
-/// The bar of every pushed page: back arrow and a left-aligned title.
-PreferredSizeWidget patientAppBar(BuildContext context, String title) {
+/// The bar of every pushed page, GoBiker and resident alike: back arrow and a
+/// left-aligned title in the heading font, on the page color.
+PreferredSizeWidget rondaAppBar(
+  BuildContext context,
+  String title, {
+  List<Widget>? actions,
+  PreferredSizeWidget? bottom,
+}) {
   return AppBar(
     backgroundColor: context.pal.background,
     surfaceTintColor: Colors.transparent,
@@ -312,18 +356,25 @@ PreferredSizeWidget patientAppBar(BuildContext context, String title) {
     titleSpacing: 0,
     leading: IconButton(
       tooltip: 'Back',
-      icon: Icon(Icons.arrow_back_rounded, color: context.pal.ink),
+      icon: Icon(Icons.arrow_back_rounded, color: context.pal.heading),
       onPressed: () => Navigator.maybePop(context),
     ),
-    title: Text(title, style: T.heading),
+    title: Text(title, style: T.heading.copyWith(color: context.pal.heading)),
+    actions: actions,
+    bottom: bottom,
   );
 }
+
+/// The resident pages' name for [rondaAppBar].
+PreferredSizeWidget patientAppBar(BuildContext context, String title) =>
+    rondaAppBar(context, title);
 
 // ---------------------------------------------------------------- buttons
 
 ButtonStyle _buttonStyle({
   required Color background,
   required Color foreground,
+  Color? pressed,
   Color? border,
 }) => ButtonStyle(
   minimumSize: const WidgetStatePropertyAll(Size.fromHeight(52)),
@@ -332,6 +383,8 @@ ButtonStyle _buttonStyle({
   backgroundColor: WidgetStateProperty.resolveWith(
     (s) => s.contains(WidgetState.disabled)
         ? background.withValues(alpha: 0.4)
+        : (s.contains(WidgetState.pressed) && pressed != null)
+        ? pressed
         : background,
   ),
   foregroundColor: WidgetStateProperty.resolveWith(
@@ -367,6 +420,9 @@ Widget _buttonChild(String label, IconData? icon, bool loading, Color color) {
 }
 
 /// The one main action of a screen. Use at most one per screen.
+///
+/// Brand blue; [danger] makes it the emergency red, for sending an SOS and
+/// nothing else of everyday weight.
 class PrimaryButton extends StatelessWidget {
   const PrimaryButton({
     super.key,
@@ -374,12 +430,14 @@ class PrimaryButton extends StatelessWidget {
     required this.onPressed,
     this.loading = false,
     this.icon,
+    this.danger = false,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool loading;
   final IconData? icon;
+  final bool danger;
 
   @override
   Widget build(BuildContext context) => Semantics(
@@ -388,7 +446,8 @@ class PrimaryButton extends StatelessWidget {
     child: FilledButton(
       onPressed: loading ? null : onPressed,
       style: _buttonStyle(
-        background: AppColors.redButton,
+        background: danger ? AppColors.redButton : AppColors.blue,
+        pressed: danger ? AppColors.redText : AppColors.bluePressed,
         foreground: Colors.white,
       ),
       child: _buttonChild(label, icon, loading, Colors.white),
@@ -396,8 +455,8 @@ class PrimaryButton extends StatelessWidget {
   );
 }
 
-/// An action that matters but is not the main one. [destructive] is for
-/// things like cancelling a request.
+/// An action that matters but is not the main one: brand-blue text in an
+/// outline. [destructive] is for things like cancelling a request.
 class SecondaryButton extends StatelessWidget {
   const SecondaryButton({
     super.key,
@@ -416,15 +475,13 @@ class SecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = destructive ? context.pal.redText : context.pal.ink;
+    final color = destructive ? context.pal.redText : context.pal.brand;
     return OutlinedButton(
       onPressed: loading ? null : onPressed,
       style: _buttonStyle(
         background: Colors.transparent,
         foreground: color,
-        border: destructive
-            ? context.pal.redText.withValues(alpha: 0.5)
-            : context.pal.ink.withValues(alpha: 0.25),
+        border: color.withValues(alpha: 0.45),
       ),
       child: _buttonChild(label, icon, loading, color),
     );
@@ -476,7 +533,8 @@ class QuietButton extends StatelessWidget {
 
 // ---------------------------------------------------------------- dialogs
 
-/// The app's one confirmation dialog. Returns true when confirmed.
+/// Asks before an action; returns true when confirmed. The same dialog as the
+/// GoBiker screens' [ConfirmModal], with an optional [icon].
 Future<bool> showConfirm(
   BuildContext context, {
   required String title,
@@ -484,35 +542,16 @@ Future<bool> showConfirm(
   required String confirmLabel,
   String cancelLabel = 'Cancel',
   bool destructive = false,
-  Color? confirmColor,
+  IconData? icon,
 }) async {
-  final ok = await showDialog<bool>(
+  final ok = await ConfirmModal.show(
     context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: context.pal.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Rd.sheet),
-      ),
-      titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, Sp.sm),
-      contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, Sp.sm),
-      actionsPadding: const EdgeInsets.fromLTRB(Sp.md, 0, Sp.md, Sp.md),
-      title: Text(title, style: T.heading),
-      content: Text(message, style: T.body),
-      actions: [
-        QuietButton(
-          label: cancelLabel,
-          onPressed: () => Navigator.pop(ctx, false),
-        ),
-        QuietButton(
-          label: confirmLabel,
-          color:
-              confirmColor ??
-              (destructive ? context.pal.redText : context.pal.ink),
-          onPressed: () => Navigator.pop(ctx, true),
-        ),
-      ],
-    ),
+    icon: icon,
+    title: title,
+    description: message,
+    confirmText: confirmLabel,
+    cancelText: cancelLabel,
+    destructive: destructive,
   );
   return ok == true;
 }
@@ -551,7 +590,7 @@ class EmptyState extends StatelessWidget {
           QuietButton(
             label: actionLabel!,
             onPressed: onAction,
-            color: context.pal.redText,
+            color: context.pal.brand,
           ),
         ],
       ],

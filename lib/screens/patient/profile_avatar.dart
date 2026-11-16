@@ -45,14 +45,14 @@ class ProfileAvatar extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: context.pal.card,
-            border: Border.all(color: AppColors.red, width: big ? 3 : 2),
+            border: Border.all(color: AppColors.blue, width: big ? 3 : 2),
           ),
           child: CircleAvatar(
             radius: radius,
-            backgroundColor: context.pal.redSoft,
+            backgroundColor: context.pal.brandSoft,
             backgroundImage: profileImage(path),
             child: profileImage(path) == null
-                ? Icon(Icons.person, size: radius * 1.1, color: AppColors.red)
+                ? Icon(Icons.person, size: radius * 1.1, color: context.pal.brand)
                 : null,
           ),
         );
@@ -71,14 +71,14 @@ class ProfileAvatar extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
-                    color: context.pal.ink,
+                    color: AppColors.blue,
                     shape: BoxShape.circle,
                     border: Border.all(color: context.pal.card, width: 2),
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.photo_camera,
                     size: 16,
-                    color: context.pal.card,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -115,16 +115,16 @@ class NavProfileIcon extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
-              color: selected ? AppColors.red : context.pal.line,
+              color: selected ? context.pal.brand : context.pal.line,
               width: selected ? 2 : 1,
             ),
           ),
           child: CircleAvatar(
             radius: _photo / 2,
-            backgroundColor: context.pal.redSoft,
+            backgroundColor: context.pal.brandSoft,
             backgroundImage: profileImage(path),
             child: profileImage(path) == null
-                ? Icon(Icons.person, size: 14, color: AppColors.red)
+                ? Icon(Icons.person, size: 14, color: context.pal.brand)
                 : null,
           ),
         );

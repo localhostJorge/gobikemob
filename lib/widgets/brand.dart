@@ -54,10 +54,7 @@ class RondaGoWordmark extends StatelessWidget {
           TextSpan(text: 'Ronda'),
           TextSpan(
             text: 'Go',
-            style: TextStyle(
-              fontStyle: FontStyle.italic,
-              color: kRondaOrange,
-            ),
+            style: TextStyle(fontStyle: FontStyle.italic, color: kRondaOrange),
           ),
         ],
       ),

@@ -9,9 +9,8 @@ Color _brand(BuildContext c) => c.pal.brand;
 Color _error(BuildContext c) => c.pal.redText;
 
 // A field sits a shade off the page in light mode and on the card colour in dark mode.
-Color _fill(BuildContext c) => Theme.of(c).brightness == Brightness.dark
-    ? c.pal.card
-    : c.pal.background;
+Color _fill(BuildContext c) =>
+    Theme.of(c).brightness == Brightness.dark ? c.pal.card : c.pal.background;
 
 Color _border(BuildContext c) => c.pal.line;
 
@@ -41,7 +40,11 @@ InputDecoration _decoration(
     fillColor: _fill(context),
     counterText: '',
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-    prefixIcon: Icon(icon, size: 22, color: focused ? _brand(context) : _hint(context)),
+    prefixIcon: Icon(
+      icon,
+      size: 22,
+      color: focused ? _brand(context) : _hint(context),
+    ),
     suffixIcon: suffix,
     errorStyle: TextStyle(color: _error(context), fontSize: 12, height: 1.3),
     enabledBorder: _outline(_border(context)),

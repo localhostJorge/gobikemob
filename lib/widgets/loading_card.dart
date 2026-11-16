@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../core/theme.dart';
+import '../screens/patient/app_colors.dart';
+
 /// A small card with a spinner and a message, shown over the screen while something finishes.
 class LoadingCard extends StatelessWidget {
   const LoadingCard({super.key, required this.message});
@@ -10,8 +13,8 @@ class LoadingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(20),
+      color: context.pal.card,
+      borderRadius: BorderRadius.circular(AppTheme.radiusCard),
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -39,7 +42,7 @@ void showLoggingOut(BuildContext context, {bool useRootNavigator = false}) {
       context: context,
       useRootNavigator: useRootNavigator,
       barrierDismissible: false,
-      barrierColor: Colors.black.withValues(alpha: 0.35),
+      barrierColor: AppColors.navy.withValues(alpha: 0.35),
       builder: (_) => const PopScope(
         canPop: false,
         child: Center(child: LoadingCard(message: 'Logging out...')),

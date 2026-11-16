@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/emergency_watcher.dart';
 import '../core/theme.dart';
+import '../screens/patient/app_colors.dart';
 
 /// Shows where the GoBiker's emergency stands. Nothing is shown when no
 /// emergency was sent. Used on the dashboard and the active ronda screen.
@@ -36,8 +37,9 @@ class EmergencyStatusCard extends StatelessWidget {
             'The admin marked your emergency as resolved.',
           ),
         };
-        final muted = Theme.of(context).colorScheme.onSurface
-            .withValues(alpha: 0.7);
+        final muted = context.pal.muted;
+        // The fill tints with the status color; words and icon use its readable shade.
+        final ink = context.pal.tone(color);
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
@@ -51,7 +53,7 @@ class EmergencyStatusCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, color: color, size: 28),
+                Icon(icon, color: ink, size: 28),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -62,7 +64,7 @@ class EmergencyStatusCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: color,
+                          color: ink,
                         ),
                       ),
                       const SizedBox(height: 3),

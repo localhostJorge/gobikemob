@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme.dart';
+import '../screens/patient/app_colors.dart';
+
 /// Shows [child], and while [isLoading] covers it with a spinner (and an optional
 /// [message]) that nothing can get through: no taps, no scrolling, no keyboard focus,
 /// no screen-reader actions, so a button can't be pressed twice while a request is
@@ -38,7 +41,7 @@ class LoadingOverlay extends StatelessWidget {
               // reaches the screen below, and it cannot be dismissed by tapping.
               child: ModalBarrier(
                 dismissible: false,
-                color: Colors.black.withValues(alpha: 0.18),
+                color: AppColors.navy.withValues(alpha: 0.18),
               ),
             ),
           ),
@@ -47,9 +50,8 @@ class LoadingOverlay extends StatelessWidget {
             child: IgnorePointer(
               child: Center(
                 child: Material(
-                  color: Theme.of(context).colorScheme.surface
-                      .withValues(alpha: 0.95),
-                  borderRadius: BorderRadius.circular(20),
+                  color: context.pal.card,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusCard),
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Column(

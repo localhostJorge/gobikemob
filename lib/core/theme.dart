@@ -16,8 +16,8 @@ class AppTheme {
   static const Color infoBlue = AppColors.blue;
 
   // Status
-  static const Color successGreen = Color(0xFF2E9D67);
-  static const Color errorRed = Color(0xFFDC4C4C);
+  static const Color successGreen = AppColors.success;
+  static const Color errorRed = AppColors.danger;
 
   /// Outline of cards and fields in dark mode.
   static const Color darkLine = Color(0xFF24324A);
@@ -101,7 +101,9 @@ class AppTheme {
         (states) =>
             states.contains(WidgetState.disabled) ? pal.muted : Colors.white,
       ),
-      overlayColor: WidgetStatePropertyAll(Colors.white.withValues(alpha: 0.08)),
+      overlayColor: WidgetStatePropertyAll(
+        Colors.white.withValues(alpha: 0.08),
+      ),
       elevation: const WidgetStatePropertyAll(0),
       shape: WidgetStatePropertyAll(controlShape),
       padding: const WidgetStatePropertyAll(buttonPadding),
@@ -176,7 +178,9 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         dragHandleColor: pal.line,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(radiusSheet)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(radiusSheet),
+          ),
         ),
       ),
       snackBarTheme: SnackBarThemeData(
@@ -272,9 +276,8 @@ class AppTheme {
               : pal.divider,
         ),
         trackOutlineColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected)
-              ? AppColors.blue
-              : outline,
+          (states) =>
+              states.contains(WidgetState.selected) ? AppColors.blue : outline,
         ),
       ),
       checkboxTheme: CheckboxThemeData(
@@ -343,7 +346,9 @@ class AppTheme {
         height: 68,
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
-            color: states.contains(WidgetState.selected) ? pal.brand : pal.muted,
+            color: states.contains(WidgetState.selected)
+                ? pal.brand
+                : pal.muted,
             size: 24,
           ),
         ),
@@ -354,7 +359,9 @@ class AppTheme {
             fontWeight: states.contains(WidgetState.selected)
                 ? FontWeight.w600
                 : FontWeight.w500,
-            color: states.contains(WidgetState.selected) ? pal.brand : pal.muted,
+            color: states.contains(WidgetState.selected)
+                ? pal.brand
+                : pal.muted,
           ),
         ),
       ),
@@ -409,10 +416,7 @@ class AppTheme {
       )?.copyWith(color: pal.heading),
     );
 
-    return base.copyWith(
-      textTheme: textTheme,
-      primaryTextTheme: textTheme,
-    );
+    return base.copyWith(textTheme: textTheme, primaryTextTheme: textTheme);
   }
 }
 

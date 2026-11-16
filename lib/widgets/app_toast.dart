@@ -32,11 +32,8 @@ class AppToast {
     }
 
     entry = OverlayEntry(
-      builder: (_) => _ToastWidget(
-        message: message,
-        type: type,
-        onDismiss: dismiss,
-      ),
+      builder: (_) =>
+          _ToastWidget(message: message, type: type, onDismiss: dismiss),
     );
 
     _activeEntry = entry;
@@ -96,20 +93,24 @@ class _ToastWidgetState extends State<_ToastWidget> {
     }
   }
 
-  Color _bgColorForType() {
+  /// The icon's color: the dark palette's readable status shades, which all pass
+  /// 4.5:1 on the toast's dark bar.
+  Color _iconColorForType() {
     switch (widget.type) {
       case ToastType.success:
-        return const Color(0xFF2E9D67);
+        return AppPalette.dark.greenText;
       case ToastType.error:
-        return const Color(0xFFDC4C4C);
+        return AppPalette.dark.redText;
       case ToastType.info:
-        return AppColors.blue;
+        return AppPalette.dark.brand;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final color = _bgColorForType();
+    // One look for every toast and SnackBar: the same dark bar with white text;
+    // the icon says what kind of message it is.
+    final background = context.pal.scrim;
 
     return Positioned(
       top: MediaQuery.of(context).padding.top + 12,
@@ -118,7 +119,8 @@ class _ToastWidgetState extends State<_ToastWidget> {
       child: SafeArea(
         child: GestureDetector(
           onVerticalDragEnd: (details) {
-            if (details.primaryVelocity != null && details.primaryVelocity! < -90) {
+            if (details.primaryVelocity != null &&
+                details.primaryVelocity! < -90) {
               _dismiss();
             }
           },
@@ -133,13 +135,16 @@ class _ToastWidgetState extends State<_ToastWidget> {
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(14),
+                    color: background,
+                    borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15),
+                        color: AppColors.navy.withValues(alpha: 0.18),
                         blurRadius: 14,
                         offset: const Offset(0, 6),
                       ),
@@ -147,15 +152,23 @@ class _ToastWidgetState extends State<_ToastWidget> {
                   ),
                   child: Row(
                     children: [
-                      Icon(_iconForType(), color: Colors.white, size: 20),
+                      Icon(
+                        _iconForType(),
+                        color: _iconColorForType(),
+                        size: 22,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          widget.message,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                        // Read out as it appears, without moving focus.
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            widget.message,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),

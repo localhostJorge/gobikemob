@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../core/follow_up.dart';
 import '../core/theme.dart';
+import '../screens/patient/app_colors.dart';
 
 /// Shows the admin's decision about a patient, with the admin's note.
 class FollowUpBanner extends StatelessWidget {
@@ -14,8 +15,8 @@ class FollowUpBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final stop = followUp.isStop;
     final color = stop ? AppTheme.successGreen : AppTheme.blue;
-    final muted = Theme.of(context).colorScheme.onSurface
-        .withValues(alpha: 0.7);
+    final muted = context.pal.muted;
+    final ink = context.pal.tone(color);
     final decided = followUp.decidedAt == null
         ? null
         : DateFormat('MMM d, yyyy').format(followUp.decidedAt!);
@@ -34,7 +35,7 @@ class FollowUpBanner extends StatelessWidget {
             stop
                 ? Icons.check_circle_outline_rounded
                 : Icons.monitor_heart_outlined,
-            color: color,
+            color: ink,
             size: 24,
           ),
           const SizedBox(width: 12),
@@ -49,7 +50,7 @@ class FollowUpBanner extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: color,
+                    color: ink,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -110,8 +111,9 @@ class FollowUpChip extends StatelessWidget {
             Container(
               width: 7,
               height: 7,
-              decoration: const BoxDecoration(
-                color: AppTheme.errorRed,
+              // The orange dot from the logo marks what is new.
+              decoration: BoxDecoration(
+                color: context.pal.accent,
                 shape: BoxShape.circle,
               ),
             ),
@@ -122,7 +124,7 @@ class FollowUpChip extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: color,
+              color: context.pal.tone(color),
             ),
           ),
         ],

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_bike_app/widgets/ronda_nav_bar.dart';
 import 'package:go_bike_app/core/appointments.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_bike_app/core/auth_service.dart';
@@ -293,6 +294,118 @@ void main() {
       expect(taps, 1);
     });
 
+    testWidgets('PrimaryButton is the brand blue; danger is the SOS red', (
+      tester,
+    ) async {
+      Color fill(String label) {
+        final button = tester.widget<FilledButton>(
+          find.widgetWithText(FilledButton, label),
+        );
+        return button.style!.backgroundColor!.resolve({})!;
+      }
+
+      await tester.pumpWidget(
+        _app(
+          Column(
+            children: [
+              PrimaryButton(label: 'Save', onPressed: () {}),
+              PrimaryButton(label: 'Send SOS', danger: true, onPressed: () {}),
+            ],
+          ),
+        ),
+      );
+      expect(fill('Save'), AppColors.blue);
+      expect(fill('Send SOS'), AppColors.redButton);
+    });
+
+    testWidgets('the bottom bar marks the selected tab, and counts replace '
+        'the orange dot', (tester) async {
+      final handle = tester.ensureSemantics();
+      var tapped = -1;
+      await tester.pumpWidget(
+        _app(
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: RondaNavBar(
+              selectedIndex: 0,
+              onTap: (i) => tapped = i,
+              items: const [
+                RondaNavItem(label: 'Home', icon: Icons.home_rounded),
+                RondaNavItem(
+                  label: 'Map',
+                  icon: Icons.map_rounded,
+                  badge: 3,
+                  semanticLabel: 'Map, 3 open SOS',
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Home')),
+        matchesSemantics(
+          label: 'Home',
+          isButton: true,
+          isSelected: true,
+          hasSelectedState: true,
+          hasTapAction: true,
+        ),
+      );
+      expect(find.bySemanticsLabel('Map, 3 open SOS'), findsOneWidget);
+      expect(find.text('3'), findsOneWidget);
+
+      await tester.tap(find.text('Map'));
+      expect(tapped, 1);
+      handle.dispose();
+    });
+
+    testWidgets('a destructive confirm is red, an ordinary one blue', (
+      tester,
+    ) async {
+      Future<Color> confirmFill(bool destructive) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => showConfirm(
+                    context,
+                    title: 'Sure?',
+                    message: 'Really.',
+                    confirmLabel: 'Yes',
+                    destructive: destructive,
+                  ),
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('open'));
+        await tester.pumpAndSettle();
+        final button = tester.widget<FilledButton>(
+          find.widgetWithText(FilledButton, 'Yes'),
+        );
+        final style = button.style;
+        final color = style?.backgroundColor?.resolve({}) ??
+            Theme.of(tester.element(find.text('Yes')))
+                .filledButtonTheme
+                .style
+                ?.backgroundColor
+                ?.resolve({});
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+        return color ?? Colors.transparent;
+      }
+
+      expect(await confirmFill(true), AppColors.redButton);
+      // An ordinary confirm takes the theme's filled button: the brand blue.
+      expect(await confirmFill(false), AppColors.blue);
+    });
+
     testWidgets('showConfirm returns the choice', (tester) async {
       bool? result;
       await tester.pumpWidget(
@@ -460,7 +573,7 @@ void main() {
         );
         await tester.pump(const Duration(milliseconds: 300));
 
-        final bar = find.byType(BottomNavigationBar);
+        final bar = find.byType(RondaNavBar);
         for (final label in ['Home', 'History', 'Safety', 'Profile']) {
           expect(
             find.descendant(of: bar, matching: find.text(label)),
@@ -472,7 +585,7 @@ void main() {
           find.descendant(of: bar, matching: find.text('Settings')),
           findsNothing,
         );
-        expect(tester.widget<BottomNavigationBar>(bar).items, hasLength(4));
+        expect(tester.widget<RondaNavBar>(bar).items, hasLength(4));
 
         // The old avatar in the Home header is gone: Profile is in the bar now.
         expect(find.bySemanticsLabel('Your profile'), findsNothing);
