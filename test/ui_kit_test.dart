@@ -147,7 +147,10 @@ void main() {
     });
 
     test('the old GoBike blue and navy are gone from the app', () {
-      final old = RegExp(r'0xFF(2E62C8|1E1E48|3B5BDB|7FA6F0|8AB4FF)');
+      // Any opacity: 0xFF2E62C8 and a shadow like 0x261E1E48 alike.
+      final old = RegExp(
+        r'0x[0-9A-Fa-f]{2}(2E62C8|1E1E48|3B5BDB|7FA6F0|8AB4FF|D8DDEA|F8F5F5)',
+      );
       final offenders = [
         for (final f in Directory('lib').listSync(recursive: true))
           if (f is File &&
@@ -156,6 +159,35 @@ void main() {
             f.path,
       ];
       expect(offenders, isEmpty);
+    });
+
+    test('colors are written down only in the palette, the theme, and the '
+        'places that show a status', () {
+      // Status colors that mean something fixed (SOS states on the map, vitals,
+      // password strength, the rating star) and a few deliberate shades.
+      const allowed = {
+        'app_colors.dart', // the palette
+        'theme.dart', // the theme
+        'live_map_screen.dart', // SOS red/yellow/green, "you are here"
+        'dashboard_screen.dart', // the assigned SOS's "responding" yellow
+        'vital_status.dart', // readings out of range
+        'visit_details_screen.dart', // a severe reading
+        'app_text_field.dart', // password strength
+        'rating_dialog.dart', // the star
+        'photo_crop_screen.dart', // the dark cropping backdrop
+        'confirm_modal.dart', // the dark-mode dim behind a dialog
+        'ronda_hero.dart', // muted text on the navy header
+      };
+      final literal = RegExp(r'Color\(0x');
+      final offenders = [
+        for (final f in Directory('lib').listSync(recursive: true))
+          if (f is File &&
+              f.path.endsWith('.dart') &&
+              !allowed.contains(f.uri.pathSegments.last) &&
+              literal.hasMatch(f.readAsStringSync()))
+            f.path,
+      ];
+      expect(offenders, isEmpty, reason: 'use AppColors / context.pal instead');
     });
   });
 

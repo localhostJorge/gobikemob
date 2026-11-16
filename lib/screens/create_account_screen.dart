@@ -13,7 +13,7 @@ import '../widgets/loading_overlay.dart';
 import '../widgets/photo_flow.dart';
 import '../core/age.dart';
 import '../core/auth_service.dart';
-import '../core/theme.dart';
+import 'patient/app_colors.dart';
 import 'legal_screen.dart';
 import 'login_screen.dart';
 
@@ -276,8 +276,10 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                         'Create your account',
                         textAlign: TextAlign.center,
                         style: TextStyle(
+                          fontFamily: 'Poppins',
                           fontSize: 24,
-                          fontWeight: FontWeight.w700,
+                          height: 1.25,
+                          fontWeight: FontWeight.w600,
                           color: onSurface,
                         ),
                       ),
@@ -716,9 +718,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   Widget _buildRoleCard(String role, IconData icon, String subtitle) {
     final selected = selectedRole == role;
     final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
     final onSurface = theme.colorScheme.onSurface;
-    final border = dark ? AppTheme.darkLine : const Color(0xFFD8DDEA);
+    final border = context.pal.line;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,

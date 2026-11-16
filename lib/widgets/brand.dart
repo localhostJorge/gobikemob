@@ -31,6 +31,59 @@ class RondaGoIcon extends StatelessWidget {
   }
 }
 
+/// "About RondaGo": the app icon, the wordmark and the installed version, as on the
+/// profile pages of both apps. [version] is null while it loads; [pending] shows then.
+class RondaGoAbout extends StatelessWidget {
+  const RondaGoAbout({super.key, this.version, this.pending, this.padding});
+
+  final String? version;
+  final Widget? pending;
+  final EdgeInsetsGeometry? padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = context.pal.muted;
+    return Semantics(
+      container: true,
+      label: version == null ? 'RondaGo' : 'RondaGo, version $version',
+      excludeSemantics: true,
+      child: Padding(
+        padding: padding ?? EdgeInsets.zero,
+        child: Row(
+          children: [
+            const RondaGoIcon(size: 40),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: RondaGoWordmark(fontSize: 18),
+                  ),
+                  const SizedBox(height: 2),
+                  if (version != null)
+                    Text(
+                      'Version $version',
+                      style: TextStyle(fontSize: 13, color: muted),
+                    )
+                  else
+                    pending ??
+                        Text(
+                          'Version …',
+                          style: TextStyle(fontSize: 13, color: muted),
+                        ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// "RondaGo" set as in the brand video: "Ronda" in blue, "Go" in orange italic, Poppins
 /// bold. In dark mode "Ronda" turns white so it stays readable.
 class RondaGoWordmark extends StatelessWidget {

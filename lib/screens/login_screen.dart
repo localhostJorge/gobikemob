@@ -155,8 +155,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         'Every Ride Has a Purpose.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
+                          fontFamily: 'Poppins',
                           fontSize: 24,
-                          fontWeight: FontWeight.w700,
+                          height: 1.25,
+                          fontWeight: FontWeight.w600,
                           color: onSurface,
                         ),
                       ),

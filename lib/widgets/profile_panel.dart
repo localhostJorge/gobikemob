@@ -14,6 +14,7 @@ import '../core/tracking_service.dart';
 import '../screens/legal_screen.dart';
 import '../screens/login_screen.dart';
 import 'app_toast.dart';
+import 'brand.dart';
 import 'app_text_field.dart';
 import 'birthday_field.dart';
 import 'confirm_modal.dart';
@@ -462,13 +463,8 @@ class _ProfilePanelBodyState extends State<_ProfilePanelBody> {
                           _SectionLabel('ABOUT', muted),
                           FutureBuilder<PackageInfo>(
                             future: _appInfo,
-                            builder: (context, snap) => _InfoRow(
-                              Icons.info_outline_rounded,
-                              'RondaGo',
-                              snap.hasData
-                                  ? 'Version ${snap.data!.version}'
-                                  : null,
-                            ),
+                            builder: (context, snap) =>
+                                RondaGoAbout(version: snap.data?.version),
                           ),
                         ],
                       ),

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import '../screens/patient/app_colors.dart';
 import 'auth_service.dart';
 import 'distance_tracker.dart';
 import 'fix.dart';
@@ -292,6 +293,12 @@ class TrackingService {
         notificationText: 'Sharing your live location with the Go Bike admin.',
         enableWakeLock: true,
         setOngoing: true,
+        // The RondaGo mark in the status bar, in the brand blue.
+        notificationIcon: AndroidResource(
+          name: 'ic_stat_rondago',
+          defType: 'drawable',
+        ),
+        color: AppColors.blue,
       ),
     );
     _stream = Geolocator.getPositionStream(locationSettings: settings)

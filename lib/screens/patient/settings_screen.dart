@@ -6,6 +6,7 @@ import 'app_colors.dart';
 import 'patient_store.dart';
 import 'skeletons.dart';
 import 'ui_kit.dart';
+import '../../widgets/brand.dart';
 
 // The settings of the resident app. They live inside the Profile tab, so this file
 // holds the pieces that tab puts together rather than a screen of its own.
@@ -96,11 +97,11 @@ class AboutRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return FutureBuilder<PackageInfo>(
       future: PackageInfo.fromPlatform(),
-      builder: (context, snap) => NavRow(
-        icon: Icons.info_outline_rounded,
-        title: 'RondaGo',
-        subtitle: snap.hasData ? 'Version ${snap.data!.version}' : null,
-        subtitleWidget: snap.hasData ? null : const LineSkeleton(width: 80),
+      // The app icon and wordmark, the way the app is known, with its version.
+      builder: (context, snap) => RondaGoAbout(
+        version: snap.data?.version,
+        pending: const LineSkeleton(width: 80),
+        padding: const EdgeInsets.fromLTRB(Sp.md, 12, Sp.md, 12),
       ),
     );
   }

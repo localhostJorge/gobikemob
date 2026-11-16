@@ -331,11 +331,11 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
       decoration: BoxDecoration(
         color: AppTheme.navy,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x261E1E48),
+            color: AppColors.navy.withValues(alpha: 0.15),
             blurRadius: 16,
-            offset: Offset(0, 8),
+            offset: const Offset(0, 8),
           ),
         ],
       ),

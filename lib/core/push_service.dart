@@ -15,6 +15,7 @@ import '../screens/patient/medical_history_screen.dart';
 import '../screens/patient/safety_tab.dart';
 import '../screens/patient/visit_request_screen.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/brand.dart';
 import 'announcements.dart';
 import 'app_navigator.dart';
 import 'appointments.dart';
@@ -303,7 +304,8 @@ class _SafetyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(),
+    // Opened from a notification: the wordmark says which app this is.
+    appBar: AppBar(title: const RondaGoWordmark(fontSize: 20)),
     body: const SafeArea(child: SafetyTab(active: true)),
   );
 }

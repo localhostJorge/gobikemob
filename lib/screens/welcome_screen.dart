@@ -38,8 +38,10 @@ class WelcomeScreen extends StatelessWidget {
                   'Saving lives one ride at a time',
                   textAlign: TextAlign.center,
                   style: TextStyle(
+                    fontFamily: 'Poppins',
                     fontSize: 22,
-                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                    fontWeight: FontWeight.w600,
                     color: onSurface,
                   ),
                 ),

@@ -11,6 +11,7 @@ import '../core/api_config.dart';
 import '../core/theme.dart';
 import 'patient/app_colors.dart';
 import '../widgets/auth_widgets.dart';
+import '../widgets/brand.dart';
 
 enum LegalType { terms, privacy }
 
@@ -134,7 +135,19 @@ class _LegalScreenState extends State<LegalScreen> {
         foregroundColor: onSurface,
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: Text(doc?.title ?? widget.type.fallbackTitle),
+        // The RondaGo icon beside the title: these are the app's own documents.
+        title: Row(
+          children: [
+            const RondaGoIcon(size: 28),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                doc?.title ?? widget.type.fallbackTitle,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
       ),
       body: SafeArea(
         child: doc == null
