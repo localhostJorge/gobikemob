@@ -13,6 +13,7 @@ import '../core/live_map.dart';
 import '../core/location_gate.dart';
 import '../core/presence_service.dart';
 import '../core/theme.dart';
+import 'patient/app_colors.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/bottom_gap.dart';
 import '../widgets/confirm_modal.dart';
@@ -507,7 +508,11 @@ class _LiveMapScreenState extends State<LiveMapScreen>
             border: Border.all(color: Colors.white, width: 2.5),
             boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
           ),
-          child: Icon(icon, color: Colors.white, size: size * 0.55),
+          child: Icon(
+            icon,
+            color: color == AppTheme.orange ? AppColors.navy : Colors.white,
+            size: size * 0.55,
+          ),
         ),
       ),
     );
@@ -651,7 +656,7 @@ class _LiveMapScreenState extends State<LiveMapScreen>
               heroTag: null, // two buttons on one screen: only one may fly
               tooltip: _satellite ? 'Show the street map' : 'Show satellite',
               backgroundColor: theme.colorScheme.surface,
-              foregroundColor: AppTheme.blue,
+              foregroundColor: context.pal.brand,
               onPressed: _toggleMapStyle,
               child: Icon(
                 _satellite ? Icons.map_outlined : Icons.satellite_alt_outlined,
@@ -661,7 +666,7 @@ class _LiveMapScreenState extends State<LiveMapScreen>
             FloatingActionButton(
               tooltip: 'Center on me',
               backgroundColor: theme.colorScheme.surface,
-              foregroundColor: AppTheme.blue,
+              foregroundColor: context.pal.brand,
               onPressed: () => _locateMe(),
               child: const Icon(Icons.my_location_rounded),
             ),
@@ -743,7 +748,7 @@ class _InfoBar extends StatelessWidget {
             Text(
               summary,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: error != null ? AppTheme.errorRed : muted,
+                color: error != null ? context.pal.redText : muted,
               ),
             ),
             const SizedBox(height: 8),
@@ -793,7 +798,7 @@ class _DirectionsBar extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
         child: Row(
           children: [
-            const Icon(Icons.directions_rounded, color: AppTheme.orange),
+            Icon(Icons.directions_rounded, color: context.pal.orangeText),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -937,7 +942,7 @@ class _SosSheet extends StatelessWidget {
                 width: double.infinity,
                 child: FilledButton.icon(
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppTheme.successGreen,
+                    backgroundColor: AppColors.greenText,
                     minimumSize: const Size.fromHeight(48),
                   ),
                   onPressed: onResolve,

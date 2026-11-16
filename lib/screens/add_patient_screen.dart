@@ -97,11 +97,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
         appBar: AppBar(
           backgroundColor: authBackground(context),
           scrolledUnderElevation: 0,
-          centerTitle: true,
-          title: const Text(
-            'New Patient',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
+          title: const Text('New Patient'),
         ),
         body: SafeArea(
           child: GestureDetector(

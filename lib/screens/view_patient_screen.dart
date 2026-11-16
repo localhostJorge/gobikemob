@@ -123,11 +123,7 @@ class _ViewPatientScreenState extends State<ViewPatientScreen> {
         appBar: AppBar(
           backgroundColor: authBackground(context),
           scrolledUnderElevation: 0,
-          centerTitle: true,
-          title: Text(
-            _editing ? 'Edit Record' : 'Patient Record',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
+          title: Text(_editing ? 'Edit Record' : 'Patient Record'),
           actions: [
             IconButton(
               tooltip: 'Delete record',

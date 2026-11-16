@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/auth_service.dart';
 import '../core/theme.dart';
+import '../screens/patient/app_colors.dart';
 import '../core/tracking_service.dart';
 import '../screens/legal_screen.dart';
 import 'app_text_field.dart';
@@ -185,17 +186,14 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
                   const SizedBox(height: 8),
                   Text(
                     _error!,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppTheme.errorRed,
-                    ),
+                    style: TextStyle(fontSize: 13, color: context.pal.redText),
                   ),
                 ],
                 const SizedBox(height: 20),
                 FilledButton(
                   onPressed: _busy ? null : _delete,
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppTheme.errorRed,
+                    backgroundColor: AppColors.redButton,
                     foregroundColor: Colors.white,
                     minimumSize: const Size.fromHeight(50),
                   ),

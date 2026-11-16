@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/appointments.dart';
 import '../core/theme.dart';
+import 'patient/app_colors.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/visit_note_dialog.dart';
 import 'visit_checkup_screen.dart';
@@ -111,11 +112,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
         return Scaffold(
           appBar: AppBar(
             scrolledUnderElevation: 0,
-            centerTitle: true,
-            title: const Text(
-              'Appointments',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
+            title: const Text('Appointments'),
             bottom: TabBar(
               controller: _tabs,
               labelStyle: const TextStyle(fontWeight: FontWeight.w700),
@@ -325,7 +322,7 @@ class _AppointmentCard extends StatelessWidget {
                         ),
                         style: FilledButton.styleFrom(
                           minimumSize: const Size(48, 48),
-                          backgroundColor: AppTheme.successGreen,
+                          backgroundColor: AppColors.greenText,
                         ),
                       ),
                     ),
@@ -354,7 +351,7 @@ class _AppointmentCard extends StatelessWidget {
                         label: const Text('Decline'),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size(48, 48),
-                          foregroundColor: AppTheme.errorRed,
+                          foregroundColor: context.pal.redText,
                         ),
                       ),
                   ],

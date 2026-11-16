@@ -214,21 +214,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         controller: _birthday,
                         readOnly: true,
                         onTap: _pickBirthday,
-                        decoration: inputDecoration(
-                          context,
-                          'Birthday',
-                          Icons.cake_outlined,
-                          suffix: Icon(
-                            Icons.calendar_today_outlined,
-                            size: 18,
-                            color: context.pal.muted,
-                          ),
-                        ).copyWith(
-                          hintText: 'Select your birthday',
-                          helperText: _birthdate == null
-                              ? null
-                              : 'You are ${ageFromBirthdate(_birthdate!, DateTime.now())} years old.',
-                        ),
+                        decoration:
+                            inputDecoration(
+                              context,
+                              'Birthday',
+                              Icons.cake_outlined,
+                              suffix: Icon(
+                                Icons.calendar_today_outlined,
+                                size: 18,
+                                color: context.pal.muted,
+                              ),
+                            ).copyWith(
+                              hintText: 'Select your birthday',
+                              helperText: _birthdate == null
+                                  ? null
+                                  : 'You are ${ageFromBirthdate(_birthdate!, DateTime.now())} years old.',
+                            ),
                         validator: (_) =>
                             birthdayError(_birthdate, required: false),
                       ),

@@ -86,7 +86,10 @@ void main() {
           'orangeText': p.orangeText,
           'greenText': p.greenText,
         }.entries) {
-          for (final bg in {'card': p.card, 'background': p.background}.entries) {
+          for (final bg in {
+            'card': p.card,
+            'background': p.background,
+          }.entries) {
             expect(
               _contrast(c.value, bg.value),
               greaterThanOrEqualTo(4.5),
@@ -392,7 +395,8 @@ void main() {
           find.widgetWithText(FilledButton, 'Yes'),
         );
         final style = button.style;
-        final color = style?.backgroundColor?.resolve({}) ??
+        final color =
+            style?.backgroundColor?.resolve({}) ??
             Theme.of(tester.element(find.text('Yes')))
                 .filledButtonTheme
                 .style
@@ -525,9 +529,7 @@ void main() {
       tester.view.physicalSize = const Size(900, 3200);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      addTearDown(
-        () => ThemeController.instance.setThemeMode(ThemeMode.light),
-      );
+      addTearDown(() => ThemeController.instance.setThemeMode(ThemeMode.light));
 
       await tester.pumpWidget(
         ListenableBuilder(
@@ -635,9 +637,8 @@ void main() {
       MaterialApp(
         theme: AppTheme.lightTheme,
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(textScaler: const TextScaler.linear(1.5)),
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(1.5)),
           child: child!,
         ),
         home: const ResidentDashboardScreen(currentUser: resident),

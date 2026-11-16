@@ -151,11 +151,7 @@ class _VisitCheckupScreenState extends State<VisitCheckupScreen> {
         appBar: AppBar(
           backgroundColor: authBackground(context),
           scrolledUnderElevation: 0,
-          centerTitle: true,
-          title: const Text(
-            'Home check-up',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
+          title: const Text('Home check-up'),
         ),
         body: SafeArea(
           child: GestureDetector(

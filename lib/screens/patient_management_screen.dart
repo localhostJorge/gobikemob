@@ -6,6 +6,8 @@ import '../core/follow_up.dart';
 import '../core/follow_up_alerts.dart';
 import '../core/patient_service.dart';
 import '../core/theme.dart';
+import 'patient/app_colors.dart';
+import 'patient/ui_kit.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/fade_in_slide.dart';
 import '../widgets/follow_up_banner.dart';
@@ -182,14 +184,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
       });
 
     return Scaffold(
-      appBar: AppBar(
-        scrolledUnderElevation: 0,
-        centerTitle: true,
-        title: const Text(
-          'Patients',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
-      ),
+      appBar: AppBar(scrolledUnderElevation: 0, title: const Text('Patients')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addPatient,
         backgroundColor: AppTheme.blue,
@@ -383,20 +378,8 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
     );
   }
 
-  Widget _sectionTitle(String text, Color muted) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-          color: muted,
-        ),
-      ),
-    );
-  }
+  Widget _sectionTitle(String text, Color muted) =>
+      SectionHeader(sentenceCase(text));
 
   BoxDecoration _cardDecoration(ThemeData theme) => BoxDecoration(
     color: theme.cardColor,
@@ -417,13 +400,13 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
       decoration: _cardDecoration(theme),
       child: Column(
         children: [
-          Icon(icon, color: color, size: 24),
+          Icon(icon, color: context.pal.tone(color), size: 24),
           const SizedBox(height: 10),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
               value,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+              style: T.stat.copyWith(fontSize: 22, color: context.pal.heading),
             ),
           ),
           const SizedBox(height: 4),
@@ -483,15 +466,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen> {
             padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
             child: Row(
               children: [
-                Text(
-                  _dateLabel(date).toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
-                    color: muted,
-                  ),
-                ),
+                Text(_dateLabel(date), style: T.label.copyWith(color: muted)),
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(

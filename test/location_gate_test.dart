@@ -113,38 +113,35 @@ void main() {
       expect(phone.permissionRequests, 0, reason: 'check() must never prompt');
     });
 
-    test(
-      'asks for the permission only when location is on and it can still be asked',
-      () async {
-        phone.serviceOn = false;
-        expect(
-          await LocationGate.instance.requestPermission(),
-          LocationState.serviceOff,
-        );
-        expect(
-          phone.permissionRequests,
-          0,
-          reason: 'location off: not ours to ask about',
-        );
+    test('asks for the permission only when location is on and it can still be asked', () async {
+      phone.serviceOn = false;
+      expect(
+        await LocationGate.instance.requestPermission(),
+        LocationState.serviceOff,
+      );
+      expect(
+        phone.permissionRequests,
+        0,
+        reason: 'location off: not ours to ask about',
+      );
 
-        phone
-          ..serviceOn = true
-          ..permission = LocationPermission.deniedForever;
-        expect(
-          await LocationGate.instance.requestPermission(),
-          LocationState.permissionDeniedForever,
-        );
-        expect(
-          phone.permissionRequests,
-          0,
-          reason: 'blocked for good: nothing to ask',
-        );
+      phone
+        ..serviceOn = true
+        ..permission = LocationPermission.deniedForever;
+      expect(
+        await LocationGate.instance.requestPermission(),
+        LocationState.permissionDeniedForever,
+      );
+      expect(
+        phone.permissionRequests,
+        0,
+        reason: 'blocked for good: nothing to ask',
+      );
 
-        phone.permission = LocationPermission.denied;
-        await LocationGate.instance.requestPermission();
-        expect(phone.permissionRequests, 1);
-      },
-    );
+      phone.permission = LocationPermission.denied;
+      await LocationGate.instance.requestPermission();
+      expect(phone.permissionRequests, 1);
+    });
 
     test('sends the person to the settings screen that can fix it', () async {
       await LocationGate.instance.openSettingsFor(LocationState.serviceOff);

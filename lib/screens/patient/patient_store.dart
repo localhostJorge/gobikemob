@@ -197,7 +197,8 @@ class PatientStore extends ChangeNotifier {
     }
     _seenVisitsReady = p.getBool(_k('seen_visits_ready')) ?? false;
     _hiddenDeclines = {
-      for (final id in p.getStringList(_k('hidden_declines')) ?? const <String>[])
+      for (final id
+          in p.getStringList(_k('hidden_declines')) ?? const <String>[])
         ?int.tryParse(id),
     };
   }

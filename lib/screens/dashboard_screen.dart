@@ -15,8 +15,10 @@ import '../core/theme.dart';
 import '../core/tracking_service.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/bottom_gap.dart';
+import '../widgets/ronda_hero.dart';
 import '../widgets/ronda_nav_bar.dart';
-import '../widgets/brand.dart';
+import 'patient/app_colors.dart';
+import 'patient/ui_kit.dart';
 import '../widgets/confirm_modal.dart';
 import '../widgets/emergency_status_card.dart';
 import '../widgets/fade_in_slide.dart';
@@ -315,7 +317,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('ASSIGNED SOS', muted),
+        _sectionTitle('Assigned SOS', muted),
         for (final sos in open)
           Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -459,173 +461,174 @@ class _DashboardScreenState extends State<DashboardScreen>
       message: _resuming ? 'Resuming ronda...' : 'Starting ronda...',
       child: Scaffold(
         // The bottom bar reserves the phone's navigation area itself (bottomGap).
-        body: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              // 1) Greeting header
-              FadeInSlide(
-                offset: const Offset(0, -12),
-                child: _buildHeader(theme, muted, user?.firstName ?? 'there'),
-              ),
+        // The navy header runs up under the status bar and the bottom bar reserves
+        // the phone's navigation area itself, so no SafeArea here.
+        body: Column(
+          children: [
+            // 1) Greeting header
+            _buildHeader(user?.firstName ?? 'there', barangay),
 
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // The admin's answer to an emergency alert, if one was sent
-                      const EmergencyStatusCard(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(
+                  Sp.gutter,
+                  Sp.xl,
+                  Sp.gutter,
+                  Sp.xl,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // The admin's answer to an emergency alert, if one was sent
+                    const EmergencyStatusCard(),
 
-                      // SOS requests the admin sent this GoBiker to
-                      _buildAssignedSos(theme, muted),
+                    // SOS requests the admin sent this GoBiker to
+                    _buildAssignedSos(theme, muted),
 
-                      // 2) Today's assignment (primary)
-                      FadeInSlide(
-                        delay: const Duration(milliseconds: 80),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (_savedRonda != null) ...[
-                              _sectionTitle('OPEN RONDA', muted),
-                              _buildResumeCard(theme, muted),
-                              const SizedBox(height: 24),
+                    // 2) Today's assignment (primary)
+                    FadeInSlide(
+                      delay: const Duration(milliseconds: 80),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_savedRonda != null) ...[
+                            _sectionTitle('Open ronda', muted),
+                            _buildResumeCard(theme, muted),
+                            const SizedBox(height: 24),
+                          ],
+                          _sectionTitle("Today's assignment", muted),
+                          _buildAssignmentCard(theme, muted, barangay),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 3) Today's summary
+                    FadeInSlide(
+                      delay: const Duration(milliseconds: 160),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _sectionTitle("Today's summary", muted),
+                          _summaryStrip(theme, muted, [
+                            ('$todayVisited', 'Visited'),
+                            (
+                              '${GobikerAppointments.instance.openCount}',
+                              'Appointments',
+                            ),
+                            (
+                              '${todayDistance.toStringAsFixed(1)} km',
+                              'Distance',
+                            ),
+                          ]),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 4) Quick actions
+                    FadeInSlide(
+                      delay: const Duration(milliseconds: 240),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _sectionTitle('Quick actions', muted),
+                          ListenableBuilder(
+                            listenable: FollowUpAlerts.instance,
+                            builder: (context, _) =>
+                                _followUpNotice(theme, muted),
+                          ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ListenableBuilder(
+                                  listenable: FollowUpAlerts.instance,
+                                  builder: (context, _) => _quickAction(
+                                    theme,
+                                    icon: Icons.people_alt_rounded,
+                                    color: AppTheme.blue,
+                                    label: 'Patients',
+                                    badge: FollowUpAlerts.instance.count,
+                                    onTap: _openPatients,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _quickAction(
+                                  theme,
+                                  icon: Icons.warning_amber_rounded,
+                                  color: AppTheme.errorRed,
+                                  label: 'Emergency',
+                                  onTap: _onEmergency,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _quickAction(
+                                  theme,
+                                  icon: Icons.calendar_month_rounded,
+                                  color: AppTheme.blue,
+                                  label: 'Appointments',
+                                  badge:
+                                      GobikerAppointments
+                                          .instance
+                                          .requests
+                                          .length +
+                                      GobikerAppointments
+                                          .instance
+                                          .available
+                                          .length,
+                                  onTap: _onAppointments,
+                                ),
+                              ),
                             ],
-                            _sectionTitle("TODAY'S ASSIGNMENT", muted),
-                            _buildAssignmentCard(theme, muted, barangay),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // 3) Today's summary
-                      FadeInSlide(
-                        delay: const Duration(milliseconds: 160),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _sectionTitle("TODAY'S SUMMARY", muted),
-                            _summaryStrip(theme, muted, [
-                              ('$todayVisited', 'Visited'),
-                              (
-                                '${GobikerAppointments.instance.openCount}',
-                                'Appointments',
-                              ),
-                              (
-                                '${todayDistance.toStringAsFixed(1)} km',
-                                'Distance',
-                              ),
-                            ]),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // 4) Quick actions
-                      FadeInSlide(
-                        delay: const Duration(milliseconds: 240),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _sectionTitle('QUICK ACTIONS', muted),
-                            ListenableBuilder(
-                              listenable: FollowUpAlerts.instance,
-                              builder: (context, _) =>
-                                  _followUpNotice(theme, muted),
-                            ),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ListenableBuilder(
-                                    listenable: FollowUpAlerts.instance,
-                                    builder: (context, _) => _quickAction(
-                                      theme,
-                                      icon: Icons.people_alt_rounded,
-                                      color: AppTheme.blue,
-                                      label: 'Patients',
-                                      badge: FollowUpAlerts.instance.count,
-                                      onTap: _openPatients,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _quickAction(
-                                    theme,
-                                    icon: Icons.warning_amber_rounded,
-                                    color: AppTheme.errorRed,
-                                    label: 'Emergency',
-                                    onTap: _onEmergency,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _quickAction(
-                                    theme,
-                                    icon: Icons.calendar_month_rounded,
-                                    color: AppTheme.orange,
-                                    label: 'Appointments',
-                                    badge:
-                                        GobikerAppointments
-                                            .instance
-                                            .requests
-                                            .length +
-                                        GobikerAppointments
-                                            .instance
-                                            .available
-                                            .length,
-                                    onTap: _onAppointments,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // 5) Announcements
-                      FadeInSlide(
-                        delay: const Duration(milliseconds: 320),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _sectionTitle('ANNOUNCEMENTS', muted),
-                            ListenableBuilder(
-                              listenable: Announcements.instance,
-                              builder: (context, _) =>
-                                  _announcementsSection(theme, muted),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // 6) Secondary button (History is in the bottom bar)
-                      FadeInSlide(
-                        delay: const Duration(milliseconds: 400),
-                        child: OutlinedButton.icon(
-                          onPressed: _showMessageAdminSheet,
-                          icon: const Icon(
-                            Icons.chat_bubble_outline_rounded,
-                            size: 20,
                           ),
-                          label: const Text('Message Admin'),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(50),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 5) Announcements
+                    FadeInSlide(
+                      delay: const Duration(milliseconds: 320),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _sectionTitle('Announcements', muted),
+                          ListenableBuilder(
+                            listenable: Announcements.instance,
+                            builder: (context, _) =>
+                                _announcementsSection(theme, muted),
                           ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 6) Secondary button (History is in the bottom bar)
+                    FadeInSlide(
+                      delay: const Duration(milliseconds: 400),
+                      child: OutlinedButton.icon(
+                        onPressed: _showMessageAdminSheet,
+                        icon: const Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          size: 20,
+                        ),
+                        label: const Text('Message Admin'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
+            ),
 
-              // Bottom bar (Profile at the far right)
-              _buildBottomBar(),
-            ],
-          ),
+            // Bottom bar (Profile at the far right)
+            _buildBottomBar(),
+          ],
         ),
       ),
     );
@@ -636,15 +639,15 @@ class _DashboardScreenState extends State<DashboardScreen>
   BoxDecoration _cardDecoration(ThemeData theme, {bool shadow = false}) {
     final isLight = theme.brightness == Brightness.light;
     return BoxDecoration(
-      color: theme.cardColor,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: theme.dividerColor),
+      color: context.pal.card,
+      borderRadius: BorderRadius.circular(Rd.card),
+      border: Border.all(color: context.pal.line),
       boxShadow: (shadow && isLight)
-          ? const [
+          ? [
               BoxShadow(
-                color: Color(0x141E1E48),
-                blurRadius: 14,
-                offset: Offset(0, 6),
+                color: AppColors.navy.withValues(alpha: 0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
               ),
             ]
           : null,
@@ -657,67 +660,23 @@ class _DashboardScreenState extends State<DashboardScreen>
     alpha: theme.brightness == Brightness.dark ? 0.18 : 0.10,
   );
 
-  Widget _sectionTitle(String text, Color muted) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-          color: muted,
-        ),
-      ),
-    );
-  }
+  /// A section heading, as on the resident screens: "Today's assignment".
+  Widget _sectionTitle(String text, Color muted) => SectionHeader(text);
 
-  Widget _iconBadge(IconData icon, Color color) {
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        shape: BoxShape.circle,
-      ),
-      child: Icon(icon, color: color, size: 24),
-    );
-  }
+  Widget _iconBadge(IconData icon, Color color) =>
+      IconTile(icon, color: color, size: 44);
 
-  Widget _buildHeader(ThemeData theme, Color muted, String firstName) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        border: Border(bottom: BorderSide(color: theme.dividerColor)),
-      ),
-      child: Row(
-        children: [
-          const RondaGoIcon(size: 40),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  greetingForNow(),
-                  style: TextStyle(fontSize: 13, color: muted),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  firstName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+  /// The navy RondaGo band: greeting, name, the barangay this GoBiker covers, and
+  /// an "On ronda" pill (with the logo's orange dot) while a ronda is open.
+  Widget _buildHeader(String firstName, String barangay) {
+    return RondaHero(
+      eyebrow: greetingForNow(),
+      title: firstName,
+      subtitle: barangay == 'Not set'
+          ? 'No barangay assigned yet'
+          : 'Barangay $barangay',
+      subtitleIcon: Icons.place_outlined,
+      trailing: _savedRonda == null ? null : const _OnRondaPill(),
     );
   }
 
@@ -850,10 +809,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     List<(String value, String label)> stats,
   ) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
+      padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.onSurface.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(12),
+        color: context.pal.brandSoft,
+        borderRadius: BorderRadius.circular(Rd.card),
       ),
       child: IntrinsicHeight(
         child: Row(
@@ -863,7 +822,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 VerticalDivider(
                   width: 1,
                   thickness: 1,
-                  color: theme.dividerColor,
+                  color: context.pal.brand.withValues(alpha: 0.2),
                 ),
               Expanded(
                 child: Semantics(
@@ -875,9 +834,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                         fit: BoxFit.scaleDown,
                         child: Text(
                           stats[i].$1,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
+                          style: T.stat.copyWith(
+                            fontSize: 22,
+                            color: context.pal.heading,
                           ),
                         ),
                       ),
@@ -918,15 +877,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(icon, color: color, size: 26),
-                ),
+                IconTile(icon, color: color, size: 48),
                 if (badge > 0)
                   Positioned(top: -6, right: -8, child: _CountBadge(badge)),
               ],
@@ -986,10 +937,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                       unseen > 1
                           ? '$more more · $unseen new — tap to read all'
                           : '$more more — tap to read all',
-                      style: const TextStyle(
-                        fontSize: 12,
+                      style: TextStyle(
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.blue,
+                        color: context.pal.brand,
                       ),
                     ),
                   ),
@@ -1018,13 +969,15 @@ class _DashboardScreenState extends State<DashboardScreen>
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: _tint(theme, AppTheme.blue),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.blue.withValues(alpha: 0.35)),
+            color: context.pal.brandSoft,
+            borderRadius: BorderRadius.circular(Rd.card),
+            border: Border.all(
+              color: context.pal.brand.withValues(alpha: 0.35),
+            ),
           ),
           child: Row(
             children: [
-              const Icon(Icons.campaign_rounded, color: AppTheme.blue),
+              Icon(Icons.campaign_rounded, color: context.pal.brand),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1307,9 +1260,9 @@ class _CountBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 5),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: AppTheme.errorRed,
+        color: AppColors.blue,
         borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: Theme.of(context).cardColor, width: 1.5),
+        border: Border.all(color: context.pal.card, width: 1.5),
       ),
       child: Text(
         count > 9 ? '9+' : '$count',
@@ -1322,4 +1275,42 @@ class _CountBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "On ronda", with the orange dot from the logo: shown in the header while a
+/// ronda is open.
+class _OnRondaPill extends StatelessWidget {
+  const _OnRondaPill();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(999),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: const BoxDecoration(
+            color: AppColors.orange,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 6),
+        const Text(
+          'On ronda',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+      ],
+    ),
+  );
 }

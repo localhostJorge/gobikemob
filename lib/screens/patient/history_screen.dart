@@ -285,9 +285,7 @@ class _HistoryTabState extends State<HistoryTab> {
                               : context.pal.line,
                         ),
                         labelStyle: T.label.copyWith(
-                          color: _filter == f
-                              ? Colors.white
-                              : context.pal.ink,
+                          color: _filter == f ? Colors.white : context.pal.ink,
                         ),
                         onSelected: (_) => setState(() => _filter = f),
                       ),
@@ -313,18 +311,20 @@ class _Row extends StatelessWidget {
   const _Row({required this.item});
   final _Item item;
 
-  ({IconData icon, Color color}) _look(
-    BuildContext context,
-  ) => switch (item.kind) {
-    // Red only for an emergency; everything else in the brand blue.
-    _Kind.sos => (icon: Icons.sos_rounded, color: AppColors.red),
-    _Kind.visit => (icon: Icons.home_outlined, color: AppColors.blue),
-    _Kind.checkup => (
-      icon: Icons.favorite_border_rounded,
-      color: AppColors.blue,
-    ),
-    _Kind.checkupUpdated => (icon: Icons.edit_outlined, color: AppColors.blue),
-  };
+  ({IconData icon, Color color}) _look(BuildContext context) =>
+      switch (item.kind) {
+        // Red only for an emergency; everything else in the brand blue.
+        _Kind.sos => (icon: Icons.sos_rounded, color: AppColors.red),
+        _Kind.visit => (icon: Icons.home_outlined, color: AppColors.blue),
+        _Kind.checkup => (
+          icon: Icons.favorite_border_rounded,
+          color: AppColors.blue,
+        ),
+        _Kind.checkupUpdated => (
+          icon: Icons.edit_outlined,
+          color: AppColors.blue,
+        ),
+      };
 
   @override
   Widget build(BuildContext context) {

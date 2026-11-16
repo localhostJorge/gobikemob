@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../core/theme.dart';
+import '../screens/patient/app_colors.dart';
 
 /// Asks the GoBiker for an optional reason before they turn a visit down, and returns it
 /// ('' for none) or null when they change their mind. The resident is shown the reason.
@@ -81,7 +81,7 @@ class _VisitNoteDialogState extends State<_VisitNoteDialog> {
         onPressed: () => Navigator.pop(context, _note.text.trim()),
         style: FilledButton.styleFrom(
           minimumSize: const Size(48, 48),
-          backgroundColor: AppTheme.errorRed,
+          backgroundColor: AppColors.redButton,
         ),
         child: Text(widget.confirmLabel),
       ),

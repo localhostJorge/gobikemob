@@ -160,7 +160,8 @@ class _LoopArcPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final stroke = size.width * 0.13;
-    final rect = Offset(stroke / 2, stroke / 2) &
+    final rect =
+        Offset(stroke / 2, stroke / 2) &
         Size(size.width - stroke, size.height - stroke);
     final arc = Paint()
       ..color = Colors.white.withValues(alpha: 0.07)

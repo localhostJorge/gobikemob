@@ -139,10 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Hero(
-                            tag: authLogoHero,
-                            child: AuthLogo(height: 60),
-                          ),
+                          Hero(tag: authLogoHero, child: AuthLogo(height: 60)),
                           SizedBox(width: 14),
                           // On a very narrow phone the wordmark shrinks to fit.
                           Flexible(

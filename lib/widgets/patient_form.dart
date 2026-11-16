@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../screens/patient/app_colors.dart';
+import '../screens/patient/ui_kit.dart';
 import 'app_text_field.dart';
 
 /// Holds the controllers for every patient field and converts to/from the
@@ -339,12 +341,13 @@ class _SectionHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Text(
-        text,
+        sentenceCase(text),
         style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-          color: color,
+          fontFamily: kHeadingFont,
+          fontSize: 16,
+          height: 1.3,
+          fontWeight: FontWeight.w600,
+          color: context.pal.heading,
         ),
       ),
     );

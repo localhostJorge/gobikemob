@@ -162,10 +162,7 @@ void main() {
       await openMyVisits(tester);
 
       expect(find.textContaining('My visits (1)'), findsOneWidget);
-      expect(
-        find.widgetWithText(FilledButton, 'Record it'),
-        findsOneWidget,
-      );
+      expect(find.widgetWithText(FilledButton, 'Record it'), findsOneWidget);
       expect(find.text('Done'), findsNothing);
     }, () => MockClient(handle));
   });
@@ -192,10 +189,7 @@ void main() {
       await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
       // The visit is there, ready for its check-up, without going to look for it.
-      expect(
-        find.widgetWithText(FilledButton, 'Record it'),
-        findsOneWidget,
-      );
+      expect(find.widgetWithText(FilledButton, 'Record it'), findsOneWidget);
       expect(find.text('Accept'), findsNothing);
       await tester.pump(const Duration(seconds: 4)); // the toast goes away
     }, () => MockClient(handle));

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../core/announcements.dart';
 import '../core/theme.dart';
+import 'patient/app_colors.dart';
 
 /// Every live announcement from the admin, newest first.
 class AnnouncementsScreen extends StatefulWidget {
@@ -35,11 +36,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     return Scaffold(
       appBar: AppBar(
         scrolledUnderElevation: 0,
-        centerTitle: true,
-        title: const Text(
-          'Announcements',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
+        title: const Text('Announcements'),
       ),
       body: SafeArea(
         child: ListenableBuilder(
@@ -138,7 +135,7 @@ class AnnouncementCard extends StatelessWidget {
               color: AppTheme.orange.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.campaign_rounded, color: AppTheme.orange),
+            child: Icon(Icons.campaign_rounded, color: context.pal.orangeText),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -164,7 +161,7 @@ class AnnouncementCard extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppTheme.errorRed,
+                          color: AppColors.blue,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Text(

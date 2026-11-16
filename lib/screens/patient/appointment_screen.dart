@@ -133,9 +133,9 @@ class _OpenRequestsNote extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: T.secondary.muted(context).copyWith(
-                color: atLimit ? context.pal.orangeText : null,
-              ),
+              style: T.secondary
+                  .muted(context)
+                  .copyWith(color: atLimit ? context.pal.orangeText : null),
             ),
           ),
         ],

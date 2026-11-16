@@ -108,6 +108,14 @@ abstract final class T {
   );
 }
 
+/// "PERSONAL INFORMATION" -> "Personal information": section labels are written in
+/// sentence case, the way the rest of the app reads.
+String sentenceCase(String s) {
+  final t = s.trim();
+  if (t.isEmpty) return t;
+  return t[0].toUpperCase() + t.substring(1).toLowerCase();
+}
+
 /// Secondary text color from the current theme.
 extension MutedText on TextStyle {
   TextStyle muted(BuildContext context) => copyWith(color: context.pal.muted);

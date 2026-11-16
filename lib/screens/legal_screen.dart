@@ -134,11 +134,7 @@ class _LegalScreenState extends State<LegalScreen> {
         foregroundColor: onSurface,
         elevation: 0,
         scrolledUnderElevation: 0,
-        centerTitle: true,
-        title: Text(
-          doc?.title ?? widget.type.fallbackTitle,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
+        title: Text(doc?.title ?? widget.type.fallbackTitle),
       ),
       body: SafeArea(
         child: doc == null

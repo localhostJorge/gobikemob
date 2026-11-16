@@ -8,6 +8,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../core/auth_service.dart';
 import '../core/gobiker_history.dart';
 import '../core/theme.dart';
+import '../screens/patient/app_colors.dart';
+import '../screens/patient/ui_kit.dart';
 import '../core/tracking_service.dart';
 import '../screens/legal_screen.dart';
 import '../screens/login_screen.dart';
@@ -414,7 +416,6 @@ class _ProfilePanelBodyState extends State<_ProfilePanelBody> {
                                   Switch(
                                     value: isDark,
                                     activeThumbColor: Colors.white,
-                                    activeTrackColor: AppTheme.blue,
                                     onChanged: (v) =>
                                         ThemeController.instance.setThemeMode(
                                           v ? ThemeMode.dark : ThemeMode.light,
@@ -485,8 +486,8 @@ class _ProfilePanelBodyState extends State<_ProfilePanelBody> {
                         style: TextStyle(fontWeight: FontWeight.w700),
                       ),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.errorRed,
-                        side: const BorderSide(color: AppTheme.errorRed),
+                        foregroundColor: context.pal.redText,
+                        side: BorderSide(color: context.pal.redText),
                         minimumSize: const Size.fromHeight(50),
                       ),
                     ),
@@ -511,12 +512,13 @@ class _SectionLabel extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
-        text,
+        sentenceCase(text),
         style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-          color: color,
+          fontFamily: kHeadingFont,
+          fontSize: 16,
+          height: 1.3,
+          fontWeight: FontWeight.w600,
+          color: context.pal.heading,
         ),
       ),
     );

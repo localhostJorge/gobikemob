@@ -297,11 +297,12 @@ class AppTheme {
         ),
       ),
       chipTheme: ChipThemeData(
+        // Selected: solid brand blue with white text (5.6:1), in both themes.
         backgroundColor: pal.card,
-        selectedColor: pal.brandSoft,
+        selectedColor: AppColors.blue,
         disabledColor: pal.divider,
         side: BorderSide(color: pal.line),
-        checkmarkColor: pal.brand,
+        checkmarkColor: Colors.white,
         shape: const StadiumBorder(),
         labelStyle: TextStyle(
           fontFamily: bodyFont,
@@ -309,11 +310,11 @@ class AppTheme {
           fontWeight: FontWeight.w600,
           color: pal.ink,
         ),
-        secondaryLabelStyle: TextStyle(
+        secondaryLabelStyle: const TextStyle(
           fontFamily: bodyFont,
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: pal.brand,
+          color: Colors.white,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       ),

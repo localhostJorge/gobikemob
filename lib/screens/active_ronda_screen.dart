@@ -7,6 +7,7 @@ import '../core/auth_service.dart';
 import '../core/emergency_flow.dart';
 import '../core/gobiker_history.dart';
 import '../core/theme.dart';
+import 'patient/app_colors.dart';
 import '../core/tracking_service.dart';
 import '../widgets/app_text_field.dart';
 import '../widgets/app_toast.dart';
@@ -551,7 +552,7 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
               ),
               style: FilledButton.styleFrom(
-                backgroundColor: AppTheme.errorRed,
+                backgroundColor: AppColors.redButton,
                 foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(52),
               ),
@@ -565,8 +566,8 @@ class _ActiveRondaScreenState extends State<ActiveRondaScreen>
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
               ),
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppTheme.errorRed,
-                side: const BorderSide(color: AppTheme.errorRed),
+                foregroundColor: context.pal.redText,
+                side: BorderSide(color: context.pal.redText),
                 minimumSize: const Size.fromHeight(52),
               ),
             ),

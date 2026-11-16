@@ -5,6 +5,7 @@ import '../widgets/app_toast.dart';
 import '../widgets/confirm_modal.dart';
 import 'emergency_watcher.dart';
 import 'theme.dart';
+import '../screens/patient/app_colors.dart';
 import 'tracking_service.dart';
 
 enum _FailAction { cancel, retry, call }
@@ -129,7 +130,7 @@ class EmergencyFlow {
             icon: const Icon(Icons.call_rounded),
             label: const Text('Call 911'),
             style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.errorRed,
+              backgroundColor: AppColors.redButton,
               foregroundColor: Colors.white,
             ),
           ),
@@ -168,7 +169,7 @@ class EmergencyFlow {
             icon: const Icon(Icons.call_rounded),
             label: const Text('Call 911'),
             style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.errorRed,
+              backgroundColor: AppColors.redButton,
               foregroundColor: Colors.white,
             ),
           ),

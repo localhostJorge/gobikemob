@@ -193,7 +193,7 @@ void main() {
       for (final label in ['Full name', 'Address', 'Contact number', 'Age']) {
         expect(find.text(label), findsNothing, reason: label);
       }
-      expect(find.text('PERSONAL DETAILS'), findsNothing);
+      expect(find.text('Personal details'), findsNothing);
     });
   });
 

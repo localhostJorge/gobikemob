@@ -627,8 +627,8 @@ void main() {
         expect(find.text('Ronda History'), findsNothing);
         final button = find.widgetWithText(OutlinedButton, 'Message Admin');
         expect(button, findsOneWidget);
-        // The width of the page less its two 16 dp margins.
-        expect(tester.getSize(button).width, closeTo(1080 / 2.5 - 32, 1));
+        // The width of the page less its two 20 dp gutters (the app's side padding).
+        expect(tester.getSize(button).width, closeTo(1080 / 2.5 - 40, 1));
       },
     );
 

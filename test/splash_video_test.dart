@@ -105,35 +105,36 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('plays the RondaGo video, and waits for it to end before moving on', (
-    tester,
-  ) async {
-    await phone(tester);
-    final player = _FakeVideoPlayer();
-    VideoPlayerPlatform.instance = player;
+  testWidgets(
+    'plays the RondaGo video, and waits for it to end before moving on',
+    (tester) async {
+      await phone(tester);
+      final player = _FakeVideoPlayer();
+      VideoPlayerPlatform.instance = player;
 
-    await tester.pumpWidget(const MaterialApp(home: SplashScreen()));
-    await tester.pump();
+      await tester.pumpWidget(const MaterialApp(home: SplashScreen()));
+      await tester.pump();
 
-    expect(player.asset, SplashScreen.video);
-    expect(player.played, isTrue);
-    expect(find.byType(VideoPlayer), findsOneWidget);
-    expect(find.byType(AuthLogo), findsNothing);
+      expect(player.asset, SplashScreen.video);
+      expect(player.played, isTrue);
+      expect(find.byType(VideoPlayer), findsOneWidget);
+      expect(find.byType(AuthLogo), findsNothing);
 
-    // The session is known long before the video ends: the splash stays.
-    await letSessionLoad(tester);
-    expect(find.byType(SplashScreen), findsOneWidget);
-    expect(find.text('Get Started'), findsNothing);
+      // The session is known long before the video ends: the splash stays.
+      await letSessionLoad(tester);
+      expect(find.byType(SplashScreen), findsOneWidget);
+      expect(find.text('Get Started'), findsNothing);
 
-    player.finish();
-    await tester.pump();
-    await tester.pump(); // a new page sits offstage for its first frame
-    await tester.pump(const Duration(seconds: 1)); // the fade
-    expect(find.byType(SplashScreen), findsNothing);
-    expect(find.text('Get Started'), findsOneWidget);
-    expect(find.byType(RondaGoWordmark), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      player.finish();
+      await tester.pump();
+      await tester.pump(); // a new page sits offstage for its first frame
+      await tester.pump(const Duration(seconds: 1)); // the fade
+      expect(find.byType(SplashScreen), findsNothing);
+      expect(find.text('Get Started'), findsOneWidget);
+      expect(find.byType(RondaGoWordmark), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('a video that never reports its end does not hold the app', (
     tester,

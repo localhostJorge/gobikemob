@@ -52,7 +52,11 @@ class ProfileAvatar extends StatelessWidget {
             backgroundColor: context.pal.brandSoft,
             backgroundImage: profileImage(path),
             child: profileImage(path) == null
-                ? Icon(Icons.person, size: radius * 1.1, color: context.pal.brand)
+                ? Icon(
+                    Icons.person,
+                    size: radius * 1.1,
+                    color: context.pal.brand,
+                  )
                 : null,
           ),
         );

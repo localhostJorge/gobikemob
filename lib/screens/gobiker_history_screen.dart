@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 
 import '../core/gobiker_history.dart';
 import '../core/theme.dart';
+import 'patient/app_colors.dart';
+import 'patient/ui_kit.dart';
 import '../widgets/confirm_modal.dart';
 import 'view_patient_screen.dart';
 
@@ -95,11 +97,7 @@ class _GobikerHistoryScreenState extends State<GobikerHistoryScreen> {
         return Scaffold(
           appBar: AppBar(
             scrolledUnderElevation: 0,
-            centerTitle: true,
-            title: const Text(
-              'History',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
+            title: const Text('History'),
             actions: [
               if (all.isNotEmpty)
                 TextButton.icon(
@@ -284,7 +282,7 @@ class _GobikerHistoryScreenState extends State<GobikerHistoryScreen> {
     icon: Icons.favorite_border_rounded,
     color: AppTheme.successGreen,
   ),
-  HistoryKind.visit => (icon: Icons.home_outlined, color: AppTheme.orange),
+  HistoryKind.visit => (icon: Icons.home_outlined, color: AppTheme.blue),
   HistoryKind.sos => (icon: Icons.sos_rounded, color: AppTheme.errorRed),
 };
 
@@ -319,15 +317,7 @@ class _HistoryRow extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: look.color.withValues(alpha: 0.14),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(look.icon, size: 20, color: look.color),
-            ),
+            IconTile(look.icon, color: look.color),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -359,7 +349,7 @@ class _HistoryRow extends StatelessWidget {
                               ? Icons.check_circle_rounded
                               : Icons.remove_circle_outline_rounded,
                           size: 14,
-                          color: ok ? AppTheme.successGreen : muted,
+                          color: ok ? context.pal.greenText : muted,
                         ),
                         const SizedBox(width: 4),
                         Flexible(
@@ -368,7 +358,7 @@ class _HistoryRow extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w700,
-                              color: ok ? AppTheme.successGreen : muted,
+                              color: ok ? context.pal.greenText : muted,
                             ),
                           ),
                         ),
@@ -457,13 +447,12 @@ class GobikerHistoryDetailsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         scrolledUnderElevation: 0,
-        centerTitle: true,
         title: Text(switch (entry.kind) {
           HistoryKind.ronda => 'Ronda',
           HistoryKind.visit => 'Home visit',
           HistoryKind.sos => 'Emergency',
           HistoryKind.checkup => 'Check-up',
-        }, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        }),
       ),
       body: SafeArea(
         child: ListView(
