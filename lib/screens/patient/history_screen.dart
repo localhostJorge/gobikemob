@@ -213,7 +213,6 @@ class _HistoryTabState extends State<HistoryTab> {
           body = ErrorState(message: _visits.error!, onRetry: _refresh);
         } else {
           body = RefreshIndicator(
-            color: AppColors.red,
             onRefresh: _refresh,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -243,7 +242,7 @@ class _HistoryTabState extends State<HistoryTab> {
                       ),
                     ),
                     CardGroup(
-                      dividerIndent: 52,
+                      dividerIndent: 64,
                       children: [for (final i in dayItems) _Row(item: i)],
                     ),
                   ],
@@ -278,16 +277,16 @@ class _HistoryTabState extends State<HistoryTab> {
                         label: Text(f.label),
                         selected: _filter == f,
                         showCheckmark: false,
-                        selectedColor: context.pal.ink,
+                        selectedColor: AppColors.blue,
                         backgroundColor: context.pal.card,
                         side: BorderSide(
                           color: _filter == f
-                              ? context.pal.ink
+                              ? AppColors.blue
                               : context.pal.line,
                         ),
                         labelStyle: T.label.copyWith(
                           color: _filter == f
-                              ? context.pal.card
+                              ? Colors.white
                               : context.pal.ink,
                         ),
                         onSelected: (_) => setState(() => _filter = f),
@@ -317,8 +316,9 @@ class _Row extends StatelessWidget {
   ({IconData icon, Color color}) _look(
     BuildContext context,
   ) => switch (item.kind) {
-    _Kind.sos => (icon: Icons.sos_rounded, color: context.pal.redText),
-    _Kind.visit => (icon: Icons.home_outlined, color: context.pal.orangeText),
+    // Red only for an emergency; everything else in the brand blue.
+    _Kind.sos => (icon: Icons.sos_rounded, color: AppColors.red),
+    _Kind.visit => (icon: Icons.home_outlined, color: AppColors.blue),
     _Kind.checkup => (
       icon: Icons.favorite_border_rounded,
       color: AppColors.blue,
@@ -345,15 +345,12 @@ class _Row extends StatelessWidget {
               ),
             ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(Sp.lg, 14, Sp.md, 14),
+        padding: const EdgeInsets.fromLTRB(Sp.md, 12, Sp.md, 12),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 1),
-              child: Icon(look.icon, size: 22, color: look.color),
-            ),
-            const SizedBox(width: 14),
+            IconTile(look.icon, color: look.color),
+            const SizedBox(width: Sp.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -369,8 +366,10 @@ class _Row extends StatelessWidget {
                             width: 8,
                             height: 8,
                             margin: const EdgeInsets.only(right: Sp.sm),
+                            // The logo's orange dot marks what's new (the
+                            // readable shade, 3:1 or better on the card).
                             decoration: BoxDecoration(
-                              color: AppColors.red,
+                              color: context.pal.orangeText,
                               shape: BoxShape.circle,
                             ),
                           ),

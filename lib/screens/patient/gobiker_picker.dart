@@ -156,7 +156,7 @@ class _GobikerPickerBodyState extends State<GobikerPickerBody> {
         TextField(
           controller: _search,
           style: T.body.copyWith(color: context.pal.ink),
-          cursorColor: context.pal.ink,
+          cursorColor: context.pal.brand,
           textInputAction: TextInputAction.search,
           textCapitalization: TextCapitalization.words,
           onChanged: (_) => setState(() {}),
@@ -245,8 +245,8 @@ class _GobikerPickerBodyState extends State<GobikerPickerBody> {
       enabled: !disabled,
       minVerticalPadding: 12,
       leading: CircleAvatar(
-        backgroundColor: context.pal.background,
-        foregroundColor: context.pal.ink,
+        backgroundColor: context.pal.brandSoft,
+        foregroundColor: context.pal.brand,
         child: Text(g.name.isEmpty ? '?' : g.name[0].toUpperCase()),
       ),
       title: Text(
@@ -262,7 +262,7 @@ class _GobikerPickerBodyState extends State<GobikerPickerBody> {
         style: T.secondary.muted(context),
       ),
       trailing: selected
-          ? Icon(Icons.check_rounded, color: context.pal.ink)
+          ? Icon(Icons.check_rounded, color: context.pal.brand)
           : null,
       onTap: disabled ? null : () => widget.onPick(g),
     );

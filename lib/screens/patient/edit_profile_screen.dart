@@ -157,7 +157,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       const SizedBox(height: Sp.xl),
                       TextFormField(
                         style: T.body.copyWith(color: context.pal.ink),
-                        cursorColor: context.pal.ink,
+                        cursorColor: context.pal.brand,
                         controller: _name,
                         textCapitalization: TextCapitalization.words,
                         decoration: inputDecoration(
@@ -194,7 +194,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       const SizedBox(height: Sp.lg),
                       TextFormField(
                         style: T.body.copyWith(color: context.pal.ink),
-                        cursorColor: context.pal.ink,
+                        cursorColor: context.pal.brand,
                         controller: _mobile,
                         keyboardType: TextInputType.phone,
                         decoration: inputDecoration(

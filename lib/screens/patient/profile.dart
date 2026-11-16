@@ -120,7 +120,7 @@ class ProfileTab extends StatelessWidget {
                   const SizedBox(height: Sp.xl),
                   const SectionHeader('Account'),
                   CardGroup(
-                    dividerIndent: 52,
+                    dividerIndent: 64,
                     children: [
                       NavRow(
                         icon: Icons.person_outline_rounded,
@@ -151,7 +151,7 @@ class ProfileTab extends StatelessWidget {
                   const SizedBox(height: Sp.xl),
                   const SectionHeader('Preferences'),
                   CardGroup(
-                    dividerIndent: 52,
+                    dividerIndent: 64,
                     children: [
                       const DarkModeRow(),
                       NavRow(
@@ -169,7 +169,7 @@ class ProfileTab extends StatelessWidget {
                   const SizedBox(height: Sp.xl),
                   const SectionHeader('Legal'),
                   CardGroup(
-                    dividerIndent: 52,
+                    dividerIndent: 64,
                     children: [
                       NavRow(
                         icon: Icons.description_outlined,

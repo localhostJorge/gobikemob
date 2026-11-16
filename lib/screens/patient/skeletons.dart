@@ -14,12 +14,13 @@ class _RowShape extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(Sp.lg, 14, Sp.lg, 14),
+    padding: const EdgeInsets.fromLTRB(Sp.md, 12, Sp.lg, 12),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SkeletonBox(height: 22, circle: true),
-        const SizedBox(width: 14),
+        // The size of a row's icon tile.
+        const SkeletonBox(width: 40, height: 40, radius: 12),
+        const SizedBox(width: Sp.md),
         const Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -52,7 +53,7 @@ class _RowsCard extends StatelessWidget {
     child: Column(
       children: [
         for (var i = 0; i < count; i++) ...[
-          if (i > 0) Divider(height: 1, indent: 52, color: context.pal.divider),
+          if (i > 0) Divider(height: 1, indent: 64, color: context.pal.divider),
           _RowShape(trailing: trailing),
         ],
       ],

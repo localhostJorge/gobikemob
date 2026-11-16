@@ -134,7 +134,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       if (!_setting) ...[
                         TextFormField(
                           style: T.body.copyWith(color: context.pal.ink),
-                          cursorColor: context.pal.ink,
+                          cursorColor: context.pal.brand,
                           controller: _current,
                           obscureText: !_showCurrent,
                           decoration: inputDecoration(
@@ -155,7 +155,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       ],
                       TextFormField(
                         style: T.body.copyWith(color: context.pal.ink),
-                        cursorColor: context.pal.ink,
+                        cursorColor: context.pal.brand,
                         controller: _new,
                         obscureText: !_showNew,
                         decoration: inputDecoration(
@@ -193,7 +193,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       const SizedBox(height: Sp.lg),
                       TextFormField(
                         style: T.body.copyWith(color: context.pal.ink),
-                        cursorColor: context.pal.ink,
+                        cursorColor: context.pal.brand,
                         controller: _confirm,
                         obscureText: !_showConfirm,
                         decoration: inputDecoration(

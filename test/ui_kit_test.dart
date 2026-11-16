@@ -3,6 +3,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_bike_app/widgets/brand.dart';
+import 'package:go_bike_app/widgets/ronda_hero.dart';
 import 'package:go_bike_app/widgets/ronda_nav_bar.dart';
 import 'package:go_bike_app/core/appointments.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -590,6 +592,17 @@ void main() {
         // The old avatar in the Home header is gone: Profile is in the bar now.
         expect(find.bySemanticsLabel('Your profile'), findsNothing);
 
+        // Home opens on the navy RondaGo header with the app icon and the greeting.
+        expect(find.byType(RondaHero), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(RondaHero),
+            matching: find.byType(RondaGoIcon),
+          ),
+          findsOneWidget,
+        );
+        expect(find.textContaining(', Ana'), findsOneWidget);
+
         // Opening Profile from the bar shows the settings.
         await tester.tap(
           find.descendant(of: bar, matching: find.text('Profile')),
@@ -605,6 +618,33 @@ void main() {
         expect(find.text('Log out'), findsOneWidget);
       },
     );
+  });
+
+  testWidgets('Home fits a narrow phone with large text', (tester) async {
+    tester.view.physicalSize = const Size(320, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    const resident = AppUser(
+      id: 1,
+      name: 'Maria Concepcion Dela Cruz',
+      email: 'maria@example.com',
+      role: 'User',
+      barangay: 'San Francisco (Poblacion)',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.lightTheme,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: const TextScaler.linear(1.5)),
+          child: child!,
+        ),
+        home: const ResidentDashboardScreen(currentUser: resident),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull);
   });
 
   test('stores used by the screens start empty', () {

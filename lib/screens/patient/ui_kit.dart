@@ -877,7 +877,7 @@ InputDecoration inputDecoration(
     ),
     border: border(context.pal.line),
     enabledBorder: border(context.pal.line),
-    focusedBorder: border(context.pal.ink, 1.5),
+    focusedBorder: border(context.pal.brand, 1.5),
     errorBorder: border(context.pal.redText),
     focusedErrorBorder: border(context.pal.redText, 1.5),
     errorStyle: T.meta.copyWith(color: context.pal.redText),

@@ -30,7 +30,6 @@ class MedicalHistoryScreen extends StatelessWidget {
               loading: firstLoad && store.loading,
               skeleton: const MedicalHistorySkeleton(),
               child: RefreshIndicator(
-                color: AppColors.red,
                 onRefresh: store.load,
                 child: _list(store),
               ),

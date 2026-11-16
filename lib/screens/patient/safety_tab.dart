@@ -137,7 +137,6 @@ class _SafetyTabState extends State<SafetyTab> with _SosPolling {
             const TabHeader('Safety'),
             Expanded(
               child: RefreshIndicator(
-                color: AppColors.red,
                 onRefresh: _store.load,
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
@@ -492,7 +491,8 @@ class _HotlineRow extends StatelessWidget {
               QuietButton(
                 label: formatPhone(n),
                 icon: Icons.call_rounded,
-                color: context.pal.redText,
+                // A link to call: the brand blue. Red is kept for the 911 card.
+                color: context.pal.brand,
                 onPressed: () => onCall(n),
               ),
           ],

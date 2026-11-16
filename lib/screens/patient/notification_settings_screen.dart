@@ -113,8 +113,6 @@ class _Toggle extends StatelessWidget {
           }
         },
         contentPadding: const EdgeInsets.fromLTRB(Sp.lg, 4, Sp.md, 4),
-        activeTrackColor: context.pal.ink,
-        activeThumbColor: context.pal.card,
         title: Text(title, style: T.rowTitle),
         subtitle: Text(subtitle, style: T.secondary.muted(context)),
       ),

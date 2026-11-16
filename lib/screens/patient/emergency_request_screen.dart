@@ -324,7 +324,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                     _fieldLabel('Address'),
                     TextField(
                       style: T.body.copyWith(color: context.pal.ink),
-                      cursorColor: context.pal.ink,
+                      cursorColor: context.pal.brand,
                       controller: _address,
                       textCapitalization: TextCapitalization.words,
                       textInputAction: TextInputAction.next,
@@ -339,7 +339,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                     _fieldLabel('Landmark'),
                     TextField(
                       style: T.body.copyWith(color: context.pal.ink),
-                      cursorColor: context.pal.ink,
+                      cursorColor: context.pal.brand,
                       controller: _landmark,
                       textCapitalization: TextCapitalization.words,
                       onChanged: (_) => _showErrors ? setState(() {}) : null,
@@ -354,7 +354,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                     const SizedBox(height: Sp.md),
                     TextField(
                       style: T.body.copyWith(color: context.pal.ink),
-                      cursorColor: context.pal.ink,
+                      cursorColor: context.pal.brand,
                       controller: _description,
                       maxLines: 4,
                       textCapitalization: TextCapitalization.sentences,
@@ -507,8 +507,6 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
             value: _shareLocation,
             onChanged: _sending ? null : _setShareLocation,
             contentPadding: const EdgeInsets.fromLTRB(Sp.lg, 4, Sp.md, 4),
-            activeTrackColor: context.pal.ink,
-            activeThumbColor: context.pal.card,
             secondary: Icon(
               _shareLocation
                   ? Icons.my_location_rounded
@@ -606,7 +604,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
       contentPadding: const EdgeInsets.all(Sp.lg),
       border: border(context.pal.line),
       enabledBorder: border(context.pal.line),
-      focusedBorder: border(context.pal.ink, 1.5),
+      focusedBorder: border(context.pal.brand, 1.5),
     );
   }
 

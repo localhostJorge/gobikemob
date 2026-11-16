@@ -9,6 +9,7 @@ import '../../core/resident_sos.dart';
 import '../../core/resident_visits.dart';
 import '../live_map_screen.dart';
 import '../../widgets/bottom_gap.dart';
+import '../../widgets/ronda_hero.dart';
 import '../../widgets/ronda_nav_bar.dart';
 import 'app_colors.dart';
 import 'appointment_screen.dart';
@@ -132,33 +133,42 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.pal.background,
-      body: SafeArea(
-        child: IndexedStack(
-          index: _tab,
-          children: [
-            _home(),
-            const HistoryTab(),
-            SafetyTab(active: _tab == 2),
-            ProfileTab(currentUser: widget.currentUser),
-          ],
-        ),
+      // Home runs its navy header up under the status bar; the other tabs keep
+      // clear of it.
+      body: IndexedStack(
+        index: _tab,
+        children: [
+          _home(),
+          const SafeArea(bottom: false, child: HistoryTab()),
+          SafeArea(bottom: false, child: SafetyTab(active: _tab == 2)),
+          SafeArea(
+            bottom: false,
+            child: ProfileTab(currentUser: widget.currentUser),
+          ),
+        ],
       ),
       bottomNavigationBar: _bottomNav(),
     );
   }
 
   Widget _home() {
+    return Column(
+      children: [
+        _header(),
+        Expanded(child: _homeBody()),
+      ],
+    );
+  }
+
+  Widget _homeBody() {
     return RefreshIndicator(
-      color: AppColors.red,
       onRefresh: _refreshHome,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(Sp.gutter, Sp.md, Sp.gutter, Sp.xl),
+        padding: const EdgeInsets.fromLTRB(Sp.gutter, Sp.xl, Sp.gutter, Sp.xl),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _header(),
-            const SizedBox(height: Sp.lg),
             // The one thing that must be easy to find: first, and biggest.
             Center(
               child: ListenableBuilder(
@@ -191,45 +201,15 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
     );
   }
 
+  /// The navy band with the RondaGo icon, the greeting and the barangay.
   Widget _header() {
     return ListenableBuilder(
       listenable: PatientStore.instance,
-      builder: (context, _) {
-        final place = _place;
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('$_greeting, $_firstName', style: T.title),
-                  if (place != null) ...[
-                    const SizedBox(height: Sp.xs),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.place_outlined,
-                          size: 16,
-                          color: context.pal.muted,
-                        ),
-                        const SizedBox(width: Sp.xs),
-                        Flexible(
-                          child: Text(
-                            place,
-                            overflow: TextOverflow.ellipsis,
-                            style: T.secondary.muted(context),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        );
-      },
+      builder: (context, _) => RondaHero(
+        title: '$_greeting, $_firstName',
+        subtitle: _place,
+        subtitleIcon: Icons.place_outlined,
+      ),
     );
   }
 
@@ -329,11 +309,10 @@ class _HealthList extends StatelessWidget {
           loading: loading,
           skeleton: const HealthListSkeleton(),
           child: CardGroup(
-            dividerIndent: 52,
+            dividerIndent: 64,
             children: [
               NavRow(
                 icon: Icons.favorite_border_rounded,
-                color: AppColors.blue,
                 title: 'Medical history',
                 subtitle: last == null
                     ? 'No check-ups yet'
@@ -348,7 +327,6 @@ class _HealthList extends StatelessWidget {
               ),
               NavRow(
                 icon: Icons.home_outlined,
-                color: context.pal.orangeText,
                 title: 'Home visit',
                 // Always a new request. How the ones already sent stand is in History.
                 subtitle: 'Ask a GoBiker to check on you at home',
@@ -359,7 +337,6 @@ class _HealthList extends StatelessWidget {
               ),
               NavRow(
                 icon: Icons.map_outlined,
-                color: AppColors.blue,
                 title: 'Map',
                 subtitle: 'View live map',
                 onTap: () => Navigator.push(
@@ -371,8 +348,9 @@ class _HealthList extends StatelessWidget {
               // good they leave Home and stay in History.
               for (final a in appointments.open)
                 NavRow(
-                  icon: Icons.home_outlined,
-                  color: context.pal.orangeText,
+                  icon: Icons.schedule_rounded,
+                  // Orange: still open, waiting on someone.
+                  color: AppColors.orange,
                   title: 'Home visit request',
                   subtitle:
                       '${a.gobikerName ?? 'A GoBiker'} · '
@@ -389,7 +367,7 @@ class _HealthList extends StatelessWidget {
               if (declined != null)
                 NavRow(
                   icon: Icons.event_busy_outlined,
-                  color: context.pal.redText,
+                  color: AppColors.red,
                   title: 'Visit declined',
                   subtitle:
                       '${declined.gobikerName ?? 'A GoBiker'} · '
