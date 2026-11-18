@@ -1,4 +1,4 @@
-package com.rondago.app
+package com.gobikeproject.app
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -14,7 +14,7 @@ class MainActivity : FlutterActivity() {
 
     /**
      * One channel per sound/vibration choice in the resident's Notification Settings. The server
-     * picks the channel for each push (rondago_alerts, rondago_sound, rondago_vibrate, rondago_quiet),
+     * picks the channel for each push (gobike_alerts, gobike_sound, gobike_vibrate, gobike_quiet),
      * because Android fixes a channel's sound and vibration once it is created.
      */
     private fun createNotificationChannels() {
@@ -31,10 +31,10 @@ class MainActivity : FlutterActivity() {
 
         manager.createNotificationChannels(
             listOf(
-                channel("rondago_alerts", "Alerts", sound = true, vibrate = true),
-                channel("rondago_sound", "Alerts (sound only)", sound = true, vibrate = false),
-                channel("rondago_vibrate", "Alerts (vibrate only)", sound = false, vibrate = true),
-                channel("rondago_quiet", "Alerts (silent)", sound = false, vibrate = false),
+                channel("gobike_alerts", "Alerts", sound = true, vibrate = true),
+                channel("gobike_sound", "Alerts (sound only)", sound = true, vibrate = false),
+                channel("gobike_vibrate", "Alerts (vibrate only)", sound = false, vibrate = true),
+                channel("gobike_quiet", "Alerts (silent)", sound = false, vibrate = false),
             )
         )
     }

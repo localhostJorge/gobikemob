@@ -564,14 +564,14 @@ class _LiveMapScreenState extends State<LiveMapScreen>
                     urlTemplate:
                         'https://server.arcgisonline.com/ArcGIS/rest/services/'
                         '$service/MapServer/tile/{z}/{y}/{x}',
-                    userAgentPackageName: 'com.rondago.app',
+                    userAgentPackageName: 'com.gobikeproject.app',
                     maxNativeZoom: _imageryZoom,
                     maxZoom: _maxZoom,
                   )
               else
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.rondago.app',
+                  userAgentPackageName: 'com.gobikeproject.app',
                   maxZoom: _maxZoom,
                 ),
               AnimatedBuilder(

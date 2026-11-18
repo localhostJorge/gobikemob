@@ -41,6 +41,7 @@ class EmergencyFlow {
     final navigator = Navigator.of(context, rootNavigator: true);
 
     while (true) {
+      if (!context.mounted) return;
       _showSending(context);
       final result = await TrackingService.instance.sendEmergencyAlert();
       navigator.pop(); // close the "Sending..." dialog

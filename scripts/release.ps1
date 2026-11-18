@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Builds a signed RondaGo release APK and sends it to testers through Firebase App Distribution.
+  Builds a signed Go Bike release APK and sends it to testers through Firebase App Distribution.
 
 .DESCRIPTION
   1. Checks that the work is committed and the release key is present.
@@ -31,7 +31,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # ---- settings -------------------------------------------------------------
-# Firebase console > Project settings > Your apps > RondaGo (Android) > App ID.
+# Firebase console > Project settings > Your apps > Go Bike (Android) > App ID.
 $FirebaseAppId = '1:519313660154:android:f1dc533472747e19719143'
 $TesterGroups  = 'testers'
 $ApiBaseUrl    = 'https://gobikeproject.org/api'
@@ -83,7 +83,7 @@ $build = $parts[0] * 10000 + $parts[1] * 100 + $parts[2]
 
 $pubspec = $pubspec.Remove($match.Index, $match.Length).Insert($match.Index, "version: $versionName")
 [IO.File]::WriteAllText($pubspecPath, $pubspec, (New-Object Text.UTF8Encoding $false))
-Write-Host "release: building RondaGo $versionName" -ForegroundColor Cyan
+Write-Host "release: building Go Bike $versionName" -ForegroundColor Cyan
 
 # ---- 2. build ---------------------------------------------------------------
 Invoke-Checked 'flutter build' { flutter build apk --release "--build-name=$versionName" "--build-number=$build" "--dart-define=API_BASE_URL=$ApiBaseUrl" }
@@ -96,10 +96,10 @@ if (-not $Notes) {
     $lastTag = (git tag --list 'release-*' --sort=-creatordate | Select-Object -First 1)
     $range = if ($lastTag) { "$lastTag..HEAD" } else { 'HEAD~10..HEAD' }
     $Notes = (git log $range --no-merges --format='- %s') -join "`n"
-    if (-not $Notes) { $Notes = "RondaGo $versionName" }
+    if (-not $Notes) { $Notes = "Go Bike $versionName" }
 }
-$notesFile = Join-Path $env:TEMP "rondago-release-notes-$build.txt"
-[IO.File]::WriteAllText($notesFile, "RondaGo $versionName`n`n$Notes", (New-Object Text.UTF8Encoding $false))
+$notesFile = Join-Path $env:TEMP "gobike-release-notes-$build.txt"
+[IO.File]::WriteAllText($notesFile, "Go Bike $versionName`n`n$Notes", (New-Object Text.UTF8Encoding $false))
 
 # ---- 4. upload --------------------------------------------------------------
 # The ~55 MB upload sometimes drops on a slow connection, so try a few times.
@@ -119,8 +119,8 @@ if (git tag --list $tag) { $tag = "release-$versionName-$build" }
 # With -KeepVersionName the version may already be committed: nothing to commit then.
 git add pubspec.yaml
 git diff --cached --quiet
-if ($LASTEXITCODE -ne 0) { Invoke-Checked 'git commit' { git commit -q -m "chore(release): RondaGo $versionName" } }
+if ($LASTEXITCODE -ne 0) { Invoke-Checked 'git commit' { git commit -q -m "chore(release): Go Bike $versionName" } }
 Invoke-Checked 'git tag' { git tag $tag }
 
-Write-Host "release: RondaGo $versionName sent to '$TesterGroups' and tagged $tag." -ForegroundColor Green
+Write-Host "release: Go Bike $versionName sent to '$TesterGroups' and tagged $tag." -ForegroundColor Green
 Write-Host 'release: push when ready: git push; git push --tags'

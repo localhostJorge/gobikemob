@@ -295,7 +295,7 @@ class TrackingService {
         setOngoing: true,
         // The Go Bike mark in the status bar, in the brand blue.
         notificationIcon: AndroidResource(
-          name: 'ic_stat_rondago',
+          name: 'ic_stat_gobike',
           defType: 'drawable',
         ),
         color: AppColors.blue,

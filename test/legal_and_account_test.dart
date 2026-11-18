@@ -19,7 +19,7 @@ Map<String, dynamic> termsJson({String updated = 'November 13, 2026'}) => {
   'sections': [
     {
       'title': '1. Acceptance of These Terms',
-      'content': 'These Terms govern your use of **the RondaGo app**.\n\nRead our [Privacy Policy](/privacy-policy).',
+      'content': 'These Terms govern your use of **the Go Bike app**.\n\nRead our [Privacy Policy](/privacy-policy).',
     },
     {
       'title': '6. Emergencies and SOS Requests',
@@ -94,7 +94,7 @@ void main() {
         expect(find.text('1. Acceptance of These Terms'), findsOneWidget);
         expect(find.text('6. Emergencies and SOS Requests'), findsOneWidget);
         // Bold, links and list items are shown as text, without the markup.
-        expect(rich('govern your use of the RondaGo app.'), findsOneWidget);
+        expect(rich('govern your use of the Go Bike app.'), findsOneWidget);
         expect(rich('**'), findsNothing);
         expect(rich('Privacy Policy'), findsOneWidget);
         expect(rich('](/privacy-policy)'), findsNothing);

@@ -7,7 +7,7 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// Release signing: android/key.properties (gitignored) points at the RondaGo keystore,
+// Release signing: android/key.properties (gitignored) points at the Go Bike keystore,
 // which lives outside the repo. Without it, release builds fall back to the debug key.
 val keystoreProperties = Properties().apply {
     val file = rootProject.file("key.properties")
@@ -15,7 +15,7 @@ val keystoreProperties = Properties().apply {
 }
 
 android {
-    namespace = "com.rondago.app"
+    namespace = "com.gobikeproject.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -25,7 +25,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.rondago.app"
+        applicationId = "com.gobikeproject.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

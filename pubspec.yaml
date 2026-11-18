@@ -82,7 +82,7 @@ flutter:
       - assets/images/GoBike-icon.png
       - assets/GoBike-splash.mp4
 
-  # Poppins: the RondaGo wordmark ("Ronda" bold, "Go" bold italic, as in the brand
+  # Poppins: the Go Bike wordmark ("Go" bold, "Bike" bold italic, as in the brand
   # video) and the app's headings and big numbers. Body text stays in Roboto.
   # Licence: assets/fonts/Poppins-OFL.txt.
   fonts:

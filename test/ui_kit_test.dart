@@ -124,7 +124,7 @@ void main() {
       }
     });
 
-    test('the brand colors are the RondaGo logo colors', () {
+    test('the brand colors are the Go Bike logo colors', () {
       expect(AppColors.blue, const Color(0xFF1667C2));
       expect(AppColors.orange, const Color(0xFFF58220));
       expect(AppColors.navy, const Color(0xFF0B3D78));
@@ -627,7 +627,7 @@ void main() {
         // The old avatar in the Home header is gone: Profile is in the bar now.
         expect(find.bySemanticsLabel('Your profile'), findsNothing);
 
-        // Home opens on the navy RondaGo header with the app icon and the greeting.
+        // Home opens on the navy Go Bike header with the app icon and the greeting.
         expect(find.byType(RondaHero), findsOneWidget);
         expect(
           find.descendant(

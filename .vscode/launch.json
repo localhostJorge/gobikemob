@@ -2,12 +2,12 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "RondaGo (online API)",
+      "name": "Go Bike (online API)",
       "request": "launch",
       "type": "dart"
     },
     {
-      "name": "RondaGo (local API over USB)",
+      "name": "Go Bike (local API over USB)",
       "request": "launch",
       "type": "dart",
       "args": ["--dart-define=API_BASE_URL=http://127.0.0.1:8000/api"]

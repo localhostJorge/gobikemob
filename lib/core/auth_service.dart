@@ -3,7 +3,7 @@
 // session restore and logout.
 //
 // GOOGLE SIGN-IN SETUP (already done in Google Cloud):
-//  * Android package name: com.rondago.app (register a new Android OAuth client)
+//  * Android package name: com.gobikeproject.app (register a new Android OAuth client)
 //  * SHA-1 of this laptop's debug keystore is registered on the Android client
 //  * kGoogleWebClientId (lib/core/api_config.dart) is the WEB client ID, used
 //    as serverClientId so Google returns an ID token that Laravel can verify.

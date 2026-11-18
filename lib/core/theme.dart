@@ -397,7 +397,7 @@ class AppTheme {
       ),
     );
 
-    // Big type in Poppins (as the RondaGo wordmark), everything else in Roboto.
+    // Big type in Poppins (as the Go Bike wordmark), everything else in Roboto.
     TextStyle? heading(TextStyle? s, FontWeight w) =>
         s?.copyWith(fontFamily: headingFont, fontWeight: w);
     final text = base.textTheme.apply(

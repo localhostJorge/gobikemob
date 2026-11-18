@@ -54,7 +54,7 @@
              bar, tinted with the brand blue, instead of a blank square. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@drawable/ic_stat_rondago" />
+            android:resource="@drawable/ic_stat_gobike" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/gobike_blue" />

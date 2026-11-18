@@ -106,7 +106,7 @@ void main() {
   }
 
   testWidgets(
-    'plays the RondaGo video, and waits for it to end before moving on',
+    'plays the Go Bike video, and waits for it to end before moving on',
     (tester) async {
       await phone(tester);
       final player = _FakeVideoPlayer();
