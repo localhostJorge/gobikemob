@@ -386,7 +386,7 @@ class _GobikerProfileTabState extends State<GobikerProfileTab> {
                 FutureBuilder<PackageInfo>(
                   future: _appInfo,
                   builder: (context, snap) =>
-                      RondaGoAbout(version: snap.data?.version),
+                      GoBikeAbout(version: snap.data?.version),
                 ),
                 const SizedBox(height: 28),
                 OutlinedButton.icon(

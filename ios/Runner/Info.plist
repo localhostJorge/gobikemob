@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>RondaGo</string>
+	<string>Go Bike</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>RondaGo</string>
+	<string>Go Bike</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -67,14 +67,14 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>RondaGo shares your location with the Go Bike admin while a ronda is active.</string>
+	<string>Go Bike shares your location with the Go Bike admin while a ronda is active.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>RondaGo keeps sharing your location with the Go Bike admin during a ronda, even when the app is in the background.</string>
+	<string>Go Bike keeps sharing your location with the Go Bike admin during a ronda, even when the app is in the background.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>RondaGo uses the camera to attach a photo or video to an emergency request.</string>
+	<string>Go Bike uses the camera to attach a photo or video to an emergency request.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>RondaGo lets you attach a photo or video from your library to an emergency request or your profile.</string>
+	<string>Go Bike lets you attach a photo or video from your library to an emergency request or your profile.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>RondaGo records sound when you film a video for an emergency request.</string>
+	<string>Go Bike records sound when you film a video for an emergency request.</string>
 </dict>
 </plist>

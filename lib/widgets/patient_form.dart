@@ -324,7 +324,7 @@ class PatientForm extends StatelessWidget {
           maxLength: 1000,
           helper: readOnly
               ? null
-              : 'The patient can read this in their RondaGo app.',
+              : 'The patient can read this in their Go Bike app.',
         ),
       ],
     );

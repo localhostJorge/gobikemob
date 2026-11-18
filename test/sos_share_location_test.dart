@@ -345,7 +345,7 @@ void main() {
 
         expect(
           find.text(
-            'RondaGo is not allowed to use your location, so no pin will be '
+            'Go Bike is not allowed to use your location, so no pin will be '
             'sent.',
           ),
           findsOneWidget,

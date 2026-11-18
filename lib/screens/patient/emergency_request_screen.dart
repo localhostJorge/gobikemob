@@ -545,7 +545,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                         child: Text(
                           problem == LocationState.serviceOff
                               ? 'Location is off on this phone, so no pin will be sent.'
-                              : 'RondaGo is not allowed to use your location, so no pin will be sent.',
+                              : 'Go Bike is not allowed to use your location, so no pin will be sent.',
                           style: T.secondary.muted(context),
                         ),
                       ),

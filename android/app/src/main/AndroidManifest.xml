@@ -24,7 +24,7 @@
     </queries>
 
     <application
-        android:label="RondaGo"
+        android:label="Go Bike"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -50,14 +50,14 @@
             </intent-filter>
         </activity>
         
-        <!-- Push notifications show the RondaGo mark (a white silhouette) in the status
+        <!-- Push notifications show the Go Bike mark (a white silhouette) in the status
              bar, tinted with the brand blue, instead of a blank square. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_stat_rondago" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
-            android:resource="@color/rondago_blue" />
+            android:resource="@color/gobike_blue" />
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

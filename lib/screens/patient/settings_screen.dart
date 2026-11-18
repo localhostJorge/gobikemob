@@ -98,7 +98,7 @@ class AboutRow extends StatelessWidget {
     return FutureBuilder<PackageInfo>(
       future: PackageInfo.fromPlatform(),
       // The app icon and wordmark, the way the app is known, with its version.
-      builder: (context, snap) => RondaGoAbout(
+      builder: (context, snap) => GoBikeAbout(
         version: snap.data?.version,
         pending: const LineSkeleton(width: 80),
         padding: const EdgeInsets.fromLTRB(Sp.md, 12, Sp.md, 12),

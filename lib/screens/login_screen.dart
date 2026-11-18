@@ -151,7 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // The full RondaGo logo, as the brand video ends: icon, then wordmark.
+                            // The full Go Bike logo, as the brand video ends: icon, then wordmark.
                             const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -164,7 +164,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 Flexible(
                                   child: FittedBox(
                                     fit: BoxFit.scaleDown,
-                                    child: RondaGoWordmark(fontSize: 32),
+                                    child: GoBikeWordmark(fontSize: 32),
                                   ),
                                 ),
                               ],

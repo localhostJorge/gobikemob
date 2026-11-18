@@ -523,11 +523,12 @@ void main() {
         'Dark mode',
         'Notification settings',
         'Hold time',
-        'RondaGo',
         'Log out',
       ]) {
         expect(find.text(text), findsOneWidget, reason: text);
       }
+      // The wordmark renders as "Go" + "Bike" (two spans), so check the semantics label.
+      expect(find.bySemanticsLabel('Go Bike'), findsOneWidget);
     });
 
     testWidgets('Log out asks first, and Cancel leaves the person signed in', (
@@ -631,7 +632,7 @@ void main() {
         expect(
           find.descendant(
             of: find.byType(RondaHero),
-            matching: find.byType(RondaGoIcon),
+            matching: find.byType(GoBikeIcon),
           ),
           findsOneWidget,
         );

@@ -14,11 +14,11 @@ void main() async {
       .init(); // push notifications (works without them too)
   // When the admin answers an emergency, tell the GoBiker on whatever screen they are on.
   EmergencyWatcher.instance.onAnnounce = showEmergencyAlert;
-  runApp(const RondaGoApp());
+  runApp(const GoBikeApp());
 }
 
-class RondaGoApp extends StatelessWidget {
-  const RondaGoApp({super.key});
+class GoBikeApp extends StatelessWidget {
+  const GoBikeApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +27,7 @@ class RondaGoApp extends StatelessWidget {
       builder: (context, _) {
         return MaterialApp(
           navigatorKey: appNavigatorKey,
-          title: 'RondaGo',
+          title: 'Go Bike',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,

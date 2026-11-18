@@ -36,7 +36,7 @@ class RondaNavItem {
 /// The bottom bar of both home screens, GoBiker and resident.
 ///
 /// The selected tab gets a pale brand pill behind its icon, a brand-blue label, and
-/// the orange dot from the RondaGo logo at the pill's corner. A count badge takes the
+/// the orange dot from the Go Bike logo at the pill's corner. A count badge takes the
 /// dot's place.
 class RondaNavBar extends StatelessWidget {
   const RondaNavBar({

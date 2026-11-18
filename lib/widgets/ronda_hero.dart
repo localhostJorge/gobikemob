@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import '../screens/patient/app_colors.dart';
 import 'brand.dart';
 
-/// The navy band at the top of both home screens: the RondaGo icon, a greeting and a
+/// The navy band at the top of both home screens: the Go Bike icon, a greeting and a
 /// line under it, over a faint arc of the logo's loop arrow and its orange dot.
 ///
 /// It runs up under the status bar (whose icons turn light over it) and stays put
@@ -72,7 +72,7 @@ class RondaHero extends StatelessWidget {
                               color: Colors.white.withValues(alpha: 0.18),
                             ),
                           ),
-                          child: const RondaGoIcon(size: 44),
+                          child: const GoBikeIcon(size: 44),
                         ),
                         const SizedBox(width: 14),
                         Expanded(

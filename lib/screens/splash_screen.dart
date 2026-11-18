@@ -7,10 +7,11 @@ import '../core/app_router.dart';
 import '../core/auth_service.dart';
 import '../core/first_run.dart';
 import '../widgets/auth_widgets.dart';
+import '../widgets/brand.dart';
 import 'login_screen.dart';
 import 'welcome_screen.dart';
 
-/// Opens the app: plays the RondaGo brand video once while the saved session is checked,
+/// Opens the app: plays the Go Bike brand video once while the saved session is checked,
 /// then moves on to the right first screen.
 ///
 /// The video is drawn on white (its own background), so it blends into the page on any
@@ -19,7 +20,7 @@ import 'welcome_screen.dart';
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
-  static const String video = 'assets/RondaGo-splash.mp4';
+  static const String video = 'assets/GoBike-splash.mp4';
 
   /// Never wait longer than this for the video to end, whatever the player does.
   static const Duration longestWait = Duration(seconds: 7);
@@ -177,7 +178,7 @@ class _SplashScreenState extends State<SplashScreen>
               width: 26,
               child: CircularProgressIndicator(
                 strokeWidth: 2.5,
-                color: kAuthBlue,
+                color: kGoBikeBlue,
               ),
             ),
           ],
@@ -191,7 +192,7 @@ class _SplashScreenState extends State<SplashScreen>
       child: Scaffold(
         backgroundColor: Colors.white,
         body: Semantics(
-          label: 'RondaGo is starting',
+          label: 'Go Bike is starting',
           container: true,
           child: body,
         ),

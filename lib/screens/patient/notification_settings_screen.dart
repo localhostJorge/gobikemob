@@ -69,8 +69,8 @@ class NotificationSettingsScreen extends StatelessWidget {
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 4),
                   child: Text(
-                    'Notifications arrive even when RondaGo is closed. If none '
-                    'arrive, check that notifications are allowed for RondaGo '
+                    'Notifications arrive even when Go Bike is closed. If none '
+                    'arrive, check that notifications are allowed for Go Bike '
                     "in your phone's settings.",
                     style: T.meta.muted(context),
                   ),
@@ -121,7 +121,7 @@ class _Toggle extends StatelessWidget {
 }
 
 /// Sets this phone up for notifications without showing anything (no loading,
-/// no retry). Only when notifications are turned off for RondaGo in the
+/// no retry). Only when notifications are turned off for Go Bike in the
 /// phone's settings does it show a notice with a way to turn them on.
 class _PhoneStatus extends StatefulWidget {
   const _PhoneStatus();
@@ -183,7 +183,7 @@ class _PhoneStatusState extends State<_PhoneStatus>
                   const SizedBox(width: Sp.md),
                   Expanded(
                     child: Text(
-                      "Notifications are turned off for RondaGo in your phone's settings.",
+                      "Notifications are turned off for Go Bike in your phone's settings.",
                       style: T.label.copyWith(color: context.pal.redText),
                     ),
                   ),

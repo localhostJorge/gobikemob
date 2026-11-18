@@ -730,7 +730,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _iconBadge(IconData icon, Color color) =>
       IconTile(icon, color: color, size: 44);
 
-  /// The navy RondaGo band: greeting, name, the barangay this GoBiker covers, and
+  /// The navy Go Bike band: greeting, name, the barangay this GoBiker covers, and
   /// an "On ronda" pill (with the logo's orange dot) while a ronda is open.
   Widget _buildHeader(String firstName, String barangay) {
     return RondaHero(

@@ -29,13 +29,13 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 18),
               const FadeInSlide(
                 delay: Duration(milliseconds: 60),
-                child: RondaGoWordmark(fontSize: 36),
+                child: GoBikeWordmark(fontSize: 36),
               ),
               const SizedBox(height: 24),
               FadeInSlide(
                 delay: const Duration(milliseconds: 120),
                 child: Text(
-                  'Saving lives one ride at a time',
+                  'Community health on two wheels',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontFamily: 'Poppins',

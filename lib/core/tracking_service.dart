@@ -289,11 +289,11 @@ class TrackingService {
       distanceFilter: 0,
       intervalDuration: const Duration(seconds: 3),
       foregroundNotificationConfig: const ForegroundNotificationConfig(
-        notificationTitle: 'RondaGo: ronda in progress',
+        notificationTitle: 'Go Bike: ronda in progress',
         notificationText: 'Sharing your live location with the Go Bike admin.',
         enableWakeLock: true,
         setOngoing: true,
-        // The RondaGo mark in the status bar, in the brand blue.
+        // The Go Bike mark in the status bar, in the brand blue.
         notificationIcon: AndroidResource(
           name: 'ic_stat_rondago',
           defType: 'drawable',

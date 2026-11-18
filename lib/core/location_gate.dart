@@ -110,7 +110,7 @@ class LocationGate {
       "Your phone's location is off. Turn it on to see yourself on the map.",
     LocationState.permissionDenied =>
       'Allow location access to see yourself on the map.',
-    LocationState.permissionDeniedForever => 'Location access is blocked for RondaGo. Allow it in your phone settings.',
+    LocationState.permissionDeniedForever => 'Location access is blocked for Go Bike. Allow it in your phone settings.',
     LocationState.ready => '',
   };
 }

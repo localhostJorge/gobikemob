@@ -27,8 +27,8 @@ extension on LegalType {
       this == LegalType.terms ? '/terms' : '/privacy-policy';
 
   String get intro => this == LegalType.terms
-      ? 'These terms apply when you use the RondaGo app, the Go Bike Project website and our programs. By creating an account you agree to them.'
-      : 'How the Go Bike Project collects, uses, shares and protects your personal information when you use RondaGo, and your rights under the Data Privacy Act of 2012.';
+      ? 'These terms apply when you use the Go Bike app, the Go Bike Project website and our programs. By creating an account you agree to them.'
+      : 'How the Go Bike Project collects, uses, shares and protects your personal information when you use Go Bike, and your rights under the Data Privacy Act of 2012.';
 }
 
 /// The website address (the API without its "/api" ending), for relative links.
@@ -135,10 +135,10 @@ class _LegalScreenState extends State<LegalScreen> {
         foregroundColor: onSurface,
         elevation: 0,
         scrolledUnderElevation: 0,
-        // The RondaGo icon beside the title: these are the app's own documents.
+        // The Go Bike icon beside the title: these are the app's own documents.
         title: Row(
           children: [
-            const RondaGoIcon(size: 28),
+            const GoBikeIcon(size: 28),
             const SizedBox(width: 10),
             Flexible(
               child: Text(

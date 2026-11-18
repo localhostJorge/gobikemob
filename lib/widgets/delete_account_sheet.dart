@@ -96,7 +96,7 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
       Uri(
         scheme: 'mailto',
         path: _supportEmail,
-        query: 'subject=Close my RondaGo account',
+        query: 'subject=Close my Go Bike account',
       ),
     ).catchError((_) => false);
   }
@@ -125,7 +125,7 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
               ),
               const SizedBox(height: 12),
               Text(
-                'This permanently deletes your RondaGo account: your profile and photo, '
+                'This permanently deletes your Go Bike account: your profile and photo, '
                 'your location, your emergency (SOS) requests with their photos and videos, '
                 'your visit requests, ratings and messages. You cannot undo this.',
                 style: body,

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Android 12 and later show their own launch screen: the RondaGo icon on white, the
+    <!-- Android 12 and later show their own launch screen: the Go Bike icon on white, the
          same white the splash video starts on, in light and dark mode alike. -->
     <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">@drawable/launch_background</item>

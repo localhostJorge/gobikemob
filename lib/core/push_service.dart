@@ -305,7 +305,7 @@ class _SafetyScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     // Opened from a notification: the wordmark says which app this is.
-    appBar: AppBar(title: const RondaGoWordmark(fontSize: 20)),
+    appBar: AppBar(title: const GoBikeWordmark(fontSize: 20)),
     body: const SafeArea(child: SafetyTab(active: true)),
   );
 }
@@ -326,3 +326,4 @@ class PushStatus {
   final String state;
   final String? message;
 }
+   

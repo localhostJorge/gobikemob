@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../screens/patient/app_colors.dart';
 
-/// The RondaGo theme: one design system for the GoBiker and resident screens, built
+/// The Go Bike theme: one design system for the GoBiker and resident screens, built
 /// on the brand colors of the logo, app icon and splash video (see [AppColors]).
 ///
 /// Light and dark are built by the same code from [AppPalette.light] and

@@ -201,7 +201,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
     );
   }
 
-  /// The navy band with the RondaGo icon, the greeting and the barangay.
+  /// The navy band with the Go Bike icon, the greeting and the barangay.
   Widget _header() {
     return ListenableBuilder(
       listenable: PatientStore.instance,

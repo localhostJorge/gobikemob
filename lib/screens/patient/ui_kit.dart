@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/confirm_modal.dart';
 import 'app_colors.dart';
 
-/// The RondaGo design tokens and building blocks, for GoBiker and resident screens
+/// The Go Bike design tokens and building blocks, for GoBiker and resident screens
 /// alike. Every screen uses these instead of its own sizes, so the app reads as one
 /// thing.
 
@@ -37,7 +37,7 @@ abstract final class Rd {
 /// The body font. Named where a widget (a button) replaces the inherited style.
 const kFontFamily = 'Roboto';
 
-/// The heading font: Poppins, as in the RondaGo wordmark. Titles, headings and big
+/// The heading font: Poppins, as in the Go Bike wordmark. Titles, headings and big
 /// numbers only; running text stays in [kFontFamily].
 const kHeadingFont = 'Poppins';
 

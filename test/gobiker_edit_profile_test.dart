@@ -68,7 +68,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
     await tester.pump();
 
-    final top = tester.getTopLeft(find.byType(RondaGoIcon)).dy;
+    final top = tester.getTopLeft(find.byType(GoBikeIcon)).dy;
     final bottom = tester.getBottomLeft(find.text('Sign Up')).dy;
     final middle = (top + bottom) / 2;
     // Centered in the screen (within a few points), not pinned to the top.

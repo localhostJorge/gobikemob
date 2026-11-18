@@ -45,7 +45,7 @@ BorderSide authCheckboxSide(BuildContext context) {
 /// from one to the next instead of jumping.
 const authLogoHero = 'auth-logo';
 
-/// The RondaGo icon on the sign-in pages. It carries its own blue background, so it
+/// The Go Bike icon on the sign-in pages. It carries its own blue background, so it
 /// needs no plate in dark mode.
 class AuthLogo extends StatelessWidget {
   const AuthLogo({super.key, this.height = 80});
@@ -53,7 +53,7 @@ class AuthLogo extends StatelessWidget {
   final double height;
 
   @override
-  Widget build(BuildContext context) => RondaGoIcon(size: height);
+  Widget build(BuildContext context) => GoBikeIcon(size: height);
 }
 
 /// Thin lines with a small "or" in the middle.

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// The RondaGo colors that look the same in light and dark mode: the brand (from the
+/// The Go Bike colors that look the same in light and dark mode: the brand (from the
 /// logo, the app icon and the splash video) and the emergency red. Everything that has
 /// to change with the theme (pages, cards, text, lines, readable status shades) lives
 /// in [AppPalette].
@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 /// Brand rules:
 /// - [blue] is the brand: buttons, links, active states. White text on it is 5.6:1.
 /// - [navy] is for headings and the big brand surfaces (home header, ronda card).
-/// - [orange] is an accent only: dots, badges, highlights, the "Go". White text on it
+/// - [orange] is an accent only: dots, badges, highlights, the "Bike". White text on it
 ///   is 2.6:1, so it never sits behind white text; orange words use `orangeText`.
 /// - [red] means emergency (SOS) and danger, nothing else.
 class AppColors {

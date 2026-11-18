@@ -131,7 +131,7 @@ void main() {
       await tester.pump(const Duration(seconds: 1)); // the fade
       expect(find.byType(SplashScreen), findsNothing);
       expect(find.text('Get Started'), findsOneWidget);
-      expect(find.byType(RondaGoWordmark), findsOneWidget);
+      expect(find.byType(GoBikeWordmark), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

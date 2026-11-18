@@ -2,28 +2,28 @@ import 'package:flutter/material.dart';
 
 import '../screens/patient/app_colors.dart';
 
-/// The blue of the RondaGo icon (sampled from the designer's artwork).
-const Color kRondaBlue = AppColors.blue;
+/// The blue of the Go Bike icon (sampled from the designer's artwork).
+const Color kGoBikeBlue = AppColors.blue;
 
 /// The orange of the dot in the icon and of "Go" in the wordmark.
-const Color kRondaOrange = AppColors.orange;
+const Color kGoBikeOrange = AppColors.orange;
 
-const String kRondaGoIconAsset = 'assets/images/rondago_icon.png';
+const String kGoBikeIconAsset = 'assets/images/GoBike-icon.png';
 
-/// The RondaGo app icon: a rounded blue square with the loop, the R and the orange dot.
+/// The Go Bike app icon: a rounded blue square with the loop, the R and the orange dot.
 /// It is its own background, so it reads the same on light and dark pages.
-class RondaGoIcon extends StatelessWidget {
-  const RondaGoIcon({super.key, this.size = 80});
+class GoBikeIcon extends StatelessWidget {
+  const GoBikeIcon({super.key, this.size = 80});
 
   final double size;
 
   @override
   Widget build(BuildContext context) {
     return Image.asset(
-      kRondaGoIconAsset,
+      kGoBikeIconAsset,
       width: size,
       height: size,
-      semanticLabel: 'RondaGo',
+      semanticLabel: 'Go Bike',
       filterQuality: FilterQuality.medium,
       errorBuilder: (context, error, stackTrace) =>
           SizedBox.square(dimension: size),
@@ -31,10 +31,10 @@ class RondaGoIcon extends StatelessWidget {
   }
 }
 
-/// "About RondaGo": the app icon, the wordmark and the installed version, as on the
+/// "About Go Bike": the app icon, the wordmark and the installed version, as on the
 /// profile pages of both apps. [version] is null while it loads; [pending] shows then.
-class RondaGoAbout extends StatelessWidget {
-  const RondaGoAbout({super.key, this.version, this.pending, this.padding});
+class GoBikeAbout extends StatelessWidget {
+  const GoBikeAbout({super.key, this.version, this.pending, this.padding});
 
   final String? version;
   final Widget? pending;
@@ -45,13 +45,13 @@ class RondaGoAbout extends StatelessWidget {
     final muted = context.pal.muted;
     return Semantics(
       container: true,
-      label: version == null ? 'RondaGo' : 'RondaGo, version $version',
+      label: version == null ? 'Go Bike' : 'Go Bike, version $version',
       excludeSemantics: true,
       child: Padding(
         padding: padding ?? EdgeInsets.zero,
         child: Row(
           children: [
-            const RondaGoIcon(size: 40),
+            const GoBikeIcon(size: 40),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -60,7 +60,7 @@ class RondaGoAbout extends StatelessWidget {
                 children: [
                   const Align(
                     alignment: Alignment.centerLeft,
-                    child: RondaGoWordmark(fontSize: 18),
+                    child: GoBikeWordmark(fontSize: 18),
                   ),
                   const SizedBox(height: 2),
                   if (version != null)
@@ -84,10 +84,10 @@ class RondaGoAbout extends StatelessWidget {
   }
 }
 
-/// "RondaGo" set as in the brand video: "Ronda" in blue, "Go" in orange italic, Poppins
-/// bold. In dark mode "Ronda" turns white so it stays readable.
-class RondaGoWordmark extends StatelessWidget {
-  const RondaGoWordmark({super.key, this.fontSize = 32});
+/// "Go Bike" set as in the brand video: "Go" in blue, "Bike" in orange italic, Poppins
+/// bold. In dark mode "Go" turns white so it stays readable.
+class GoBikeWordmark extends StatelessWidget {
+  const GoBikeWordmark({super.key, this.fontSize = 32});
 
   final double fontSize;
 
@@ -101,19 +101,19 @@ class RondaGoWordmark extends StatelessWidget {
           fontWeight: FontWeight.w700,
           fontSize: fontSize,
           height: 1.15,
-          color: dark ? Colors.white : kRondaBlue,
+          color: dark ? Colors.white : kGoBikeBlue,
         ),
         children: const [
-          TextSpan(text: 'Ronda'),
+          TextSpan(text: 'Go'),
           TextSpan(
-            text: 'Go',
-            style: TextStyle(fontStyle: FontStyle.italic, color: kRondaOrange),
+            text: 'Bike',
+            style: TextStyle(fontStyle: FontStyle.italic, color: kGoBikeOrange),
           ),
         ],
       ),
       // A logo keeps its proportions: it does not grow with the phone's text size.
       textScaler: TextScaler.noScaling,
-      semanticsLabel: 'RondaGo',
+      semanticsLabel: 'Go Bike',
     );
   }
 }
