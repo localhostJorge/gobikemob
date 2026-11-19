@@ -32,7 +32,7 @@ $ErrorActionPreference = 'Stop'
 
 # ---- settings -------------------------------------------------------------
 # Firebase console > Project settings > Your apps > Go Bike (Android) > App ID.
-$FirebaseAppId = '1:519313660154:android:f1dc533472747e19719143'
+$FirebaseAppId = '1:519313660154:android:3c1ec6b2349c9950719143'
 $TesterGroups  = 'testers'
 $ApiBaseUrl    = 'https://gobikeproject.org/api'
 # ---------------------------------------------------------------------------

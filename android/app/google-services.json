@@ -7,9 +7,28 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:519313660154:android:f1dc533472747e19719143",
+        "mobilesdk_app_id": "1:519313660154:android:3c1ec6b2349c9950719143",
         "android_client_info": {
           "package_name": "com.gobikeproject.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAHY5wAFVx8fXOPiKqn3tIrKyMv-LxF8mI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:519313660154:android:f1dc533472747e19719143",
+        "android_client_info": {
+          "package_name": "com.rondago.app"
         }
       },
       "oauth_client": [],
