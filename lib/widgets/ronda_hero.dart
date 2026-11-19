@@ -6,8 +6,8 @@ import 'package:flutter/services.dart';
 import '../screens/patient/app_colors.dart';
 import 'brand.dart';
 
-/// The navy band at the top of both home screens: the Go Bike icon, a greeting and a
-/// line under it, over a faint arc of the logo's loop arrow and its orange dot.
+/// The navy band at the top of both home screens: the "Go Bike" name, a greeting and a
+/// line under it, over a faint arc and an orange dot.
 ///
 /// It runs up under the status bar (whose icons turn light over it) and stays put
 /// while the page below scrolls.
@@ -61,20 +61,12 @@ class RondaHero extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // The app's name across the top of the band, in the logo's colors.
+                    const GoBikeWordmark(fontSize: 20, onNavy: true),
+                    const SizedBox(height: 12),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // The icon is its own blue tile; a hairline keeps it off the navy.
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.18),
-                            ),
-                          ),
-                          child: const GoBikeIcon(size: 44),
-                        ),
-                        const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

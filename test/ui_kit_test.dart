@@ -627,14 +627,22 @@ void main() {
         // The old avatar in the Home header is gone: Profile is in the bar now.
         expect(find.bySemanticsLabel('Your profile'), findsNothing);
 
-        // Home opens on the navy Go Bike header with the app icon and the greeting.
+        // Home opens on the navy Go Bike header with the "Go Bike" name (not the
+        // logo image) and the greeting.
         expect(find.byType(RondaHero), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(RondaHero),
+            matching: find.byType(GoBikeWordmark),
+          ),
+          findsOneWidget,
+        );
         expect(
           find.descendant(
             of: find.byType(RondaHero),
             matching: find.byType(GoBikeIcon),
           ),
-          findsOneWidget,
+          findsNothing,
         );
         expect(find.textContaining(', Ana'), findsOneWidget);
 

@@ -121,14 +121,16 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
-# The Go Bike icon. Made from assets/launcher/gobike_icon_source.png (the designer's
-# export); regenerate the app icons with: dart run flutter_launcher_icons
+# The Go Bike icon: the logo (bike, heartbeat, GO BIKE) on white, from
+# assets/images/GoBike-icon.png. gobike_logo_foreground.png is the same logo with the
+# white made transparent, for Android's adaptive icon (white tile behind it) and its
+# themed monochrome icon. Regenerate the app icons with: dart run flutter_launcher_icons
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/launcher/icon_rounded.png"
-  image_path_ios: "assets/launcher/icon_square.png"
+  image_path: "assets/images/GoBike-icon.png"
+  image_path_ios: "assets/images/GoBike-icon.png"
   remove_alpha_ios: true
-  adaptive_icon_background: "#1667C2"
-  adaptive_icon_foreground: "assets/launcher/icon_foreground.png"
-  adaptive_icon_monochrome: "assets/launcher/icon_foreground.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/launcher/gobike_logo_foreground.png"
+  adaptive_icon_monochrome: "assets/launcher/gobike_logo_foreground.png"

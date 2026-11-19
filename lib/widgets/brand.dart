@@ -10,8 +10,8 @@ const Color kGoBikeOrange = AppColors.orange;
 
 const String kGoBikeIconAsset = 'assets/images/GoBike-icon.png';
 
-/// The Go Bike app icon: a rounded blue square with the loop, the R and the orange dot.
-/// It is its own background, so it reads the same on light and dark pages.
+/// The Go Bike logo (bike, heartbeat and GO BIKE) on its white square. It is its own
+/// background, so it reads the same on light and dark pages.
 class GoBikeIcon extends StatelessWidget {
   const GoBikeIcon({super.key, this.size = 80});
 
@@ -84,16 +84,22 @@ class GoBikeAbout extends StatelessWidget {
   }
 }
 
-/// "Go Bike" set as in the brand video: "Go" in blue, "Bike" in orange italic, Poppins
-/// bold. In dark mode "Go" turns white so it stays readable.
+/// "Go Bike" set as in the logo: "Go" in orange italic, "Bike" in the logo blue,
+/// Poppins bold, in light and dark mode alike (the logo blue is 3.3:1 on the dark
+/// page, enough for a big bold wordmark).
+///
+/// Only on the navy home band ([onNavy]) does "Bike" take a lighter blue: the logo
+/// blue is 1.9:1 there and all but disappears.
 class GoBikeWordmark extends StatelessWidget {
-  const GoBikeWordmark({super.key, this.fontSize = 32});
+  const GoBikeWordmark({super.key, this.fontSize = 32, this.onNavy = false});
 
   final double fontSize;
 
+  /// Set on the navy home band.
+  final bool onNavy;
+
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
     return Text.rich(
       TextSpan(
         style: TextStyle(
@@ -101,13 +107,16 @@ class GoBikeWordmark extends StatelessWidget {
           fontWeight: FontWeight.w700,
           fontSize: fontSize,
           height: 1.15,
-          color: dark ? Colors.white : kGoBikeBlue,
         ),
-        children: const [
-          TextSpan(text: 'Go'),
+        children: [
+          const TextSpan(
+            text: 'Go ',
+            style: TextStyle(fontStyle: FontStyle.italic, color: kGoBikeOrange),
+          ),
           TextSpan(
             text: 'Bike',
-            style: TextStyle(fontStyle: FontStyle.italic, color: kGoBikeOrange),
+            // On navy: the dark palette's brand, the blue lifted so it reads there.
+            style: TextStyle(color: onNavy ? AppPalette.dark.brand : kGoBikeBlue),
           ),
         ],
       ),
