@@ -11,6 +11,7 @@ class Announcement {
     required this.id,
     required this.title,
     required this.body,
+    this.content,
     this.postedAt,
     this.expiresAt,
   });
@@ -18,6 +19,7 @@ class Announcement {
   final int id;
   final String title;
   final String body;
+  final String? content;
   final DateTime? postedAt;
   final DateTime? expiresAt;
 
@@ -30,6 +32,7 @@ class Announcement {
       id: id,
       title: title,
       body: '${raw['body'] ?? ''}'.trim(),
+      content: '${raw['content'] ?? ''}'.trim(),
       postedAt: DateTime.tryParse('${raw['posted_at'] ?? ''}')?.toLocal(),
       expiresAt: DateTime.tryParse('${raw['expires_at'] ?? ''}')?.toLocal(),
     );
@@ -39,6 +42,7 @@ class Announcement {
     'id': id,
     'title': title,
     'body': body,
+    'content': content,
     'posted_at': postedAt?.toUtc().toIso8601String(),
     'expires_at': expiresAt?.toUtc().toIso8601String(),
   };

@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_bike_app/core/location_gate.dart';
 import 'package:go_bike_app/core/resident_sos.dart';
 import 'package:go_bike_app/screens/patient/emergency_request_screen.dart';
+import 'package:go_bike_app/screens/patient/ui_kit.dart';
 
 /// A phone whose location state the test sets, counting the settings screens it was sent to.
 class FakePhone implements LocationPlatform {
@@ -162,36 +163,30 @@ void main() {
     await tester.pump(const Duration(seconds: 5)); // the snackbar goes away
   }
 
-  bool shareIsOn(WidgetTester tester) => tester
-      .widget<SwitchListTile>(
-        find.widgetWithText(SwitchListTile, 'Share my location'),
-      )
-      .value;
-
-  Future<void> toggle(WidgetTester tester) async {
-    await tester.tap(find.byType(Switch));
+  Future<void> waitForLocation(WidgetTester tester) async {
+    // Wait for the GPS fix to be found (the initial gps() Future completes)
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 100)); // flush microtasks
     await tester.pumpAndSettle();
   }
 
-  testWidgets('offers to share the location, on by default, and looks for it', (
-    tester,
-  ) async {
+  testWidgets('looks for location automatically and shows status', (tester) async {
     await run(tester, () async {
       await open(tester);
+      await waitForLocation(tester);
 
-      expect(find.text('Share my location'), findsOneWidget);
-      expect(shareIsOn(tester), isTrue);
-      expect(
-        find.textContaining('Responders see a pin where you are'),
-        findsOneWidget,
-      );
+      // Should show location status row instead of share location toggle
+      expect(find.text('Your location'), findsOneWidget);
+      expect(find.textContaining('Responders will see a pin where you are'), findsOneWidget);
+      expect(find.text('Share my location'), findsNothing);
       expect(lookups, 1);
     });
   });
 
-  testWidgets('sends the position when they share it', (tester) async {
+  testWidgets('sends the position when GPS fix is available', (tester) async {
     await run(tester, () async {
       await open(tester);
+      await waitForLocation(tester);
       await fillAndSend(tester);
 
       expect(posted.single['latitude'], 16.04);
@@ -203,6 +198,7 @@ void main() {
   testWidgets('says how precise the pin is and how old', (tester) async {
     await run(tester, () async {
       await open(tester);
+      await waitForLocation(tester);
       await fillAndSend(tester);
 
       expect(posted.single['accuracy'], 5);
@@ -221,6 +217,7 @@ void main() {
       updates.add(pin(latitude: 16.0401, accuracy: 9));
       updates.add(pin(latitude: 16.07, accuracy: 120)); // a worse one after it
       await tester.pump();
+      await waitForLocation(tester);
 
       await fillAndSend(tester);
 
@@ -235,6 +232,7 @@ void main() {
     gps = () async => pin(accuracy: 300);
     await run(tester, () async {
       await open(tester);
+      await waitForLocation(tester);
       await fillAndSend(tester);
 
       expect(posted.single['latitude'], 16.04);
@@ -242,37 +240,23 @@ void main() {
     });
   });
 
-  testWidgets('stops listening, and sends nothing, once sharing is turned '
-      'off', (tester) async {
-    await run(tester, () async {
-      await open(tester);
-      expect(updates.hasListener, isTrue);
-
-      await toggle(tester);
-      expect(updates.hasListener, isFalse);
-
-      await fillAndSend(tester);
-      expect(posted.single.containsKey('latitude'), isFalse);
-      expect(posted.single.containsKey('accuracy'), isFalse);
-    });
-  });
-
-  testWidgets('sends no position when they turn sharing off, and does not wait '
-      'for the GPS', (tester) async {
-    // A GPS that never answers: with sharing on this is the 3-second wait.
-    gps = () => Completer<Position?>().future;
+  testWidgets('does not send when GPS is off: Send stays disabled', (tester) async {
+    final phone = FakePhone(serviceOn: false);
+    LocationGate.instance = LocationGate(phone);
+    gps = foundNothing;
     await run(tester, () async {
       await open(tester);
 
-      await toggle(tester);
-      expect(shareIsOn(tester), isFalse);
       expect(
-        find.textContaining('did not share your location'),
+        find.text('Location is off on this phone. Turn it on to share your location.'),
         findsOneWidget,
       );
-      expect(find.textContaining('Responders see a pin'), findsNothing);
+      expect(find.text('Open settings'), findsOneWidget);
+      await tester.tap(find.text('Open settings'));
+      await tester.pump();
+      expect(phone.locationSettingsOpened, 1);
 
-      // Not a single frame is spent waiting: 100 ms is enough for the request to be sent.
+      // The form still fills, but Send is disabled without a fix.
       await tester.enterText(
         find.widgetWithText(TextField, 'House no., street, purok'),
         '12 Rizal St.',
@@ -281,100 +265,61 @@ void main() {
         find.widgetWithText(TextField, 'e.g. Beside the barangay hall'),
         'Beside the chapel',
       );
-      await tester.tap(find.text('Send SOS'));
-      await tester.pump();
+      expect(
+        tester.widget<PrimaryButton>(
+          find.widgetWithText(PrimaryButton, 'Send SOS'),
+        ).enabled,
+        isFalse,
+      );
+      await tester.tap(find.text('Send SOS'), warnIfMissed: false);
       await tester.pump(const Duration(milliseconds: 100));
-
-      expect(posted, hasLength(1));
-      expect(posted.single.containsKey('latitude'), isFalse);
-      expect(posted.single.containsKey('longitude'), isFalse);
-      expect(posted.single['address'], '12 Rizal St.');
-      await tester.pump(const Duration(seconds: 5));
+      expect(posted, isEmpty);
     });
   });
 
-  testWidgets('looks again, and sends the position, when they turn it back '
-      'on', (tester) async {
+  testWidgets('does not send when permission is denied forever', (tester) async {
+    final phone = FakePhone(permission: LocationPermission.deniedForever);
+    LocationGate.instance = LocationGate(phone);
+    gps = foundNothing;
     await run(tester, () async {
       await open(tester);
-      await toggle(tester); // off
-      expect(lookups, 1);
 
-      await toggle(tester); // on again
-      expect(shareIsOn(tester), isTrue);
-      expect(lookups, 2);
+      expect(
+        find.text(
+          'Go Bike is not allowed to use your location. Allow it in settings.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Open settings'), findsOneWidget);
+      await tester.tap(find.text('Open settings'));
+      await tester.pump();
+      expect(phone.appSettingsOpened, 1);
 
-      await fillAndSend(tester);
-      expect(posted.single['latitude'], 16.04);
+      // The form still fills, but Send is disabled without a fix.
+      await tester.enterText(
+        find.widgetWithText(TextField, 'House no., street, purok'),
+        '12 Rizal St.',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextField, 'e.g. Beside the barangay hall'),
+        'Beside the chapel',
+      );
+      expect(
+        tester.widget<PrimaryButton>(
+          find.widgetWithText(PrimaryButton, 'Send SOS'),
+        ).enabled,
+        isFalse,
+      );
+      await tester.tap(find.text('Send SOS'), warnIfMissed: false);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(posted, isEmpty);
     });
   });
 
-  group('when the phone has no location to give', () {
-    testWidgets('says location is off, offers settings, and still sends', (
-      tester,
-    ) async {
-      final phone = FakePhone(serviceOn: false);
-      LocationGate.instance = LocationGate(phone);
-      gps = foundNothing;
-      await run(tester, () async {
-        await open(tester);
-
-        expect(
-          find.text('Location is off on this phone, so no pin will be sent.'),
-          findsOneWidget,
-        );
-        await tester.tap(find.text('Open settings'));
-        await tester.pump();
-        expect(phone.locationSettingsOpened, 1);
-
-        // Nothing here stops an emergency from being sent.
-        await fillAndSend(tester);
-        expect(posted, hasLength(1));
-        expect(posted.single.containsKey('latitude'), isFalse);
-      });
-    });
-
-    testWidgets('says the app is not allowed when permission was refused', (
-      tester,
-    ) async {
-      final phone = FakePhone(permission: LocationPermission.deniedForever);
-      LocationGate.instance = LocationGate(phone);
-      gps = foundNothing;
-      await run(tester, () async {
-        await open(tester);
-
-        expect(
-          find.text(
-            'Go Bike is not allowed to use your location, so no pin will be '
-            'sent.',
-          ),
-          findsOneWidget,
-        );
-        await tester.tap(find.text('Open settings'));
-        await tester.pump();
-        expect(phone.appSettingsOpened, 1);
-      });
-    });
-
-    testWidgets('has no warning while it works, or once sharing is off', (
-      tester,
-    ) async {
-      await run(tester, () async {
-        await open(tester);
-        expect(find.text('Open settings'), findsNothing);
-      });
-
-      LocationGate.instance = LocationGate(FakePhone(serviceOn: false));
-      gps = foundNothing;
-      await run(tester, () async {
-        await tester.pumpWidget(const SizedBox());
-        await open(tester);
-        expect(find.text('Open settings'), findsOneWidget);
-
-        // They chose not to share: the phone's state is no longer their concern.
-        await toggle(tester);
-        expect(find.text('Open settings'), findsNothing);
-      });
+  testWidgets('has no warning while GPS works', (tester) async {
+    await run(tester, () async {
+      await open(tester);
+      expect(find.text('Open settings'), findsNothing);
     });
   });
 }

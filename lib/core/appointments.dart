@@ -109,6 +109,7 @@ class GobikerOption {
     required this.name,
     required this.barangay,
     this.visitsDone = 0,
+    this.photoUrl,
   });
 
   final int id;
@@ -116,11 +117,18 @@ class GobikerOption {
   final String barangay;
   final int visitsDone;
 
+  /// The GoBiker's profile photo, null when they haven't set one.
+  final String? photoUrl;
+
   factory GobikerOption.fromJson(Map<String, dynamic> j) => GobikerOption(
     id: (j['id'] as num?)?.toInt() ?? 0,
     name: '${j['name'] ?? ''}',
     barangay: '${j['barangay'] ?? ''}',
     visitsDone: (j['visits_done'] as num?)?.toInt() ?? 0,
+    photoUrl: () {
+      final s = '${j['photo_url'] ?? ''}'.trim();
+      return s.isEmpty ? null : s;
+    }(),
   );
 }
 

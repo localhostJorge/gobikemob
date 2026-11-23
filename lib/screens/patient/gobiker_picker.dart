@@ -240,12 +240,14 @@ class _GobikerPickerBodyState extends State<GobikerPickerBody> {
     final done = g.visitsDone == 1
         ? '1 visit done'
         : '${g.visitsDone} visits done';
+    final photo = g.photoUrl;
 
     return ListTile(
       enabled: !disabled,
       minVerticalPadding: 12,
       leading: CircleAvatar(
         backgroundColor: context.pal.brandSoft,
+        foregroundImage: photo == null ? null : NetworkImage(photo),
         foregroundColor: context.pal.brand,
         child: Text(g.name.isEmpty ? '?' : g.name[0].toUpperCase()),
       ),

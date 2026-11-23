@@ -24,6 +24,7 @@ import 'appointments.dart';
 import 'emergency_watcher.dart';
 import 'feedback_prompt.dart';
 import 'follow_up_alerts.dart';
+import 'gobiker_messages.dart';
 import 'live_map.dart';
 import 'presence_service.dart';
 import 'push_service.dart';
@@ -721,6 +722,7 @@ class AuthService {
     ResidentVisits.instance.reset();
     ResidentSos.instance.reset();
     GobikerAppointments.instance.reset();
+    GobikerMessages.instance.reset();
     ResidentAppointments.instance.reset();
     GobikerSos.instance.reset();
     FeedbackPrompt.instance.reset();

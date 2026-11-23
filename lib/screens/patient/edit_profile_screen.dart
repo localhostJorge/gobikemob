@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/age.dart';
 import '../../core/auth_service.dart';
 import '../../widgets/birthday_field.dart';
+import '../../widgets/location_dropdowns.dart';
 import 'app_colors.dart';
-import 'emergency_request_screen.dart' show kLocations;
 import 'patient_store.dart';
 import 'patient_ui.dart';
 import 'profile_avatar.dart';
@@ -56,12 +56,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     _initName = user?.name ?? '';
     _initMobile = user?.mobile ?? '';
-    // Only offer a barangay the server accepts; an old free-text one must be re-picked.
+    // The cascading widget pre-selects this barangay; an old free-text one
+    // that the server no longer knows just starts unselected.
     final barangay = user?.barangay;
-    _initBarangay =
-        (kLocations['Bugallon'] ?? const <String>[]).contains(barangay)
-        ? barangay
-        : null;
+    _initBarangay = (barangay == null || barangay.isEmpty) ? null : barangay;
 
     _name.text = _initName;
     _email.text = user?.email ?? '';
@@ -119,8 +117,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final barangays = kLocations['Bugallon'] ?? const <String>[];
-
     return Scaffold(
       backgroundColor: context.pal.background,
       appBar: patientAppBar(context, 'Edit profile'),
@@ -234,20 +230,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             birthdayError(_birthdate, required: false),
                       ),
                       const SizedBox(height: Sp.lg),
-                      DropdownButtonFormField<String>(
-                        style: T.body.copyWith(color: context.pal.ink),
-                        dropdownColor: context.pal.card,
-                        initialValue: _barangay,
-                        isExpanded: true,
-                        decoration: inputDecoration(
-                          context,
-                          'Barangay',
-                          Icons.map_outlined,
-                        ),
-                        items: [
-                          for (final b in barangays)
-                            DropdownMenuItem(value: b, child: Text(b)),
-                        ],
+                      LocationDropdowns(
+                        initialBarangay: _initBarangay,
                         onChanged: (v) => setState(() => _barangay = v),
                         validator: (v) =>
                             v == null ? 'Select your barangay' : null,

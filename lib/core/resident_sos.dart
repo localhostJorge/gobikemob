@@ -139,11 +139,12 @@ class ResidentSos extends ChangeNotifier {
   /// Sends the request itself (no media). The admin is alerted as soon as
   /// this succeeds, so it must not wait for a photo or video upload.
   /// The server files it under the resident's own barangay.
+  /// Requires a valid location fix.
   Future<({SosEntry? sos, String? error})> send({
     required String address,
     required String landmark,
     String? description,
-    Fix? fix,
+    required Fix fix,
   }) async {
     final res = await AuthService.instance.callAuthed(
       'POST',
@@ -155,15 +156,13 @@ class ResidentSos extends ChangeNotifier {
           'description': description.trim(),
         // With how precise the pin is and how old, so the admin and the
         // GoBiker can tell an exact pin from a rough one.
-        if (fix != null) ...{
-          for (final key in const [
-            'latitude',
-            'longitude',
-            'accuracy',
-            'age_seconds',
-          ])
-            key: fix.toJson()[key],
-        },
+        for (final key in const [
+          'latitude',
+          'longitude',
+          'accuracy',
+          'age_seconds',
+        ])
+          key: fix.toJson()[key],
       },
     );
     if (!res.ok) return (sos: null, error: res.message);

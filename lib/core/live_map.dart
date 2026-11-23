@@ -25,6 +25,7 @@ class MapPerson {
     required this.longitude,
     this.status = 'active',
     this.accuracy,
+    this.photoUrl,
   });
 
   final int id;
@@ -35,6 +36,9 @@ class MapPerson {
   /// How far out the position may be, in metres (null when the server does
   /// not know).
   final double? accuracy;
+
+  /// URL for the GoBiker's profile photo (may be null).
+  final String? photoUrl;
 
   bool get isRough => (accuracy ?? 0) > roughAccuracy;
   LatLng get point => LatLng(latitude, longitude);
@@ -54,6 +58,10 @@ class MapPerson {
       longitude: lng,
       status: '${j['status'] ?? 'active'}',
       accuracy: _metres(j['accuracy']),
+      photoUrl: () {
+        final s = '${j['photo_url'] ?? ''}'.trim();
+        return s.isEmpty ? null : s;
+      }(),
     );
   }
 }

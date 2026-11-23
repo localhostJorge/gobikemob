@@ -8,6 +8,7 @@ import 'package:flutter/services.dart' show PlatformException;
 
 import '../screens/announcements_screen.dart';
 import '../screens/appointments_screen.dart';
+import '../screens/gobiker_messages_screen.dart';
 import '../screens/live_map_screen.dart';
 import '../screens/patient_management_screen.dart';
 import '../screens/patient/appointment_screen.dart';
@@ -23,6 +24,7 @@ import 'auth_service.dart';
 import 'emergency_watcher.dart';
 import 'feedback_prompt.dart';
 import 'follow_up_alerts.dart';
+import 'gobiker_messages.dart';
 import 'live_map.dart';
 import 'resident_sos.dart';
 import 'resident_visits.dart';
@@ -263,6 +265,8 @@ class PushService {
         if (EmergencyWatcher.instance.isOpen) EmergencyWatcher.instance.check();
       case 'announcement':
         Announcements.instance.refresh();
+      case 'gobiker_message_reply':
+        GobikerMessages.instance.refresh();
       case 'follow_up':
         FollowUpAlerts.instance.refresh();
     }
@@ -286,6 +290,7 @@ class PushService {
       'appointment_request' ||
       'appointment_assigned' => const AppointmentsScreen(),
       'announcement' => const AnnouncementsScreen(),
+      'gobiker_message_reply' => const GobikerMessagesScreen(),
       'follow_up' => const PatientManagementScreen(),
       'sos_assigned' => LiveMapScreen(
         focusSosId: int.tryParse('${data['id'] ?? ''}'),

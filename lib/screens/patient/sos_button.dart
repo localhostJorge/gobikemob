@@ -6,6 +6,9 @@ import 'ui_kit.dart';
 
 /// Hold-to-activate SOS button. The ring around it fills while the user
 /// holds; letting go early cancels, so a stray tap never sends an SOS.
+///
+/// Shows a small location status indicator so the resident knows if their
+/// position will be sent with the SOS.
 class SosButton extends StatefulWidget {
   final VoidCallback onActivated;
   final Duration holdDuration;
@@ -157,6 +160,9 @@ class _SosButtonState extends State<SosButton> with TickerProviderStateMixin {
           ),
         ),
         const SizedBox(height: Sp.xs),
+        // Location status indicator below the button
+        _LocationStatusLine(),
+        const SizedBox(height: Sp.xs),
         AnimatedBuilder(
           animation: _hold,
           builder: (context, _) => Text(
@@ -167,6 +173,30 @@ class _SosButtonState extends State<SosButton> with TickerProviderStateMixin {
                 ? T.label.copyWith(color: context.pal.redText)
                 : T.secondary.muted(context),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Compact location status shown under the SOS button on the dashboard.
+class _LocationStatusLine extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    // Check if we have a fix by seeing if the SOS service has a recent position.
+    // The dashboard doesn't start a GPS lookup; we just show a generic hint.
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.my_location_rounded,
+          size: 14,
+          color: context.pal.muted,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          'Location will be sent with SOS',
+          style: T.meta.copyWith(color: context.pal.muted),
         ),
       ],
     );

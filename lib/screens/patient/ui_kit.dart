@@ -439,6 +439,7 @@ class PrimaryButton extends StatelessWidget {
     this.loading = false,
     this.icon,
     this.danger = false,
+    this.enabled = true,
   });
 
   final String label;
@@ -446,13 +447,14 @@ class PrimaryButton extends StatelessWidget {
   final bool loading;
   final IconData? icon;
   final bool danger;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) => Semantics(
     button: true,
-    enabled: onPressed != null && !loading,
+    enabled: enabled && onPressed != null && !loading,
     child: FilledButton(
-      onPressed: loading ? null : onPressed,
+      onPressed: (enabled && !loading) ? onPressed : null,
       style: _buttonStyle(
         background: danger ? AppColors.redButton : AppColors.blue,
         pressed: danger ? AppColors.redText : AppColors.bluePressed,

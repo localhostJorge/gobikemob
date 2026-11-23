@@ -10,6 +10,7 @@ import '../widgets/app_toast.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/birthday_field.dart';
 import '../widgets/loading_overlay.dart';
+import '../widgets/location_dropdowns.dart';
 import '../widgets/photo_flow.dart';
 import '../core/age.dart';
 import '../core/auth_service.dart';
@@ -72,7 +73,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   late final TapGestureRecognizer _privacyTap = TapGestureRecognizer()
     ..onTap = _openPrivacy;
 
-  final List<String> barangays = [
+  final List<String> barangays = const [
     'Angarian',
     'Asinan',
     'Bañaga',
@@ -419,12 +420,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      AppDropdownField(
-                        label: 'Barangay',
-                        hint: 'Select your barangay',
-                        icon: Icons.location_on_outlined,
-                        items: barangays,
-                        value: selectedBarangay,
+                      LocationDropdowns(
+                        initialBarangay: selectedBarangay,
                         onChanged: (v) => setState(() => selectedBarangay = v),
                         validator: (v) =>
                             v == null ? 'Select your barangay' : null,

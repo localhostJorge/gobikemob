@@ -12,11 +12,13 @@ import '../core/auth_service.dart';
 import '../core/live_map.dart';
 import '../core/location_gate.dart';
 import '../core/presence_service.dart';
+import '../core/routing_service.dart';
 import '../core/theme.dart';
 import 'patient/app_colors.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/bottom_gap.dart';
 import '../widgets/confirm_modal.dart';
+import '../widgets/gobiker_checkup_modal.dart';
 import '../widgets/location_help.dart';
 
 /// SOS colors: red while waiting, yellow while a GoBiker responds, green once
@@ -67,6 +69,9 @@ class _LiveMapScreenState extends State<LiveMapScreen>
   // Bugallon, Pangasinan: shown until the phone has a position.
   static const LatLng _fallbackCenter = LatLng(15.9566, 120.1866);
 
+  /// Route points for road-following directions (straight line if routing fails).
+  List<LatLng>? _routePoints;
+
   /// The satellite pictures stop at this zoom over Bugallon. Past it the
   /// server sends "Map data not yet available" tiles, so one more level is
   /// shown by enlarging these.
@@ -87,14 +92,11 @@ class _LiveMapScreenState extends State<LiveMapScreen>
     duration: _refresh,
   );
   Timer? _timer;
-  bool _loading = false;
 
   /// Satellite shows the roofs and paths a GoBiker rides by; streets has the
   /// road names. Their choice is remembered.
   bool _satellite = true;
   LiveMapData _data = const LiveMapData();
-  bool _loaded = false;
-  String? _error;
   bool _centered = false;
   int? _focusSosId;
   int? _directionsSosId;
@@ -138,9 +140,8 @@ class _LiveMapScreenState extends State<LiveMapScreen>
 
   Future<void> _restoreMapStyle() async {
     try {
-      final saved = (await SharedPreferences.getInstance()).getBool(
-        _satelliteKey,
-      );
+      final saved =
+          (await SharedPreferences.getInstance()).getBool(_satelliteKey);
       if (saved != null && mounted) setState(() => _satellite = saved);
     } catch (_) {
       // Not remembered this time: the satellite view it opened with stays.
@@ -164,9 +165,7 @@ class _LiveMapScreenState extends State<LiveMapScreen>
     final id = _directionsSosId;
     if (id == null) return null;
 
-    return _data.sos
-        .where((s) => s.id == id && s.hasPosition && s.isOpen)
-        .firstOrNull;
+    return _data.sos.where((s) => s.id == id && s.hasPosition && s.isOpen).firstOrNull;
   }
 
   /// Points the map at the emergency: both ends on screen, and the line
@@ -204,43 +203,66 @@ class _LiveMapScreenState extends State<LiveMapScreen>
     );
   }
 
-  /// How far the GoBiker still has to go, in a straight line.
-  String? get _distanceToSos {
-    final sos = _directionsSos;
-    final me = _me;
-    if (sos == null || me == null) return null;
-    return formatDistance(
-      const Distance().as(
-        LengthUnit.Meter,
-        LatLng(me.latitude, me.longitude),
-        LatLng(sos.latitude!, sos.longitude!),
-      ),
-    );
-  }
-
-  void _onMyPosition() {
+  Future<void> _load() async {
+    // A slow answer must not pile up behind the next tick.
+    if (_loading) return;
+    _loading = true;
+    final ({LiveMapData? data, String? error}) result;
+    try {
+      result = await LiveMapData.fetch();
+    } finally {
+      _loading = false; // whatever happened, the next tick may try again
+    }
     if (!mounted) return;
-    setState(() {}); // the pin, the line and the distance all follow from this
-    final me = _me;
-    if (me == null) return;
-
-    final directions = _directionsSos;
-    if (directions != null) {
-      // Riding off the edge of the screen: bring both ends back into view,
-      // but leave the map alone while they are still on it.
-      if (!_map.camera.visibleBounds.contains(
-        LatLng(me.latitude, me.longitude),
-      )) {
-        _fitToDirections(directions);
-      }
-
-      return;
+    final data = result.data;
+    if (data != null) {
+      // Each marker sets off from where it is drawn now, towards where its
+      // GoBiker is. Placed at once for people who turned animations off.
+      _glide.retarget(
+        data.gobikers,
+        progress: _glideClock.value,
+        animate: !MediaQuery.disableAnimationsOf(context),
+      );
+      _glideClock.forward(from: 0);
     }
-    if (!_centered && _focusSosId == null) {
-      _centered = true;
-      _map.move(LatLng(me.latitude, me.longitude), 16);
+    setState(() {
+      if (result.data != null) _data = result.data!;
+    });
+
+    // Road-following route toward the SOS if directions are shown.
+    if (_directionsSosId != null) {
+      final sos = _data.sos.where((s) => s.id == _directionsSosId).firstOrNull;
+      final me = _me;
+      if (sos != null && sos.hasPosition && me != null) {
+        final route = await fetchRoadRoute(
+          fromLat: me.latitude,
+          fromLng: me.longitude,
+          toLat: sos.latitude!,
+          toLng: sos.longitude!,
+        );
+        _routePoints = route ??
+            [
+              LatLng(me.latitude, me.longitude),
+              LatLng(sos.latitude!, sos.longitude!),
+            ];
+      } else {
+        _routePoints = null;
+      }
+    }
+
+    final focus = _focusSosId;
+    if (focus != null) {
+      final sos = _data.sos.where((s) => s.id == focus).firstOrNull;
+      if (sos != null && sos.hasPosition) {
+        _focusSosId = null;
+        _centered = true;
+        _map.move(LatLng(sos.latitude!, sos.longitude!), 17);
+        _openSos(sos);
+      }
     }
   }
+
+  bool _loading = false;
 
   /// Finds the phone and (when [move]) centres the map on it.
   ///
@@ -287,44 +309,49 @@ class _LiveMapScreenState extends State<LiveMapScreen>
     }
   }
 
-  Future<void> _load() async {
-    // A slow answer must not pile up behind the next tick.
-    if (_loading) return;
-    _loading = true;
-    final ({LiveMapData? data, String? error}) result;
-    try {
-      result = await LiveMapData.fetch();
-    } finally {
-      _loading = false; // whatever happened, the next tick may try again
-    }
+  void _onMyPosition() {
     if (!mounted) return;
-    final data = result.data;
-    if (data != null) {
-      // Each marker sets off from where it is drawn now, towards where its
-      // GoBiker is. Placed at once for people who turned animations off.
-      _glide.retarget(
-        data.gobikers,
-        progress: _glideClock.value,
-        animate: !MediaQuery.disableAnimationsOf(context),
-      );
-      _glideClock.forward(from: 0);
-    }
-    setState(() {
-      _loaded = true;
-      _error = result.error;
-      if (result.data != null) _data = result.data!;
-    });
+    setState(() {}); // the pin, the line and the distance all follow from this
+    final me = _me;
+    if (me == null) return;
 
-    final focus = _focusSosId;
-    if (focus != null) {
-      final sos = _data.sos.where((s) => s.id == focus).firstOrNull;
-      if (sos != null && sos.hasPosition) {
-        _focusSosId = null;
-        _centered = true;
-        _map.move(LatLng(sos.latitude!, sos.longitude!), 17);
-        _openSos(sos);
+    final directions = _directionsSos;
+    if (directions != null) {
+      // Riding off the edge of the screen: bring both ends back into view,
+      // but leave the map alone while they are still on it.
+      if (!_map.camera.visibleBounds.contains(
+        LatLng(me.latitude, me.longitude),
+      )) {
+        _fitToDirections(directions);
       }
+
+      return;
     }
+    if (!_centered && _focusSosId == null) {
+      _centered = true;
+      _map.move(LatLng(me.latitude, me.longitude), 16);
+    }
+  }
+
+  /// Called when a GoBiker marker is tapped (residents only).
+  void _onGobikerTap(MapPerson gobiker) {
+    if (_isGobiker) return; // GoBikers don't see other GoBikers' checkup modals
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.pal.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => GobikerCheckupModal(
+        gobiker: gobiker,
+        onRequestCheckup: () {
+          Navigator.pop(sheetContext);
+          // Navigate to appointment screen with pre-filled GoBiker
+          Navigator.pushNamed(sheetContext, '/appointment');
+        },
+      ),
+    );
   }
 
   // ------------------------------------------------------------- SOS sheet
@@ -371,152 +398,6 @@ class _LiveMapScreenState extends State<LiveMapScreen>
   }
 
   // ---------------------------------------------------------------- build
-
-  List<Marker> _markers() {
-    final markers = <Marker>[];
-
-    for (final g in _data.gobikers) {
-      markers.add(
-        _personMarker(
-          g,
-          point: _glide.at(g.id, _glideClock.value) ?? g.point,
-          icon: Icons.pedal_bike_rounded,
-          color: gobikerColor(g.status),
-          size: 36,
-        ),
-      );
-    }
-
-    final me = _me;
-    if (me != null) {
-      markers.add(
-        Marker(
-          point: LatLng(me.latitude, me.longitude),
-          width: 26,
-          height: 26,
-          child: Semantics(
-            label: 'You are here',
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A73E8),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 4),
-                boxShadow: const [
-                  BoxShadow(color: Colors.black26, blurRadius: 6),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    for (final s in _data.sos.where((s) => s.hasPosition)) {
-      final color = sosColor(s.status);
-      markers.add(
-        Marker(
-          point: LatLng(s.latitude!, s.longitude!),
-          width: 52,
-          height: 52,
-          child: Semantics(
-            button: true,
-            label:
-                'SOS from ${s.residentName}, ${s.status}'
-                '${s.isApproximate ? ', approximate location' : ''}',
-            child: GestureDetector(
-              onTap: () => _openSos(s),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.25),
-                  shape: BoxShape.circle,
-                ),
-                padding: const EdgeInsets.all(8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
-                  ),
-                  child: Icon(
-                    s.isOpen ? Icons.sos_rounded : Icons.check_rounded,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    return markers;
-  }
-
-  /// The circles around rough positions: the person may be anywhere inside.
-  /// Drawn stronger over the satellite picture, where a faint tint is lost.
-  List<CircleMarker> _rings() {
-    CircleMarker ring(LatLng point, double metres, Color color) => CircleMarker(
-      point: point,
-      radius: metres,
-      useRadiusInMeter: true,
-      color: color.withValues(alpha: _satellite ? 0.22 : 0.12),
-      borderColor: color.withValues(alpha: _satellite ? 0.95 : 0.6),
-      borderStrokeWidth: _satellite ? 2 : 1,
-    );
-
-    final me = _me;
-    return [
-      for (final s in _data.sos.where((s) => s.isRough))
-        ring(
-          LatLng(s.latitude!, s.longitude!),
-          s.accuracy!,
-          sosColor(s.status),
-        ),
-      for (final g in _data.gobikers.where((g) => g.isRough))
-        ring(
-          _glide.at(g.id, _glideClock.value) ?? g.point,
-          g.accuracy!,
-          gobikerColor(g.status),
-        ),
-      if (me != null && me.accuracy > _myRoughAccuracy)
-        ring(
-          LatLng(me.latitude, me.longitude),
-          me.accuracy,
-          const Color(0xFF1A73E8),
-        ),
-    ];
-  }
-
-  Marker _personMarker(
-    MapPerson p, {
-    required LatLng point,
-    required IconData icon,
-    required Color color,
-    required double size,
-  }) {
-    return Marker(
-      point: point,
-      width: size,
-      height: size,
-      child: Tooltip(
-        message: p.name,
-        triggerMode: TooltipTriggerMode.tap,
-        child: Container(
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2.5),
-            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
-          ),
-          child: Icon(
-            icon,
-            color: color == AppTheme.orange ? AppColors.navy : Colors.white,
-            size: size * 0.55,
-          ),
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -576,29 +457,64 @@ class _LiveMapScreenState extends State<LiveMapScreen>
                 ),
               AnimatedBuilder(
                 animation: _glideClock,
-                builder: (context, _) => CircleLayer(circles: _rings()),
+                builder: (context, _) => CircleLayer(
+                  circles: _rings(me),
+                ),
               ),
-              if (directions != null && me != null)
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: [
-                        LatLng(me.latitude, me.longitude),
-                        LatLng(directions.latitude!, directions.longitude!),
-                      ],
-                      color: AppTheme.orange,
-                      strokeWidth: 5,
-                      borderColor: Colors.white,
-                      borderStrokeWidth: 2,
+              MarkerLayer(
+                markers: [
+                  for (final g in _data.gobikers)
+                    _personMarker(
+                      g,
+                      point: _glide.at(g.id, _glideClock.value) ?? g.point,
+                      icon: Icons.pedal_bike_rounded,
+                      color: gobikerColor(g.status),
+                      size: 36,
+                      onTap: _isGobiker ? null : () => _onGobikerTap(g),
+                    ),
+                  if (me != null) ...[
+                    Marker(
+                      point: LatLng(me.latitude, me.longitude),
+                      width: 26,
+                      height: 26,
+                      child: Semantics(
+                        label: 'You are here',
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A73E8),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 4),
+                            boxShadow: const [
+                              BoxShadow(color: Colors.black26, blurRadius: 6),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ],
-                ),
-              // Rebuilt on every frame of a move, and only this: the tiles and
-              // the cards around the map are left alone.
-              AnimatedBuilder(
-                animation: _glideClock,
-                builder: (context, _) => MarkerLayer(markers: _markers()),
+                  for (final s in _data.sos.where((s) => s.hasPosition))
+                    _sosMarker(s),
+                ],
               ),
+              if (directions != null && me != null)
+                AnimatedBuilder(
+                  animation: _glideClock,
+                  builder: (context, _) => PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: _routePoints ??
+                            [
+                              LatLng(me.latitude, me.longitude),
+                              LatLng(directions.latitude!, directions.longitude!),
+                            ],
+                        color: AppTheme.orange,
+                        strokeWidth: 5,
+                        borderColor: Colors.white,
+                        borderStrokeWidth: 2,
+                      ),
+                    ],
+                  ),
+                ),
               // The imagery credit has to stay readable: above the phone's gesture strip
               // (and above the directions bar when it is open), on the left so the
               // "center on me" button never covers it.
@@ -636,9 +552,8 @@ class _LiveMapScreenState extends State<LiveMapScreen>
             child: _InfoBar(
               barangay: barangay,
               isGobiker: _isGobiker,
-              data: _data,
-              loaded: _loaded,
-              error: _error,
+              gobikersCount: _data.gobikers.length,
+              openSosCount: _data.sos.where((s) => s.isOpen).length,
             ),
           ),
         ],
@@ -675,6 +590,176 @@ class _LiveMapScreenState extends State<LiveMapScreen>
       ),
     );
   }
+
+  /// Distance to the current directions target.
+  String? get _distanceToSos {
+    final sos = _directionsSos;
+    final me = _me;
+    if (sos == null || me == null) return null;
+    return formatDistance(
+      const Distance().as(
+        LengthUnit.Meter,
+        LatLng(me.latitude, me.longitude),
+        LatLng(sos.latitude!, sos.longitude!),
+      ),
+    );
+  }
+
+  /// Circles around rough positions: the person may be anywhere inside.
+  List<CircleMarker> _rings(Position? me) {
+    CircleMarker ring(
+            LatLng point, double metres, Color color, bool satellite) =>
+        CircleMarker(
+      point: point,
+      radius: metres,
+      useRadiusInMeter: true,
+      color: color.withValues(alpha: satellite ? 0.22 : 0.12),
+      borderColor: color.withValues(alpha: satellite ? 0.95 : 0.6),
+      borderStrokeWidth: satellite ? 2 : 1,
+    );
+
+    final mePos = me;
+    return [
+      for (final s in _data.sos.where((s) => s.isRough))
+        ring(
+          LatLng(s.latitude!, s.longitude!),
+          s.accuracy!,
+          sosColor(s.status),
+          _satellite,
+        ),
+      for (final g in _data.gobikers.where((g) => g.isRough))
+        ring(
+          _glide.at(g.id, _glideClock.value) ?? g.point,
+          g.accuracy!,
+          gobikerColor(g.status),
+          _satellite,
+        ),
+      if (mePos != null && mePos.accuracy > _myRoughAccuracy)
+        ring(
+          LatLng(mePos.latitude, mePos.longitude),
+          mePos.accuracy,
+          const Color(0xFF1A73E8),
+          _satellite,
+        ),
+    ];
+  }
+
+  Marker _personMarker(
+    MapPerson p, {
+    required LatLng point,
+    required IconData icon,
+    required Color color,
+    required double size,
+    VoidCallback? onTap,
+  }) {
+    return Marker(
+      point: point,
+      width: size,
+      height: size,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Semantics(
+          button: true,
+          label: '${p.name} (${p.status})',
+          child: Tooltip(
+            message: p.name,
+            triggerMode: TooltipTriggerMode.tap,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(size * 0.15),
+              child: _photoImage(p.photoUrl, size: size),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Marker _sosMarker(AssignedSos s) {
+    final color = sosColor(s.status);
+    return Marker(
+      point: LatLng(s.latitude!, s.longitude!),
+      width: 52,
+      height: 52,
+      child: Semantics(
+        button: true,
+        label:
+            'SOS from ${s.residentName}, ${s.status}'
+            '${s.isApproximate ? ', approximate location' : ''}',
+        child: GestureDetector(
+          onTap: () => _openSos(s),
+          child: Container(
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.25),
+              shape: BoxShape.circle,
+            ),
+            padding: const EdgeInsets.all(8),
+            child: Container(
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 3),
+              ),
+              child: Icon(
+                s.isOpen ? Icons.sos_rounded : Icons.check_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _photoImage(String? photoUrl, {required double size}) {
+    if (photoUrl == null) {
+      return Container(
+        decoration: BoxDecoration(
+          color: context.pal.brandSoft,
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: Icon(
+            Icons.person_outlined,
+            color: context.pal.brand,
+            size: size * 0.55,
+          ),
+        ),
+      );
+    }
+    try {
+      return Image.network(
+        photoUrl,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, progress) => progress == null
+            ? child
+            : Center(
+                child: CircularProgressIndicator(
+                  value: progress.cumulativeBytesLoaded /
+                      (progress.expectedTotalBytes ?? 1),
+                ),
+              ),
+        errorBuilder: (context, error, stackTrace) =>
+            _photoErrorPlaceholder(size),
+      );
+    } catch (_) {
+      return _photoErrorPlaceholder(size);
+    }
+  }
+
+  Widget _photoErrorPlaceholder(double size) => Container(
+    decoration: BoxDecoration(
+      color: context.pal.brandSoft,
+      shape: BoxShape.circle,
+    ),
+    child: Icon(
+      Icons.person_outlined,
+      color: context.pal.brand,
+      size: size * 0.55,
+    ),
+  );
 }
 
 /// The card on top of the map: barangay, who is online, the legend.
@@ -682,51 +767,44 @@ class _InfoBar extends StatelessWidget {
   const _InfoBar({
     required this.barangay,
     required this.isGobiker,
-    required this.data,
-    required this.loaded,
-    required this.error,
+    required this.gobikersCount,
+    required this.openSosCount,
   });
 
   final String? barangay;
   final bool isGobiker;
-  final LiveMapData data;
-  final bool loaded;
-  final String? error;
+  final int gobikersCount;
+  final int openSosCount;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final muted = theme.textTheme.bodySmall?.color?.withValues(alpha: 0.75);
 
-    final String summary;
-    if (!loaded) {
-      summary = 'Loading the live map…';
-    } else if (error != null) {
-      summary = error!;
-    } else if (barangay == null) {
+    String summary;
+    if (barangay == null) {
       summary = 'Set your barangay in your profile to see who is nearby.';
     } else {
-      final gobikers = data.gobikers.length;
-      final open = data.sos.where((s) => s.isOpen).length;
       final parts = [
-        '$gobikers GoBiker${gobikers == 1 ? '' : 's'} online',
-        if (isGobiker && open > 0) '$open SOS assigned to you',
+        '$gobikersCount other GoBiker${gobikersCount == 1 ? '' : 's'} online',
+        if (isGobiker && openSosCount > 0)
+          '$openSosCount SOS ${openSosCount == 1 ? 'assigned' : 'assigned'} to you',
       ];
       summary = parts.join(' · ');
     }
 
     Widget legend(Color color, String label) => Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 4),
-        Text(label, style: theme.textTheme.labelSmall),
-      ],
-    );
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 4),
+            Text(label, style: theme.textTheme.labelSmall),
+          ],
+        );
 
     return Material(
       elevation: 3,
@@ -739,7 +817,7 @@ class _InfoBar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              barangay == null ? 'Live map' : 'Barangay $barangay',
+              barangay == null ? 'Live Map' : 'Barangay $barangay',
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -748,7 +826,7 @@ class _InfoBar extends StatelessWidget {
             Text(
               summary,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: error != null ? context.pal.redText : muted,
+                color: muted,
               ),
             ),
             const SizedBox(height: 8),
@@ -869,10 +947,8 @@ class _SosSheet extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
@@ -898,8 +974,8 @@ class _SosSheet extends StatelessWidget {
                 theme,
                 Icons.gps_not_fixed_rounded,
                 'Approximate pin: they may be up to '
-                '${formatDistance(sos.accuracy!)} from it. '
-                'Go by the address and landmark.',
+                    '${formatDistance(sos.accuracy!)} from it. '
+                    'Go by the address and landmark.',
                 color: const Color(0xFF9A4A06),
               ),
             if (sos.description != null)

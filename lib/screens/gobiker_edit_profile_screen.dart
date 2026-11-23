@@ -5,6 +5,7 @@ import '../core/auth_service.dart';
 import '../widgets/app_text_field.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/birthday_field.dart';
+import '../widgets/location_dropdowns.dart';
 import 'patient/app_colors.dart';
 import 'patient/ui_kit.dart';
 
@@ -22,33 +23,6 @@ class GobikerEditProfileScreen extends StatefulWidget {
 }
 
 class _GobikerEditProfileScreenState extends State<GobikerEditProfileScreen> {
-  static const List<String> _barangays = [
-    'Angarian',
-    'Asinan',
-    'Bañaga',
-    'Bacabac',
-    'Bolaoen',
-    'Buenlag',
-    'Cabayaoasan',
-    'Cayanga',
-    'Gueset',
-    'Hacienda',
-    'Laguit Centro',
-    'Laguit Padilla',
-    'Magtaking',
-    'Pangascasan',
-    'Pantal',
-    'Poblacion',
-    'Polong',
-    'Portic',
-    'Salasa',
-    'Salomague Norte',
-    'Salomague Sur',
-    'Samat',
-    'San Francisco',
-    'Umanday',
-  ];
-
   final _formKey = GlobalKey<FormState>();
   late final _mobileController = TextEditingController(
     text: widget.user.mobile ?? '',
@@ -56,9 +30,9 @@ class _GobikerEditProfileScreenState extends State<GobikerEditProfileScreen> {
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  late String? _barangay = _barangays.contains(widget.user.barangay)
-      ? widget.user.barangay
-      : null;
+  late String? _barangay = (widget.user.barangay?.isEmpty ?? true)
+      ? null
+      : widget.user.barangay;
   // Accounts made before the birthday was asked have none; they can add it here.
   late DateTime? _birthdate = widget.user.birthdate;
   bool _saving = false;
@@ -141,12 +115,8 @@ class _GobikerEditProfileScreenState extends State<GobikerEditProfileScreen> {
                             },
                           ),
                           const SizedBox(height: Sp.lg),
-                          AppDropdownField(
-                            label: 'Barangay',
-                            hint: 'Select your barangay',
-                            icon: Icons.location_on_outlined,
-                            items: _barangays,
-                            value: _barangay,
+                          LocationDropdowns(
+                            initialBarangay: _barangay,
                             onChanged: (value) =>
                                 setState(() => _barangay = value),
                             validator: (value) =>

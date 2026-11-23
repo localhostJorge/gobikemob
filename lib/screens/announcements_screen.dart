@@ -78,7 +78,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                 padding: const EdgeInsets.all(16),
                 itemCount: items.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 12),
-                itemBuilder: (context, index) => AnnouncementCard(
+                itemBuilder: (context, index) => ExpandableAnnouncementCard(
                   announcement: items[index],
                   isNew: _newOnOpen.contains(items[index].id),
                 ),
@@ -91,6 +91,43 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   }
 }
 
+/// Announcement card that expands on tap to show full content.
+class ExpandableAnnouncementCard extends StatefulWidget {
+  const ExpandableAnnouncementCard({
+    super.key,
+    required this.announcement,
+    this.isNew = false,
+  });
+
+  final Announcement announcement;
+  final bool isNew;
+
+  @override
+  State<ExpandableAnnouncementCard> createState() =>
+      _ExpandableAnnouncementCardState();
+}
+
+class _ExpandableAnnouncementCardState extends State<ExpandableAnnouncementCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasContent = widget.announcement.content != null &&
+        widget.announcement.content!.isNotEmpty;
+
+    return InkWell(
+      onTap: hasContent ? () => setState(() => _expanded = !_expanded) : null,
+      borderRadius: BorderRadius.circular(16),
+      child: AnnouncementCard(
+        announcement: widget.announcement,
+        isNew: widget.isNew,
+        maxLines: _expanded ? null : 3,
+        showExpandIcon: hasContent,
+      ),
+    );
+  }
+}
+
 /// One announcement: title, message, and when it was posted.
 class AnnouncementCard extends StatelessWidget {
   const AnnouncementCard({
@@ -98,13 +135,13 @@ class AnnouncementCard extends StatelessWidget {
     required this.announcement,
     this.isNew = false,
     this.maxLines,
+    this.showExpandIcon = false,
   });
 
   final Announcement announcement;
   final bool isNew;
-
-  /// Cut the message after this many lines (null shows all of it).
   final int? maxLines;
+  final bool showExpandIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -178,11 +215,24 @@ class AnnouncementCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  announcement.body,
+                  (maxLines == null && announcement.content != null && announcement.content!.isNotEmpty)
+                      ? announcement.content!
+                      : announcement.body,
                   maxLines: maxLines,
                   overflow: maxLines == null ? null : TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 13, height: 1.4, color: muted),
                 ),
+                if (showExpandIcon)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Icon(
+                      maxLines == null
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                      size: 20,
+                      color: muted,
+                    ),
+                  ),
                 if (posted != null) ...[
                   const SizedBox(height: 8),
                   Text(
