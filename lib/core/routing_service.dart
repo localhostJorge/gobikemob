@@ -15,10 +15,11 @@ Future<List<LatLng>?> fetchRoadRoute({
   required double toLng,
 }) async {
   // Try OSRM public server first; the /route endpoint returns geometry.
+  // Use overview=simplified to get the route geometry as an encoded polyline.
   final url = Uri.parse(
     'https://router.project-osrm.org/route/v1/driving/'
     '$fromLng,$fromLat;$toLng,$toLat?'
-    'overview=false&steps=false',
+    'overview=simplified&steps=false&geometries=polyline',
   );
 
   try {

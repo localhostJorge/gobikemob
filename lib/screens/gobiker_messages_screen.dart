@@ -384,7 +384,7 @@ class _SendBar extends StatelessWidget {
                           color: Colors.white,
                         ),
                       )
-                    : const Icon(Icons.send_rounded, size: 20),
+                    : const Icon(Icons.send, size: 20),
               ),
             ),
           ],
