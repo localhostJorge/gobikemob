@@ -41,6 +41,11 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
   List<LocationEntry> _municipalities = const [];
   List<String> _barangayNames = const [];
 
+  /// The barangay was chosen from the offline list while the server's
+  /// provinces had not loaded. The cascade (once it appears) must not then
+  /// hold it: the person is asked to pick again through the real ladder.
+  bool _pickedFromOffline = false;
+
   @override
   void initState() {
     super.initState();
@@ -56,7 +61,20 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
   }
 
   void _onLocationsChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    // The provinces have arrived: the cascade takes over, and a barangay
+    // picked from the offline list can no longer be shown (its dropdown now
+    // lists the ones the server sends). The pick gives way; the person picks
+    // again through the ladder.
+    if (provinceNames.isNotEmpty && _pickedFromOffline) {
+      _pickedFromOffline = false;
+      if (_barangay != null) {
+        setState(() => _barangay = null);
+        widget.onChanged(null);
+        return;
+      }
+    }
+    setState(() {});
   }
 
   List<String> get provinceNames =>
@@ -139,7 +157,7 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
       _barangayNames = const [];
     });
     widget.onChanged(null);
-    _loadBarangays(name);
+    _loadBarangays();
   }
 
   Widget _buildMunicipality(BuildContext context) {
@@ -156,49 +174,32 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
           .map((m) => DropdownMenuItem(value: m.name, child: Text(m.name)))
           .toList(growable: false),
       initialValue: _municipalityName,
-      onChanged: _cities.isEmpty ? null : _onMunicipalitySelected,
+      onChanged: _municipalities.isEmpty ? null : _onMunicipalitySelected,
       validator: (v) =>
           v == null ? 'Select your municipality' : null,
     );
   }
 
   // ------------------------------------------------------------------ Barangay
-  void _loadBarangays(String? municipalityName) async {
-    if (municipalityName == null) return;
-    // Find the municipality id from the name.
-    // We walk the server's hierarchy: province -> city -> municipality -> barangay.
-    // The API `/locations/municipalities?city_id=ID` returns a list under a city,
-    // so we need the city's id.
-    try {
-      // Try to find the city id from _province → _city → _municipality path.
-      final city = _cities.where((c) => c.name == _cityName).firstOrNull;
-      if (city == null) {
-        // Fallback: the Bugallon list is always available offline.
-        if (mounted) {
-          setState(() => _barangayNames = kOfflineBarangays);
-        }
-        return;
-      }
-      final muni = await _locations.municipalities(city.id);
-      if (!mounted) return;
-      setState(() {
-        _municipalities = muni;
-        // Pick the first municipality if there's exactly one.
-        if (_municipalities.length == 1) {
-          _municipalityName = _municipalities.first.name;
-          _loadBarangays(_municipalities.first.name);
-        } else {
-          _barangayNames = _municipalities.map((m) => m.name).toList(growable: false);
-        }
-      });
-    } catch (_) {
-      // On any error, fall back to the built-in Bugallon list.
-      if (mounted) setState(() => _barangayNames = kOfflineBarangays);
-    }
+  /// Loads the barangays of the chosen municipality from the server.
+  Future<void> _loadBarangays() async {
+    final muni = _municipalities
+        .where((m) => m.name == _municipalityName)
+        .firstOrNull;
+    if (muni == null) return;
+    var names = await _locations.barangays(muni.id);
+    // The request failed or came back empty: Bugallon's list ships with the
+    // app, so its barangays can still be picked without a connection.
+    if (names.isEmpty && muni.name == 'Bugallon') names = kOfflineBarangays;
+    if (!mounted) return;
+    setState(() => _barangayNames = names);
   }
 
   void _onBarangaySelected(String? name) {
     setState(() => _barangay = name);
+    // Picked while the province list was empty (no connection): the cascade,
+    // once it appears, will not hold this barangay and it has to give way.
+    _pickedFromOffline = provinceNames.isEmpty;
     widget.onChanged(name);
   }
 
@@ -230,7 +231,13 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
 
   Future<void> _loadMunicipality() async {
     if (_cityName == null) {
-      if (mounted) setState(() => _municipalities = const []);
+      if (mounted) {
+        setState(() {
+          _municipalities = const [];
+          _municipalityName = null;
+          _barangayNames = const [];
+        });
+      }
       return;
     }
     final city = _cities.where((c) => c.name == _cityName).firstOrNull;
@@ -241,6 +248,11 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
     final muni = await _locations.municipalities(city.id);
     if (!mounted) return;
     setState(() => _municipalities = muni);
+    // Only one municipality under this city (the usual case): pick it and
+    // load its barangays straight away, so nobody taps twice for nothing.
+    if (muni.length == 1 && _municipalityName == null) {
+      _onMunicipalitySelected(muni.first.name);
+    }
   }
 
   @override
