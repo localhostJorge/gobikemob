@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/locations.dart';
+import 'app_text_field.dart';
 
 /// Province → City/Municipality → Barangay, three dropdowns that load their
 /// child options from the API as each parent is picked. The chosen barangay is
@@ -8,6 +9,10 @@ import '../core/locations.dart';
 ///
 /// With no connection, the province list is empty and the widget falls back to
 /// the built-in Bugallon list ([kOfflineBarangays]), so sign-up still works.
+///
+/// The fields are [AppDropdownField]s: the same look as every other field on
+/// the form (label above, Roboto 15 regular inside), not Material's floating
+/// label and default weight.
 class LocationDropdowns extends StatefulWidget {
   const LocationDropdowns({
     super.key,
@@ -97,18 +102,12 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
   }
 
   Widget _buildProvince(BuildContext context) {
-    return DropdownButtonFormField<String>(
-      isExpanded: true,
-      decoration: const InputDecoration(
-        labelText: 'Province',
-        hintText: 'Select your province',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.public_rounded),
-      ),
-      items: provinceNames
-          .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-          .toList(growable: false),
-      initialValue: _province,
+    return AppDropdownField(
+      label: 'Province',
+      hint: 'Select your province',
+      icon: Icons.public_rounded,
+      items: provinceNames,
+      value: _province,
       onChanged: _onProvinceSelected,
       validator: (v) => v == null ? 'Select your province' : null,
     );
@@ -130,18 +129,12 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
 
   Widget _buildCity(BuildContext context) {
     if (_province == null) return const SizedBox.shrink();
-    return DropdownButtonFormField<String>(
-      isExpanded: true,
-      decoration: const InputDecoration(
-        labelText: 'City / Municipality',
-        hintText: 'Select your city or municipality',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.location_city_rounded),
-      ),
-      items: _cities
-          .map((c) => DropdownMenuItem(value: c.name, child: Text(c.name)))
-          .toList(growable: false),
-      initialValue: _cityName,
+    return AppDropdownField(
+      label: 'City / Municipality',
+      hint: 'Select your city or municipality',
+      icon: Icons.location_city_rounded,
+      items: _cities.map((c) => c.name).toList(growable: false),
+      value: _cityName,
       onChanged: _cities.isEmpty ? null : _onCitySelected,
       validator: (v) =>
           v == null ? 'Select your city or municipality' : null,
@@ -162,18 +155,12 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
 
   Widget _buildMunicipality(BuildContext context) {
     if (_cityName == null) return const SizedBox.shrink();
-    return DropdownButtonFormField<String>(
-      isExpanded: true,
-      decoration: const InputDecoration(
-        labelText: 'Municipality',
-        hintText: 'Select your municipality',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.map_rounded),
-      ),
-      items: _municipalities
-          .map((m) => DropdownMenuItem(value: m.name, child: Text(m.name)))
-          .toList(growable: false),
-      initialValue: _municipalityName,
+    return AppDropdownField(
+      label: 'Municipality',
+      hint: 'Select your municipality',
+      icon: Icons.map_rounded,
+      items: _municipalities.map((m) => m.name).toList(growable: false),
+      value: _municipalityName,
       onChanged: _municipalities.isEmpty ? null : _onMunicipalitySelected,
       validator: (v) =>
           v == null ? 'Select your municipality' : null,
@@ -206,20 +193,14 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
   Widget _buildBarangay(BuildContext context) {
     final offline = provinceNames.isEmpty;
     final items = offline ? kOfflineBarangays : _barangayNames;
-    return DropdownButtonFormField<String>(
-      isExpanded: true,
-      decoration: const InputDecoration(
-        labelText: 'Barangay',
-        hintText: 'Select your barangay',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.location_on_outlined),
-      ),
-      items: items
-          .map((n) => DropdownMenuItem(value: n, child: Text(n)))
-          .toList(growable: false),
-      initialValue: (items.contains(_barangay)) ? _barangay : null,
+    return AppDropdownField(
+      label: 'Barangay',
+      hint: 'Select your barangay',
+      icon: Icons.location_on_outlined,
+      items: items,
+      value: items.contains(_barangay) ? _barangay : null,
       onChanged: items.isEmpty ? null : _onBarangaySelected,
-      validator: (v) => v == null ? 'Select your barangay' : null,
+      validator: widget.validator ?? (v) => v == null ? 'Select your barangay' : null,
     );
   }
 

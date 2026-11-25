@@ -200,7 +200,9 @@ class AppDropdownField extends StatelessWidget {
   final IconData icon;
   final List<String> items;
   final String? value;
-  final ValueChanged<String?> onChanged;
+
+  /// Null disables the dropdown (nothing to pick from yet).
+  final ValueChanged<String?>? onChanged;
   final String? Function(String?)? validator;
 
   @override
