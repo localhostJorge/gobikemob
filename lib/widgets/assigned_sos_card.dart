@@ -109,6 +109,15 @@ class AssignedSosCard extends StatelessWidget {
                   const SizedBox(height: Sp.sm),
                   Text(away, style: T.meta.copyWith(color: pal.muted)),
                 ],
+                if (sos.otherResponders.isNotEmpty) ...[
+                  const SizedBox(height: Sp.sm),
+                  Text(
+                    'Also responding: ${sos.otherResponders.join(', ')}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: T.meta.copyWith(color: pal.ink),
+                  ),
+                ],
               ],
             ),
           ),

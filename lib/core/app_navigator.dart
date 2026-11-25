@@ -42,25 +42,29 @@ Future<void> Function() vibrateUrgently = () async {
   await HapticFeedback.heavyImpact();
 };
 
+/// What the GoBiker chose on the "Emergency assigned to you" alert.
+enum SosAlertChoice { accept, decline }
+
 /// The admin sent this GoBiker to a resident's emergency: vibrate and say so on
-/// top of whatever screen they are on, with a button that opens the map on it.
+/// top of whatever screen they are on, with Accept (opens the map on it) and
+/// Decline (asks why, so the admin can send someone else).
 ///
-/// Returns true once they accept it. Shown only while the app is open; with
-/// the app closed the notification itself opens the same map.
-Future<bool> showSosAssignedAlert({
+/// Returns null when there is no screen to show it on. Shown only while the
+/// app is open; with the app closed the notification itself opens the map.
+Future<SosAlertChoice?> showSosAssignedAlert({
   required String residentName,
   required String place,
 }) async {
   final context = appNavigatorKey.currentContext;
-  if (context == null) return false;
+  if (context == null) return null;
 
   vibrateUrgently();
   SystemSound.play(SystemSoundType.alert);
 
-  final view = await showDialog<bool>(
+  return showDialog<SosAlertChoice>(
     context: context,
-    // Unskippable: someone is waiting for help. It cannot be tapped away or
-    // dismissed with the back button, only accepted.
+    // It cannot be tapped away or dismissed with the back button: someone is
+    // waiting for help, so the GoBiker has to accept it or say they can't.
     barrierDismissible: false,
     builder: (dialogContext) => PopScope(
       canPop: false,
@@ -77,11 +81,16 @@ Future<bool> showSosAssignedAlert({
           textAlign: TextAlign.center,
         ),
         actionsAlignment: MainAxisAlignment.center,
-        // One way out of this: take it. There is no "Later" for an emergency
-        // the admin has already sent this GoBiker to.
         actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(SosAlertChoice.decline),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.errorRed),
+            child: const Text('Decline'),
+          ),
           FilledButton.icon(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(SosAlertChoice.accept),
             icon: const Icon(Icons.map_rounded),
             label: const Text('Accept'),
           ),
@@ -89,8 +98,6 @@ Future<bool> showSosAssignedAlert({
       ),
     ),
   );
-
-  return view ?? false;
 }
 
 /// Pops up "The admin saw your alert" / "Emergency resolved" with a vibration.

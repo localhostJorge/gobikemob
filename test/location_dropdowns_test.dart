@@ -94,4 +94,49 @@ void main() {
       }, () => _api);
     },
   );
+
+  testWidgets(
+    'Reopening Edit profile shows the saved province, town and barangay',
+    (tester) async {
+      await http.runWithClient(() async {
+        final changes = <String?>[];
+        final formKey = GlobalKey<FormState>();
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: LocationDropdowns(
+                    initialProvince: 'Pangasinan',
+                    initialCity: 'Aguilar',
+                    initialMunicipality: 'Aguilar',
+                    initialBarangay: 'Pogonsili',
+                    onChanged: changes.add,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Province, City / Municipality and Barangay all show what was saved,
+        // and the hidden municipality is set (its barangays loaded).
+        expect(find.text('Pangasinan'), findsOneWidget);
+        expect(find.text('Aguilar'), findsOneWidget);
+        expect(find.text('Pogonsili'), findsOneWidget);
+        expect(find.text('Select your barangay'), findsNothing);
+
+        // Restoring never told the screen the barangay was cleared, and
+        // saving without changes still passes validation.
+        expect(changes, isNot(contains(null)));
+        expect(formKey.currentState!.validate(), isTrue);
+
+        // The restored town's barangays are the ones on offer.
+        await _pick(tester, 'Pogonsili', 'Bayaoas');
+        expect(changes.last, 'Bayaoas');
+      }, () => _api);
+    },
+  );
 }

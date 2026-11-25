@@ -12,12 +12,13 @@ import '../core/greeting.dart';
 import '../core/gobiker_messages.dart';
 import '../core/live_map.dart';
 import '../core/presence_service.dart';
+import '../core/push_service.dart';
+import '../core/sos_actions.dart';
 import '../core/theme.dart';
 import '../core/tracking_service.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/assigned_sos_card.dart';
 import '../widgets/bottom_gap.dart';
-import '../widgets/decline_reason_dialog.dart';
 import '../widgets/ronda_hero.dart';
 import '../widgets/ronda_nav_bar.dart';
 import 'patient/app_colors.dart';
@@ -79,9 +80,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     GobikerAppointments.instance
       ..addListener(_onAppointmentsChanged)
       ..load(); // visit requests from residents
-    GobikerSos.instance
-      ..addListener(_onAppointmentsChanged)
-      ..load(); // SOS requests the admin assigned to this GoBiker
+    GobikerSos.instance.addListener(_onAppointmentsChanged);
+    // SOS requests the admin assigned to this GoBiker, and an alert for one
+    // sent while the app was closed or the push never came.
+    _loadSos();
     PresenceService.instance.start(); // on the live map while the app is open
     _refreshUser(); // the admin may have changed the barangay
   }
@@ -93,6 +95,11 @@ class _DashboardScreenState extends State<DashboardScreen>
     final saved = await RondaStore.loadFinished(userId);
     if (!mounted) return;
     setState(() => globalRondas = saved);
+  }
+
+  Future<void> _loadSos() async {
+    await GobikerSos.instance.load();
+    if (mounted) await PushService.instance.checkMissedAssignments();
   }
 
   void _onAppointmentsChanged() {
@@ -120,7 +127,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       FollowUpAlerts.instance.refresh();
       Announcements.instance.refresh();
       GobikerAppointments.instance.load();
-      GobikerSos.instance.load();
+      _loadSos();
       _refreshUser();
       if (EmergencyWatcher.instance.isOpen) EmergencyWatcher.instance.check();
     }
@@ -335,25 +342,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  /// Turns the SOS down. A required reason goes to the admin, who then sends
-  /// someone else; the request leaves this GoBiker's list.
-  Future<void> _declineSos(AssignedSos sos) async {
-    final reason = await showDeclineReasonDialog(
-      context,
-      title: 'Decline this SOS?',
-      message:
-          'Tell the admin why you cannot respond, so they can send someone else to ${sos.residentName}.',
-      confirmLabel: 'Decline',
-    );
-    if (reason == null || reason.isEmpty || !mounted) return;
-    final error = await GobikerSos.instance.decline(sos.id, reason);
-    if (!mounted) return;
-    AppToast.show(
-      context,
-      error ?? 'Declined. The admin has been told to send someone else.',
-      type: error == null ? ToastType.info : ToastType.error,
-    );
-  }
+  /// Turns the SOS down, with a reason for the admin.
+  Future<void> _declineSos(AssignedSos sos) =>
+      declineAssignedSos(context, sos.id);
 
   /// SOS requests the admin sent this GoBiker to: directions, resolve, decline.
   Widget _buildAssignedSos(ThemeData theme, Color muted) {

@@ -14,12 +14,13 @@ import '../live_map_screen.dart' show formatDistance, formatRideTime, sosRed;
 import 'app_colors.dart';
 import 'ui_kit.dart';
 
-/// The resident's own SOS on a map, with the GoBiker the admin sent coming
+/// The resident's own SOS on a map, with the GoBikers the admin sent coming
 /// towards it, live.
 ///
 /// Before a GoBiker is sent, it shows the SOS pin and says it is waiting. Once
 /// one is on the way, their marker moves as their phone reports, with the road
-/// route and how long they should take. When the SOS is over, the server stops
+/// route and how long they should take. When the admin sent several, each one
+/// with a position gets a marker; the route and the glide follow the first. When the SOS is over, the server stops
 /// sharing where they are and the map says so.
 class SosTrackingScreen extends StatefulWidget {
   const SosTrackingScreen({super.key, required this.sosId, this.path});
@@ -59,7 +60,7 @@ class _SosTrackingScreenState extends State<SosTrackingScreen>
   /// Where the resident is: the SOS pin, else the phone's own position.
   LatLng? _phone;
 
-  /// The GoBiker marker slides from [_from] to [_to] on each update.
+  /// The first GoBiker's marker slides from [_from] to [_to] on each update.
   LatLng? _from;
   LatLng? _to;
 
@@ -69,8 +70,8 @@ class _SosTrackingScreenState extends State<SosTrackingScreen>
   LatLng? _routedFrom;
   DateTime? _routedAt;
 
-  /// The camera has been fitted to both people once; after that the resident
-  /// pans freely and "Show both" brings it back.
+  /// The camera has been fitted to everyone once; after that the resident
+  /// pans freely and "Show us both" / "Show everyone" brings it back.
   bool _fitted = false;
   bool _mapReady = false;
 
@@ -118,7 +119,7 @@ class _SosTrackingScreenState extends State<SosTrackingScreen>
     // The SOS was sent without a GPS pin: show the phone's own position.
     if (data.sosPoint == null && _phone == null) _locatePhone();
 
-    final next = data.responder?.point;
+    final next = data.responders.firstOrNull?.point;
     setState(() {
       _error = null;
       _data = data;
@@ -214,7 +215,7 @@ class _SosTrackingScreenState extends State<SosTrackingScreen>
   }
 
   void _fitBoth() {
-    final points = [?_to, ?_destination];
+    final points = [?_to, for (final r in _others) ?r.point, ?_destination];
     if (points.isEmpty) return;
     if (points.length == 1) {
       _map.move(points.single, 16);
@@ -229,6 +230,10 @@ class _SosTrackingScreenState extends State<SosTrackingScreen>
     );
   }
 
+  /// The GoBikers after the first: drawn where their phone said, no glide.
+  List<TrackedResponder> get _others =>
+      _data?.responders.skip(1).toList() ?? const [];
+
   double? get _straightMetres {
     final a = _to, b = _destination;
     if (a == null || b == null) return null;
@@ -238,7 +243,7 @@ class _SosTrackingScreenState extends State<SosTrackingScreen>
   @override
   Widget build(BuildContext context) {
     final data = _data;
-    final responder = data?.responder;
+    final responder = data?.responders.firstOrNull;
     final destination = _destination;
 
     return Scaffold(
@@ -320,6 +325,15 @@ class _SosTrackingScreenState extends State<SosTrackingScreen>
                             ),
                           ),
                         ),
+                      for (final r in _others)
+                        if (r.point case final p?)
+                          Marker(
+                            point: p,
+                            width: 44,
+                            height: 44,
+                            child: _GobikerDot(responder: r),
+                          ),
+                      // The first last, so it sits on top.
                       if (g != null && responder != null)
                         Marker(
                           point: g,
@@ -350,6 +364,7 @@ class _SosTrackingScreenState extends State<SosTrackingScreen>
               route: _route,
               routing: _routing,
               straightMetres: _straightMetres,
+              destination: destination,
               onShowBoth: _fitBoth,
             ),
           ),
@@ -398,15 +413,22 @@ class SosTrackingPanel extends StatelessWidget {
     this.route,
     this.routing = false,
     this.straightMetres,
+    this.destination,
     this.onShowBoth,
     this.now,
   });
 
   final SosTracking? data;
   final String? error;
+
+  /// The road route and straight distance are for the first GoBiker.
   final RoadRoute? route;
   final bool routing;
   final double? straightMetres;
+
+  /// Where help is going, for how far the other GoBikers are. Falls back to
+  /// the SOS pin.
+  final LatLng? destination;
   final VoidCallback? onShowBoth;
 
   /// For tests: the clock "last seen" is worked out against.
@@ -416,7 +438,9 @@ class SosTrackingPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final pal = context.pal;
     final d = data;
-    final r = d?.responder;
+    final all = d?.responders ?? const <TrackedResponder>[];
+    final r = all.firstOrNull;
+    final to = destination ?? d?.sosPoint;
 
     late final Widget body;
     if (d == null) {
@@ -443,12 +467,33 @@ class SosTrackingPanel extends StatelessWidget {
             'you will see them coming here.',
       );
     } else {
-      body = _Responder(
-        responder: r,
-        route: route,
-        routing: routing,
-        straightMetres: straightMetres,
-        now: now,
+      body = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _Responder(
+            responder: r,
+            route: route,
+            routing: routing,
+            straightMetres: straightMetres,
+            now: now,
+          ),
+          for (final other in all.skip(1)) ...[
+            const Divider(height: Sp.lg),
+            _Responder(
+              responder: other,
+              straightMetres: switch ((other.point, to)) {
+                (final a?, final b?) => const Distance().as(
+                  LengthUnit.Meter,
+                  a,
+                  b,
+                ),
+                _ => null,
+              },
+              now: now,
+            ),
+          ],
+        ],
       );
     }
 
@@ -469,7 +514,7 @@ class SosTrackingPanel extends StatelessWidget {
               if (r != null && onShowBoth != null) ...[
                 const SizedBox(height: Sp.md),
                 SecondaryButton(
-                  label: 'Show us both',
+                  label: all.length > 1 ? 'Show everyone' : 'Show us both',
                   icon: Icons.zoom_out_map_rounded,
                   onPressed: onShowBoth,
                 ),

@@ -10,7 +10,7 @@ void main() {
     vibrateUrgently = () async => vibrated = true;
   });
 
-  testWidgets('the emergency the admin sent can only be accepted', (
+  testWidgets('the emergency the admin sent can be accepted or declined', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -30,12 +30,13 @@ void main() {
     );
     expect(vibrated, isTrue);
 
-    // There is no putting it off: Accept is the only button on the alert.
+    // There is no putting it off: accept it or say you can't.
     expect(find.text('Later'), findsNothing);
     expect(find.text('Accept'), findsOneWidget);
+    expect(find.text('Decline'), findsOneWidget);
     expect(
       find.byWidgetPredicate((w) => w is ButtonStyleButton),
-      findsOneWidget,
+      findsNWidgets(2),
     );
 
     // Tapping the darkened background does not make it go away...
@@ -51,8 +52,8 @@ void main() {
     await tester.tap(find.text('Accept'));
     await tester.pumpAndSettle();
 
-    // True is what sends the GoBiker to the map, on the resident's location.
-    expect(await accepted, isTrue);
+    // Accept is what sends the GoBiker to the map, on the resident's location.
+    expect(await accepted, SosAlertChoice.accept);
     expect(find.text('Emergency assigned to you'), findsNothing);
   });
 
@@ -73,6 +74,6 @@ void main() {
 
     await tester.tap(find.text('Accept'));
     await tester.pumpAndSettle();
-    expect(await accepted, isTrue);
+    expect(await accepted, SosAlertChoice.accept);
   });
 }

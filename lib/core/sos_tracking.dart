@@ -59,6 +59,7 @@ class SosTracking {
     this.sosLatitude,
     this.sosLongitude,
     this.responder,
+    this.responders = const [],
   });
 
   final int sosId;
@@ -73,6 +74,11 @@ class SosTracking {
   /// is over, when the server stops sharing where they are.
   final TrackedResponder? responder;
 
+  /// Every GoBiker on the way (the admin can send several); the first is
+  /// [responder]. A server from before that sends only [responder], which is
+  /// then the whole list. Empty whenever [responder] would be null.
+  final List<TrackedResponder> responders;
+
   bool get isOpen => status != 'resolved';
   LatLng? get sosPoint => sosLatitude != null && sosLongitude != null
       ? LatLng(sosLatitude!, sosLongitude!)
@@ -82,18 +88,25 @@ class SosTracking {
     final sos = j['sos'] is Map
         ? Map<String, dynamic>.from(j['sos'] as Map)
         : const <String, dynamic>{};
-    final responder = j['tracking'] == true && j['responder'] is Map
+    final tracking = j['tracking'] == true;
+    final responder = tracking && j['responder'] is Map
         ? TrackedResponder.fromJson(
             Map<String, dynamic>.from(j['responder'] as Map),
           )
         : null;
+    final listed = [
+      if (j['responders'] case final List list when tracking)
+        for (final m in list.whereType<Map>())
+          TrackedResponder.fromJson(Map<String, dynamic>.from(m)),
+    ];
     return SosTracking(
       sosId: (sos['id'] as num?)?.toInt() ?? 0,
       status: '${sos['status'] ?? 'sent'}',
       cancelled: sos['cancelled'] == true,
       sosLatitude: (sos['latitude'] as num?)?.toDouble(),
       sosLongitude: (sos['longitude'] as num?)?.toDouble(),
-      responder: responder,
+      responder: responder ?? listed.firstOrNull,
+      responders: listed.isNotEmpty ? listed : [?responder],
     );
   }
 

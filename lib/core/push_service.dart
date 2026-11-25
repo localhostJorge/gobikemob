@@ -28,6 +28,7 @@ import 'gobiker_messages.dart';
 import 'live_map.dart';
 import 'resident_sos.dart';
 import 'resident_visits.dart';
+import 'sos_actions.dart';
 
 /// Push notifications (Firebase Cloud Messaging).
 ///
@@ -43,9 +44,11 @@ class PushService {
   bool _ready = false;
   bool _openedInitial = false;
 
-  /// SOS requests this GoBiker has already been alerted about, so a repeated
-  /// push can't stack dialogs on top of each other. Cleared on sign-out.
-  final Set<int> _alertedSos = {};
+  /// Assignments this GoBiker has already been alerted about, keyed by
+  /// [sosAlertKey], so a repeated push can't stack dialogs on top of each
+  /// other. Sent to the same SOS again (say, after declining) is a new key,
+  /// so it alerts again. Cleared on sign-out.
+  final Set<String> _alertedSos = {};
   bool _alerting = false;
 
   /// Where the server sends to: this phone's FCM registration token (or, if
@@ -200,7 +203,10 @@ class PushService {
     // The admin sent this GoBiker to an emergency: its own alert loads the
     // list, so don't also refresh here and race it.
     if (type == 'sos_assigned') {
-      _alertSosAssigned(int.tryParse('${message.data['id'] ?? ''}'));
+      _alertSosAssigned(
+        int.tryParse('${message.data['id'] ?? ''}'),
+        message.data['assigned_at']?.toString(),
+      );
       return;
     }
     _refresh(type);
@@ -216,27 +222,93 @@ class PushService {
     );
   }
 
+  /// One assignment of SOS [id]: its id and when the admin sent this GoBiker
+  /// ([assignedAt], ISO, null from older servers). The time is read as a
+  /// moment, so the push and the list agree however each one writes it.
+  static String sosAlertKey(int id, Object? assignedAt) {
+    final at = switch (assignedAt) {
+      final DateTime t => t,
+      null => null,
+      _ => DateTime.tryParse('$assignedAt'),
+    };
+    return '$id:${at?.toUtc().toIso8601String() ?? assignedAt ?? ''}';
+  }
+
+  /// Records that this assignment was alerted. False when it already was.
+  @visibleForTesting
+  bool alertOnce(int id, Object? assignedAt) =>
+      _alertedSos.add(sosAlertKey(id, assignedAt));
+
   /// Vibrates and pops up the emergency the admin just sent this GoBiker to,
-  /// with a button that opens the map on the resident's exact location.
-  Future<void> _alertSosAssigned(int? id) async {
-    if (id == null || _alerting || !_alertedSos.add(id)) return;
+  /// with Accept (opens the map on the resident's exact location) and Decline.
+  Future<void> _alertSosAssigned(int? id, String? assignedAt) async {
+    if (id == null || _alerting) return;
+    if (_alertedSos.contains(sosAlertKey(id, assignedAt))) return;
     _alerting = true;
     try {
       await GobikerSos.instance.load();
       final sos = GobikerSos.instance.open.where((s) => s.id == id).firstOrNull;
-      // Already resolved, or not ours after all: nothing to show.
-      if (sos == null) return;
+      // Already resolved, or not ours after all: nothing to show, and a later
+      // push for it may still alert.
+      if (sos == null || !sos.isOpen) return;
+      alertOnce(id, assignedAt);
+      // The list may give the time when the push did not: remember it too, so
+      // the missed-assignment check doesn't show it twice.
+      alertOnce(id, sos.assignedAt);
+      await _showAssigned(sos);
+    } finally {
+      _alerting = false;
+    }
+  }
 
-      final view = await showSosAssignedAlert(
+  /// After the list loads (app start, back from the background): alerts for an
+  /// SOS the admin sent this GoBiker to in the last 5 minutes that was never
+  /// shown, because the app was closed or the push did not arrive.
+  Future<void> checkMissedAssignments() async {
+    if (_alerting) return;
+    _alerting = true;
+    try {
+      final since = DateTime.now().subtract(const Duration(minutes: 5));
+      final missed = GobikerSos.instance.open.where(
+        (s) =>
+            s.isOpen &&
+            s.assignedAt != null &&
+            s.assignedAt!.isAfter(since) &&
+            !_alertedSos.contains(sosAlertKey(s.id, s.assignedAt)),
+      );
+      for (final sos in missed.toList()) {
+        alertOnce(sos.id, sos.assignedAt);
+        await _showAssigned(sos);
+      }
+    } finally {
+      _alerting = false;
+    }
+  }
+
+  /// Shows the alert until the GoBiker accepts (the map opens on the SOS) or
+  /// declines with a reason. Going back from the reason brings the alert back.
+  Future<void> _showAssigned(AssignedSos sos) async {
+    while (true) {
+      final choice = await showSosAssignedAlert(
         residentName: sos.residentName,
         place: sos.place,
       );
-      if (!view) return;
-      appNavigatorKey.currentState?.push(
-        MaterialPageRoute(builder: (_) => LiveMapScreen(focusSosId: id)),
-      );
-    } finally {
-      _alerting = false;
+      switch (choice) {
+        case null:
+          return; // no screen to show it on
+        case SosAlertChoice.accept:
+          appNavigatorKey.currentState?.push(
+            MaterialPageRoute(
+              builder: (_) => LiveMapScreen(focusSosId: sos.id),
+            ),
+          );
+          return;
+        case SosAlertChoice.decline:
+          // Inside the navigator's overlay, so the toast after it can show.
+          final context = appNavigatorKey.currentState?.overlay?.context;
+          if (context == null || !context.mounted) return;
+          if (await declineAssignedSos(context, sos.id)) return;
+      }
     }
   }
 

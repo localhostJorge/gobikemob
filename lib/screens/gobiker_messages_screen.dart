@@ -154,7 +154,8 @@ class _GobikerMessagesScreenState extends State<GobikerMessagesScreen> {
 }
 
 /// One exchange in the thread: the GoBiker's message, and the admin's reply
-/// under it when there is one.
+/// under it when there is one. A message the admin started is a single
+/// left-hand admin bubble labelled "From admin".
 class _ThreadEntry extends StatelessWidget {
   const _ThreadEntry({required this.message});
 
@@ -162,8 +163,18 @@ class _ThreadEntry extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final pal = context.pal;
+    if (message.fromAdmin) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: _AdminBubble(
+          label: 'From admin',
+          text: message.message,
+          time: message.sentAt,
+          squareTop: false,
+        ),
+      );
+    }
+
     final sent = DateFormat('MMM d · h:mm a').format(message.sentAt);
 
     return Padding(
@@ -215,76 +226,101 @@ class _ThreadEntry extends StatelessWidget {
           // The admin's reply: left-aligned, card-colored with a brand edge.
           if (message.hasReply) ...[
             const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.78,
-                ),
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
-                decoration: BoxDecoration(
-                  color: theme.cardColor,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(4),
-                    topRight: Radius.circular(16),
-                    bottomLeft: Radius.circular(16),
-                    bottomRight: Radius.circular(16),
-                  ),
-                  border: Border.all(color: pal.line),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 22,
-                          height: 22,
-                          decoration: const BoxDecoration(
-                            color: AppColors.blue,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.shield_rounded,
-                            size: 13,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            message.repliedBy ?? 'Go Bike Admin',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: pal.brand,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      message.reply!,
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.4,
-                        color: pal.ink,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    if (message.repliedAt != null)
-                      Text(
-                        DateFormat('MMM d · h:mm a').format(message.repliedAt!),
-                        style: TextStyle(fontSize: 10, color: pal.muted),
-                      ),
-                  ],
-                ),
-              ),
+            _AdminBubble(
+              label: message.repliedBy ?? 'Go Bike Admin',
+              text: message.reply!,
+              time: message.repliedAt,
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Something the admin wrote: left-aligned, card-colored, with the shield
+/// badge and [label] above the text. [squareTop] tucks its top-left corner
+/// under the GoBiker's message it answers.
+class _AdminBubble extends StatelessWidget {
+  const _AdminBubble({
+    required this.label,
+    required this.text,
+    this.time,
+    this.squareTop = true,
+  });
+
+  final String label;
+  final String text;
+  final DateTime? time;
+  final bool squareTop;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final pal = context.pal;
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.78,
+        ),
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(squareTop ? 4 : 16),
+            topRight: const Radius.circular(16),
+            bottomLeft: const Radius.circular(16),
+            bottomRight: const Radius.circular(16),
+          ),
+          border: Border.all(color: pal.line),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 22,
+                  height: 22,
+                  decoration: const BoxDecoration(
+                    color: AppColors.blue,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.shield_rounded,
+                    size: 13,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: pal.brand,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              text,
+              style: TextStyle(fontSize: 14, height: 1.4, color: pal.ink),
+            ),
+            const SizedBox(height: 4),
+            if (time != null)
+              Text(
+                DateFormat('MMM d · h:mm a').format(time!),
+                style: TextStyle(fontSize: 10, color: pal.muted),
+              ),
+          ],
+        ),
       ),
     );
   }

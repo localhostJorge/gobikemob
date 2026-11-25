@@ -2,7 +2,9 @@ import 'package:flutter/foundation.dart';
 
 import 'auth_service.dart';
 
-/// One message this GoBiker sent the admin, with the admin's reply if any.
+/// One message in the GoBiker's thread with the admin: either one the GoBiker
+/// sent (with the admin's reply, if any), or one the admin started
+/// ([fromAdmin]).
 class GobikerMessage {
   const GobikerMessage({
     required this.id,
@@ -11,11 +13,12 @@ class GobikerMessage {
     this.reply,
     this.repliedAt,
     this.repliedBy,
+    this.fromAdmin = false,
   });
 
   final int id;
 
-  /// What the GoBiker wrote.
+  /// What the GoBiker wrote, or the admin's text when [fromAdmin].
   final String message;
   final DateTime sentAt;
 
@@ -24,23 +27,35 @@ class GobikerMessage {
   final DateTime? repliedAt;
   final String? repliedBy;
 
+  /// The admin started this message: [message] is theirs, and there is no
+  /// GoBiker text to show.
+  final bool fromAdmin;
+
   bool get hasReply => reply != null && reply!.trim().isNotEmpty;
+
+  /// Something from the admin the GoBiker should see: a reply, or a message
+  /// the admin started.
+  bool get hasAdminText => fromAdmin || hasReply;
 
   static GobikerMessage? from(dynamic raw) {
     if (raw is! Map) return null;
     final id = int.tryParse('${raw['id']}');
-    final text = '${raw['message'] ?? ''}'.trim();
+    final fromAdmin =
+        raw['from_admin'] == true || '${raw['from_admin']}' == '1';
+    final reply = '${raw['reply'] ?? ''}'.trim();
+    var text = '${raw['message'] ?? ''}'.trim();
+    // An admin-started row carries its text in `message`; take `reply` if a
+    // server ever puts it there instead.
+    if (fromAdmin && text.isEmpty) text = reply;
     if (id == null || text.isEmpty) return null;
     return GobikerMessage(
       id: id,
       message: text,
+      fromAdmin: fromAdmin,
       sentAt:
           DateTime.tryParse('${raw['sent_at'] ?? ''}')?.toLocal() ??
           DateTime.now(),
-      reply: () {
-        final s = '${raw['reply'] ?? ''}'.trim();
-        return s.isEmpty ? null : s;
-      }(),
+      reply: fromAdmin || reply.isEmpty ? null : reply,
       repliedAt: DateTime.tryParse('${raw['replied_at'] ?? ''}')?.toLocal(),
       repliedBy: () {
         final s = '${raw['replied_by'] ?? ''}'.trim();
@@ -79,21 +94,25 @@ class GobikerMessages extends ChangeNotifier {
   bool get sending => _sending;
   bool get loaded => _loaded;
 
-  /// True once any message has an admin reply (drives the dashboard badge).
-  bool get hasReplies => _items.any((m) => m.hasReply);
+  /// True once the admin has written anything: a reply, or a message they
+  /// started (drives the dashboard badge).
+  bool get hasReplies => _items.any((m) => m.hasAdminText);
 
-  /// How many messages came back without an answer yet.
-  int get unansweredCount => _items.where((m) => !m.hasReply).length;
+  /// How many of the GoBiker's own messages have no answer yet.
+  int get unansweredCount =>
+      _items.where((m) => !m.fromAdmin && !m.hasReply).length;
 
-  /// How many admin replies the GoBiker has not seen yet. Everything with a
-  /// reply counts until [markRepliesSeen] runs (opening the thread).
-  int get unseenReplyCount =>
-      _items.where((m) => m.hasReply && !_seenReplyIds.contains(m.id)).length;
+  /// How many admin replies and admin-started messages the GoBiker has not
+  /// seen yet. They all count until [markRepliesSeen] runs (opening the
+  /// thread).
+  int get unseenReplyCount => _items
+      .where((m) => m.hasAdminText && !_seenReplyIds.contains(m.id))
+      .length;
 
-  /// Marks every reply on screen as seen (called when the thread opens).
+  /// Marks every admin text on screen as seen (called when the thread opens).
   void markRepliesSeen() {
     if (unseenReplyCount == 0) return;
-    _seenReplyIds.addAll(_items.where((m) => m.hasReply).map((m) => m.id));
+    _seenReplyIds.addAll(_items.where((m) => m.hasAdminText).map((m) => m.id));
     notifyListeners();
   }
 

@@ -18,6 +18,9 @@ class LocationDropdowns extends StatefulWidget {
     super.key,
     required this.onChanged,
     this.initialBarangay,
+    this.initialProvince,
+    this.initialCity,
+    this.initialMunicipality,
     this.validator,
   });
 
@@ -26,6 +29,13 @@ class LocationDropdowns extends StatefulWidget {
 
   /// The barangay to pre-select, when editing a profile.
   final String? initialBarangay;
+
+  /// Where [initialBarangay] hangs, by name, so the province → city →
+  /// municipality ladder can be rebuilt when editing a profile. Without a
+  /// province the ladder starts empty, as on sign-up.
+  final String? initialProvince;
+  final String? initialCity;
+  final String? initialMunicipality;
 
   /// Validator for the barangay field.
   final String? Function(String?)? validator;
@@ -51,12 +61,22 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
   /// hold it: the person is asked to pick again through the real ladder.
   bool _pickedFromOffline = false;
 
+  /// The saved place ([LocationDropdowns.initialProvince] and below) still has
+  /// to be walked down once the provinces are in.
+  bool _restorePending = false;
+
   @override
   void initState() {
     super.initState();
     _barangay = widget.initialBarangay;
+    _restorePending = (widget.initialProvince ?? '').trim().isNotEmpty;
     _locations.addListener(_onLocationsChanged);
     if (!_locations.loaded) _locations.load();
+    // The provinces came in earlier (another form this session): restore now,
+    // after this first frame.
+    if (_restorePending && provinceNames.isNotEmpty) {
+      Future.microtask(_restore);
+    }
   }
 
   @override
@@ -67,6 +87,10 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
 
   void _onLocationsChanged() {
     if (!mounted) return;
+    if (_restorePending && provinceNames.isNotEmpty) {
+      _restore();
+      return;
+    }
     // The provinces have arrived: the cascade takes over, and a barangay
     // picked from the offline list can no longer be shown (its dropdown now
     // lists the ones the server sends). The pick gives way; the person picks
@@ -83,6 +107,57 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
   }
 
   List<String> get provinceNames => _locations.provinceNames;
+
+  /// [name] as it appears in [names]: exact, else ignoring case and spaces.
+  static String? _match(Iterable<String> names, String? name) {
+    final want = name?.trim().toLowerCase();
+    if (want == null || want.isEmpty) return null;
+    for (final n in names) {
+      if (n == name) return n;
+    }
+    for (final n in names) {
+      if (n.trim().toLowerCase() == want) return n;
+    }
+    return null;
+  }
+
+  // ------------------------------------------------------------------ Restore
+  /// Rebuilds the saved place: province, then its cities, then the city, its
+  /// municipality and that municipality's barangays, keeping the saved
+  /// barangay picked the whole way (the screen is never told it was cleared).
+  /// A step that no longer matches the server's list stops the walk there,
+  /// leaving the person to pick the rest.
+  Future<void> _restore() async {
+    if (!_restorePending || !mounted) return;
+    _restorePending = false;
+    final province = _match(provinceNames, widget.initialProvince);
+    if (province == null) return;
+
+    setState(() => _province = province);
+    await _loadCities();
+    if (!mounted || _province != province || _cityName != null) return;
+
+    final cityNames = _cities.map((c) => c.name);
+    // City and municipality usually share a name; either finds the town.
+    final city =
+        _match(cityNames, widget.initialCity) ??
+        _match(cityNames, widget.initialMunicipality);
+    if (city == null) return;
+
+    setState(() => _cityName = city);
+    await _loadMunicipality(
+      preferred: widget.initialMunicipality,
+      keepBarangay: true,
+    );
+    if (!mounted || _cityName != city) return;
+
+    // Re-apply the saved barangay in the spelling the server now lists.
+    final barangay = _match(_barangayNames, widget.initialBarangay);
+    if (barangay != null && _barangay != barangay) {
+      setState(() => _barangay = barangay);
+      widget.onChanged(barangay);
+    }
+  }
 
   // ------------------------------------------------------------------ Province
   void _onProvinceSelected(String? name) {
@@ -144,15 +219,21 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
   // municipality row of the same name, so a second dropdown would only repeat
   // the town already picked. It is chosen here, out of sight, so the
   // barangays can load from it.
-  void _onMunicipalitySelected(String? name) {
+  ///
+  /// [keepBarangay] is set while the saved place is restored: the saved
+  /// barangay stays picked instead of being cleared.
+  Future<void> _onMunicipalitySelected(
+    String? name, {
+    bool keepBarangay = false,
+  }) async {
     if (name == _municipalityName) return;
     setState(() {
       _municipalityName = name;
-      _barangay = null;
+      if (!keepBarangay) _barangay = null;
       _barangayNames = const [];
     });
-    widget.onChanged(null);
-    _loadBarangays();
+    if (!keepBarangay) widget.onChanged(null);
+    await _loadBarangays();
   }
 
   // ------------------------------------------------------------------ Barangay
@@ -199,7 +280,12 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
     setState(() => _cities = cities);
   }
 
-  Future<void> _loadMunicipality() async {
+  /// Loads the chosen city's municipalities and picks one: [preferred] when it
+  /// is listed, else the city's own (same name), else the first.
+  Future<void> _loadMunicipality({
+    String? preferred,
+    bool keepBarangay = false,
+  }) async {
     if (_cityName == null) {
       if (mounted) {
         setState(() {
@@ -222,9 +308,12 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
     // There is no Municipality dropdown: take the city's own municipality
     // (the one with its name, else the first) and load its barangays.
     if (muni.isNotEmpty && _municipalityName == null) {
+      final names = muni.map((m) => m.name);
       final own =
-          muni.where((m) => m.name == city.name).firstOrNull ?? muni.first;
-      _onMunicipalitySelected(own.name);
+          _match(names, preferred) ??
+          muni.where((m) => m.name == city.name).firstOrNull?.name ??
+          muni.first.name;
+      await _onMunicipalitySelected(own, keepBarangay: keepBarangay);
     }
   }
 

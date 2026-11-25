@@ -89,6 +89,8 @@ class AssignedSos {
     this.accuracy,
     this.createdAt,
     this.fromGobiker = false,
+    this.assignedAt,
+    this.otherResponders = const [],
   });
 
   final int id;
@@ -110,6 +112,13 @@ class AssignedSos {
   /// The one in trouble is another GoBiker (their own emergency), not a
   /// resident.
   final bool fromGobiker;
+
+  /// When the admin sent this GoBiker. A new time means they were sent again
+  /// (say, after declining), which alerts them again. Null from older servers.
+  final DateTime? assignedAt;
+
+  /// The other GoBikers the admin sent to the same SOS.
+  final List<String> otherResponders;
 
   bool get isOpen => status != 'resolved';
   bool get hasPosition => latitude != null && longitude != null;
@@ -141,6 +150,12 @@ class AssignedSos {
       accuracy: _metres(j['accuracy']),
       createdAt: DateTime.tryParse('${j['created_at'] ?? ''}')?.toLocal(),
       fromGobiker: j['from_gobiker'] == true,
+      assignedAt: DateTime.tryParse('${j['assigned_at'] ?? ''}'),
+      otherResponders: switch (j['other_responders']) {
+        final List<dynamic> names =>
+          names.map(text).whereType<String>().toList(),
+        _ => const [],
+      },
     );
   }
 }
@@ -252,13 +267,23 @@ class GobikerSos extends ChangeNotifier {
   bool _resolving = false;
   bool _declining = false;
 
-  Future<void> load() async {
-    if (loading) return;
+  Future<void>? _loading;
+
+  /// Reloads the list. A call made while one is running waits for that one,
+  /// so whoever asks next reads the fresh list and not the old one.
+  Future<void> load() => _loading ??= _load().whenComplete(() {
+    _loading = null;
+  });
+
+  Future<void> _load() async {
     loading = true;
-    final res = await AuthService.instance.callAuthed('GET', '/gobiker/sos');
-    if (res.ok) open = _sosList(res.body['sos']);
-    loading = false;
-    notifyListeners();
+    try {
+      final res = await AuthService.instance.callAuthed('GET', '/gobiker/sos');
+      if (res.ok) open = _sosList(res.body['sos']);
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
   }
 
   /// Marks the SOS as resolved. Returns null or an error message.

@@ -4,6 +4,27 @@ import 'package:geolocator/geolocator.dart';
 import 'auth_service.dart';
 import 'fix.dart';
 
+/// A GoBiker sent to an SOS, as the resident's card shows them.
+class SosResponderInfo {
+  const SosResponderInfo({required this.name, this.barangay, this.photoUrl});
+
+  final String name;
+  final String? barangay;
+  final String? photoUrl;
+
+  /// Null when [m] is not a map or has no name.
+  static SosResponderInfo? tryParse(Object? m) {
+    if (m is! Map) return null;
+    final name = m['name']?.toString().trim();
+    if (name == null || name.isEmpty) return null;
+    return SosResponderInfo(
+      name: name,
+      barangay: m['barangay']?.toString().trim(),
+      photoUrl: m['photo_url']?.toString().trim(),
+    );
+  }
+}
+
 /// One SOS request the resident sent, as GET /api/resident/sos returns it.
 class SosEntry {
   const SosEntry({
@@ -25,6 +46,7 @@ class SosEntry {
     this.responderName,
     this.responderBarangay,
     this.responderPhotoUrl,
+    this.responders = const [],
   });
 
   final int id;
@@ -59,6 +81,11 @@ class SosEntry {
   final String? responderBarangay;
   final String? responderPhotoUrl;
 
+  /// Every GoBiker on the way (the admin can send several), newest first, or
+  /// the one who resolved it. A server from before that sends only the single
+  /// responder, which is then the whole list.
+  final List<SosResponderInfo> responders;
+
   bool get isOpen => status != 'resolved';
 
   /// Where the emergency is, e.g. "12 Rizal St., Poblacion · Beside the chapel".
@@ -70,6 +97,11 @@ class SosEntry {
   factory SosEntry.fromJson(Map<String, dynamic> j) {
     DateTime? date(dynamic v) => DateTime.tryParse('${v ?? ''}')?.toLocal();
     final responder = j['responder'] is Map ? j['responder'] as Map : null;
+    final listed = [
+      if (j['responders'] case final List list)
+        for (final m in list) ?SosResponderInfo.tryParse(m),
+    ];
+    final single = SosResponderInfo.tryParse(responder);
     return SosEntry(
       id: (j['id'] as num?)?.toInt() ?? 0,
       status: '${j['status'] ?? 'sent'}',
@@ -89,6 +121,7 @@ class SosEntry {
       responderName: responder?['name']?.toString().trim(),
       responderBarangay: responder?['barangay']?.toString().trim(),
       responderPhotoUrl: responder?['photo_url']?.toString().trim(),
+      responders: listed.isNotEmpty ? listed : [?single],
     );
   }
 }

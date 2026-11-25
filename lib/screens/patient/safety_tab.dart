@@ -11,6 +11,20 @@ import 'sos_tracking_screen.dart';
 import 'ui_kit.dart';
 import 'visit_record.dart' show formatDate, formatTime;
 
+/// Who is coming, said simply: "Maria", "Maria and Juan", or with three or
+/// more "Maria and 2 other GoBikers". The verb that follows is [onTheWayVerb].
+String responderNames(List<SosResponderInfo> responders) =>
+    switch (responders) {
+      [] => '',
+      [final a] => a.name,
+      [final a, final b] => '${a.name} and ${b.name}',
+      [final a, ...final rest] => '${a.name} and ${rest.length} other GoBikers',
+    };
+
+/// "is" for one GoBiker, "are" for several.
+String onTheWayVerb(List<SosResponderInfo> responders) =>
+    responders.length > 1 ? 'are' : 'is';
+
 /// Status of an SOS as words, icon and color (never color alone). The colors
 /// are the readable text shades.
 ({String label, IconData icon, Color color, String help}) sosStatusStyle(
@@ -20,7 +34,7 @@ import 'visit_record.dart' show formatDate, formatTime;
   // Only say somebody is coming once a GoBiker has actually been sent: the admin can take a
   // request on before choosing who goes.
   'responding' =>
-    sos.responderName == null
+    sos.responders.isEmpty
         ? (
             label: 'Admin is handling it',
             icon: Icons.support_agent_rounded,
@@ -31,7 +45,9 @@ import 'visit_record.dart' show formatDate, formatTime;
             label: 'Someone is Responding',
             icon: Icons.directions_run_rounded,
             color: pal.orangeText,
-            help: '${sos.responderName} is on the way to help you.',
+            help:
+                '${responderNames(sos.responders)} '
+                '${onTheWayVerb(sos.responders)} on the way to help you.',
           ),
   // A cancelled request comes from the server as `resolved`, so tell them apart here.
   'resolved' when sos.cancelled => (
@@ -325,13 +341,14 @@ class _SosRequestCardState extends State<SosRequestCard> {
   String get _cancelLabel => 'Cancel $_noun';
 
   Future<void> _cancel() async {
-    final responder = sos.responderName;
+    final coming = sos.responders;
     final ok = await showConfirm(
       context,
       title: 'Cancel your $_noun?',
-      message: responder == null
+      message: coming.isEmpty
           ? 'The admin will be told you no longer need help.'
-          : '$responder is on the way. They will be told not to come.',
+          : '${responderNames(coming)} ${onTheWayVerb(coming)} on the way. '
+                'They will be told not to come.',
       confirmLabel: _cancelLabel,
       cancelLabel: 'Keep it',
       destructive: true,
@@ -380,16 +397,16 @@ class _SosRequestCardState extends State<SosRequestCard> {
             ),
             const SizedBox(height: Sp.md),
             Text(s.help, style: T.label.copyWith(color: s.color)),
-            if (sos.responderName != null) ...[
+            for (final r in sos.responders) ...[
               const SizedBox(height: Sp.md),
-              _Responder(sos: sos, color: s.color),
+              _Responder(sos: sos, responder: r, color: s.color),
             ],
             if (sos.isOpen) ...[
               const SizedBox(height: Sp.lg),
               // Where the GoBiker sent to help is, live; before one is sent the map
               // shows the SOS pin and says it is waiting.
               PrimaryButton(
-                label: sos.responderName != null
+                label: sos.responders.isNotEmpty
                     ? 'View map · track your GoBiker'
                     : 'View map',
                 icon: Icons.map_rounded,
@@ -412,18 +429,23 @@ class _SosRequestCardState extends State<SosRequestCard> {
   }
 }
 
-/// The GoBiker coming to help: who they are and that they are responding.
-/// There are no photos on the server, so their initials stand in for one.
+/// A GoBiker coming to help: who they are and that they are responding.
+/// Their initials stand in when they have no photo.
 class _Responder extends StatelessWidget {
-  const _Responder({required this.sos, required this.color});
+  const _Responder({
+    required this.sos,
+    required this.responder,
+    required this.color,
+  });
 
   final SosEntry sos;
+  final SosResponderInfo responder;
   final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final name = sos.responderName ?? '';
-    final where = sos.responderBarangay;
+    final name = responder.name;
+    final where = responder.barangay;
 
     return Container(
       padding: const EdgeInsets.all(Sp.sm),
@@ -435,7 +457,7 @@ class _Responder extends StatelessWidget {
         children: [
           InitialsAvatar(
             name,
-            imageUrl: sos.responderPhotoUrl,
+            imageUrl: responder.photoUrl,
             radius: 20,
             color: color,
           ),

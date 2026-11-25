@@ -38,6 +38,11 @@ String? _text(dynamic value) {
   return (text == null || text.isEmpty) ? null : text;
 }
 
+/// A place name from the user payload: a plain string, or an object with a
+/// `name` in case the server ever sends the whole row.
+String? _placeName(dynamic value) =>
+    _text(value is Map ? value['name'] : value);
+
 class AppUser {
   const AppUser({
     required this.id,
@@ -46,6 +51,9 @@ class AppUser {
     required this.role,
     this.mobile,
     this.barangay,
+    this.province,
+    this.city,
+    this.municipality,
     this.birthdate,
     this.photoUrl,
     this.hasPassword = true,
@@ -58,6 +66,13 @@ class AppUser {
   final String role; // "User" (resident), "GoBiker" or "Admin"
   final String? mobile;
   final String? barangay;
+
+  /// Where [barangay] hangs, by name (the server fills these in from the
+  /// barangay). Null when the server didn't send them; Edit profile uses them
+  /// to show the saved province and town again.
+  final String? province;
+  final String? city;
+  final String? municipality;
 
   /// Date of birth. Null for accounts made before it was asked.
   final DateTime? birthdate;
@@ -85,6 +100,9 @@ class AppUser {
     role: (json['role'] ?? 'User').toString(),
     mobile: json['mobile']?.toString(),
     barangay: json['barangay']?.toString(),
+    province: _placeName(json['province']),
+    city: _placeName(json['city']),
+    municipality: _placeName(json['municipality']),
     birthdate: birthdateFromApi(json['birthdate']),
     photoUrl: _text(json['photo_url']),
     hasPassword: json['has_password'] != false,
@@ -188,6 +206,11 @@ class AuthService {
       role: u.role,
       mobile: u.mobile,
       barangay: u.barangay,
+      province: u.province,
+      city: u.city,
+      municipality: u.municipality,
+      birthdate: u.birthdate,
+      photoUrl: u.photoUrl,
       hasPassword: u.hasPassword,
       notificationPrefs: prefs,
     );

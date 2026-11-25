@@ -117,6 +117,9 @@ class _GobikerEditProfileScreenState extends State<GobikerEditProfileScreen> {
                           const SizedBox(height: Sp.lg),
                           LocationDropdowns(
                             initialBarangay: _barangay,
+                            initialProvince: widget.user.province,
+                            initialCity: widget.user.city,
+                            initialMunicipality: widget.user.municipality,
                             onChanged: (value) =>
                                 setState(() => _barangay = value),
                             validator: (value) =>

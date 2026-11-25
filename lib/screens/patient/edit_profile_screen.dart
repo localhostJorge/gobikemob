@@ -232,6 +232,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       const SizedBox(height: Sp.lg),
                       LocationDropdowns(
                         initialBarangay: _initBarangay,
+                        initialProvince:
+                            AuthService.instance.currentUser?.province,
+                        initialCity: AuthService.instance.currentUser?.city,
+                        initialMunicipality:
+                            AuthService.instance.currentUser?.municipality,
                         onChanged: (v) => setState(() => _barangay = v),
                         validator: (v) =>
                             v == null ? 'Select your barangay' : null,

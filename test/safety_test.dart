@@ -288,4 +288,90 @@ void main() {
       findsOneWidget,
     );
   });
+
+  group('several GoBikers on one SOS', () {
+    SosEntry sos(Map<String, dynamic> extra) => SosEntry.fromJson({
+      'id': 9,
+      'status': 'responding',
+      'municipality': 'Bugallon',
+      'barangay': 'Poblacion',
+      'landmark': 'Chapel',
+      'created_at': '2026-10-25T03:57:00+00:00',
+      ...extra,
+    });
+
+    test('reads every responder, and falls back to the single one', () {
+      final both = sos({
+        'responder': {'name': 'Maria Santos', 'barangay': 'Salasa'},
+        'responders': [
+          {'name': 'Maria Santos', 'barangay': 'Salasa', 'photo_url': null},
+          {
+            'name': 'Juan Dela Cruz',
+            'barangay': 'Poblacion',
+            'photo_url': 'https://example.com/j.jpg',
+          },
+        ],
+      });
+      expect(both.responders.map((r) => r.name), [
+        'Maria Santos',
+        'Juan Dela Cruz',
+      ]);
+      expect(both.responders.last.barangay, 'Poblacion');
+      expect(both.responders.last.photoUrl, 'https://example.com/j.jpg');
+
+      // A server from before several GoBikers per SOS sends only `responder`.
+      final older = sos({
+        'responder': {'name': 'Maria Santos', 'barangay': 'Salasa'},
+      });
+      expect(older.responders.map((r) => r.name), ['Maria Santos']);
+      expect(older.responders.single.barangay, 'Salasa');
+
+      expect(sos({}).responders, isEmpty);
+      expect(sos({'responders': 'junk'}).responders, isEmpty);
+    });
+
+    Future<void> show(WidgetTester tester, List<String> names) =>
+        tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: SosRequestCard(
+                  sos: sos({
+                    'responder': {'name': names.first},
+                    'responders': [
+                      for (final n in names) {'name': n, 'barangay': 'Salasa'},
+                    ],
+                  }),
+                ),
+              ),
+            ),
+          ),
+        );
+
+    testWidgets('two GoBikers: both are named', (tester) async {
+      await show(tester, ['Maria Santos', 'Juan Dela Cruz']);
+      expect(
+        find.text(
+          'Maria Santos and Juan Dela Cruz are on the way to help you.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Maria Santos'), findsOneWidget);
+      expect(find.text('Juan Dela Cruz'), findsOneWidget);
+      expect(find.text('Someone is Responding'), findsOneWidget);
+    });
+
+    testWidgets('three or more: the first is named, the rest counted', (
+      tester,
+    ) async {
+      await show(tester, ['Maria Santos', 'Juan Dela Cruz', 'Ana Reyes']);
+      expect(
+        find.text(
+          'Maria Santos and 2 other GoBikers are on the way to help you.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Ana Reyes'), findsOneWidget);
+    });
+  });
 }

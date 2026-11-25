@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_bike_app/core/resident_sos.dart';
 import 'package:go_bike_app/core/routing_service.dart';
@@ -6,6 +9,9 @@ import 'package:go_bike_app/core/sos_tracking.dart';
 import 'package:go_bike_app/screens/patient/resident_dashboard_screen.dart';
 import 'package:go_bike_app/screens/patient/safety_tab.dart';
 import 'package:go_bike_app/screens/patient/sos_tracking_screen.dart';
+import 'package:go_bike_app/widgets/initials_avatar.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 Map<String, dynamic> trackingJson({
   String status = 'responding',
@@ -212,6 +218,115 @@ void main() {
       // Leave the screen so its refresh timer stops.
       await tester.pageBack();
       await tester.pump(const Duration(milliseconds: 400));
+    });
+  });
+
+  group('several GoBikers on one SOS', () {
+    Map<String, dynamic> rider(
+      String name, {
+      double? lat,
+      double? lng,
+      bool online = true,
+    }) => {
+      'name': name,
+      'barangay': 'Poblacion',
+      'photo_url': null,
+      'online': online,
+      'latitude': lat,
+      'longitude': lng,
+      'accuracy': 8,
+      'heading': null,
+      'position_at': '2026-11-25T10:00:00+00:00',
+    };
+
+    Map<String, dynamic> several() => {
+      ...trackingJson(),
+      'responders': [
+        rider('Maria Santos', lat: 15.9601, lng: 120.1902),
+        rider('Juan Dela Cruz', lat: 15.9540, lng: 120.1830),
+        rider('Ana Reyes'), // no position yet
+      ],
+    };
+
+    test('reads every responder, and falls back to the single one', () {
+      final t = SosTracking.fromJson(several());
+      expect(t.responders.map((r) => r.name), [
+        'Maria Santos',
+        'Juan Dela Cruz',
+        'Ana Reyes',
+      ]);
+      expect(t.responders[1].point?.latitude, 15.9540);
+      expect(t.responders[2].hasPosition, isFalse);
+      // `responder` keeps meaning the first one.
+      expect(t.responder?.name, 'Maria Santos');
+
+      // A server from before several GoBikers per SOS sends only `responder`.
+      final older = SosTracking.fromJson(trackingJson());
+      expect(older.responders.map((r) => r.name), ['Maria Santos']);
+
+      // Nobody tracked: nobody listed, whatever else came.
+      expect(
+        SosTracking.fromJson({
+          ...trackingJson(status: 'resolved', tracking: false),
+          'responders': [rider('Maria Santos', lat: 15.96, lng: 120.19)],
+        }).responders,
+        isEmpty,
+      );
+      expect(
+        SosTracking.fromJson({...trackingJson(), 'responders': 'junk'})
+            .responders
+            .map((r) => r.name),
+        ['Maria Santos'],
+      );
+    });
+
+    testWidgets('the panel lists them all and offers to show everyone', (
+      tester,
+    ) async {
+      await showPanel(tester, SosTracking.fromJson(several()), metres: 640);
+      expect(find.text('Maria Santos'), findsOneWidget);
+      expect(find.text('Juan Dela Cruz'), findsOneWidget);
+      expect(find.text('Ana Reyes'), findsOneWidget);
+      expect(
+        find.text('On the way · their location will show here soon'),
+        findsOneWidget,
+      );
+      expect(find.text('Show everyone'), findsOneWidget);
+      expect(find.text('Show us both'), findsNothing);
+    });
+
+    testWidgets('the map draws a dot for each GoBiker with a position', (
+      tester,
+    ) async {
+      Future<http.Response> handle(http.Request req) async {
+        if (req.url.path.endsWith('/resident/sos/7/tracking')) {
+          return http.Response(
+            jsonEncode(several()),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('', 404); // map tiles and road routes
+      }
+
+      await http.runWithClient(() async {
+        await tester.pumpWidget(
+          const MaterialApp(home: SosTrackingScreen(sosId: 7)),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+
+        final dots = find.descendant(
+          of: find.byType(MarkerLayer),
+          matching: find.byType(InitialsAvatar),
+        );
+        expect(dots, findsNWidgets(2));
+        expect(find.text('Show everyone'), findsOneWidget);
+
+        // Leave the screen so its refresh timer stops.
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(seconds: 1));
+      }, () => MockClient(handle));
     });
   });
 }
