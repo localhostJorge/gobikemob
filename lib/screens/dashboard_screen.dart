@@ -15,6 +15,7 @@ import '../core/theme.dart';
 import '../core/tracking_service.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/bottom_gap.dart';
+import '../widgets/decline_reason_dialog.dart';
 import '../widgets/ronda_hero.dart';
 import '../widgets/ronda_nav_bar.dart';
 import 'patient/app_colors.dart';
@@ -326,6 +327,26 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  /// Turns the SOS down. A required reason goes to the admin, who then sends
+  /// someone else; the request leaves this GoBiker's list.
+  Future<void> _declineSos(AssignedSos sos) async {
+    final reason = await showDeclineReasonDialog(
+      context,
+      title: 'Decline this SOS?',
+      message:
+          'Tell the admin why you cannot respond, so they can send someone else to ${sos.residentName}.',
+      confirmLabel: 'Decline',
+    );
+    if (reason == null || reason.isEmpty || !mounted) return;
+    final error = await GobikerSos.instance.decline(sos.id, reason);
+    if (!mounted) return;
+    AppToast.show(
+      context,
+      error ?? 'Declined. The admin has been told to send someone else.',
+      type: error == null ? ToastType.info : ToastType.error,
+    );
+  }
+
   /// SOS requests the admin sent this GoBiker to, with a Resolve button.
   Widget _buildAssignedSos(ThemeData theme, Color muted) {
     final open = GobikerSos.instance.open;
@@ -388,10 +409,24 @@ class _DashboardScreenState extends State<DashboardScreen>
                       child: OutlinedButton.icon(
                         onPressed: () => _onMap(focusSosId: sos.id),
                         icon: const Icon(Icons.map_rounded),
-                        label: const Text('View on map'),
+                        label: const Text('Map'),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.redButton,
+                          side: BorderSide(
+                            color: AppColors.redButton.withValues(alpha: 0.6),
+                          ),
+                        ),
+                        onPressed: () => _declineSos(sos),
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        label: const Text('Decline'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: FilledButton.icon(
                         style: FilledButton.styleFrom(

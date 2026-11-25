@@ -226,6 +226,7 @@ class GobikerSos extends ChangeNotifier {
   List<AssignedSos> open = const [];
   bool loading = false;
   bool _resolving = false;
+  bool _declining = false;
 
   Future<void> load() async {
     if (loading) return;
@@ -249,6 +250,25 @@ class GobikerSos extends ChangeNotifier {
       return res.ok ? null : res.message;
     } finally {
       _resolving = false;
+    }
+  }
+
+  /// Turns the SOS down with the required reason. The admin is alerted to
+  /// send someone else, and the request leaves this GoBiker's list. Returns
+  /// null or an error message.
+  Future<String?> decline(int id, String reason) async {
+    if (_declining) return null;
+    _declining = true;
+    try {
+      final res = await AuthService.instance.callAuthed(
+        'POST',
+        '/gobiker/sos/$id/decline',
+        body: {'reason': reason},
+      );
+      await load();
+      return res.ok ? null : res.message;
+    } finally {
+      _declining = false;
     }
   }
 
