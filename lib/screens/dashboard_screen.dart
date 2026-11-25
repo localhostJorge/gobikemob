@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../core/announcements.dart';
 import '../core/appointments.dart';
@@ -14,6 +15,7 @@ import '../core/presence_service.dart';
 import '../core/theme.dart';
 import '../core/tracking_service.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/assigned_sos_card.dart';
 import '../widgets/bottom_gap.dart';
 import '../widgets/decline_reason_dialog.dart';
 import '../widgets/ronda_hero.dart';
@@ -54,6 +56,9 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   /// An SOS to show when the Map tab opens (from the Assigned SOS card).
   int? _mapFocus;
+
+  /// An SOS to show the way to when the Map tab opens (its Directions button).
+  int? _mapDirections;
 
   /// History and Profile are built the first time they are opened, then kept, so
   /// their scroll position and filters survive switching tabs.
@@ -206,13 +211,16 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   /// Switches tabs: no slide, the bottom bar stays.
-  void _selectTab(int tab, {int? mapFocus}) {
-    if (tab == _tab && mapFocus == null) return;
+  void _selectTab(int tab, {int? mapFocus, int? mapDirections}) {
+    if (tab == _tab && mapFocus == null && mapDirections == null) return;
     // Leaving the map: catch up on the SOS requests it may have changed.
     if (_tab == 1 && tab != 1) GobikerSos.instance.load();
     setState(() {
       _tab = tab;
-      if (tab == 1) _mapFocus = mapFocus;
+      if (tab == 1) {
+        _mapFocus = mapFocus;
+        _mapDirections = mapDirections;
+      }
       if (tab == 2) _historyOpened = true;
       if (tab == 3) _profileOpened = true;
     });
@@ -303,7 +311,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  void _onMap({int? focusSosId}) => _selectTab(1, mapFocus: focusSosId);
+  void _onDirections(AssignedSos sos) => _selectTab(1, mapDirections: sos.id);
 
   Future<void> _resolveSos(AssignedSos sos) async {
     var confirmed = false;
@@ -347,99 +355,24 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  /// SOS requests the admin sent this GoBiker to, with a Resolve button.
+  /// SOS requests the admin sent this GoBiker to: directions, resolve, decline.
   Widget _buildAssignedSos(ThemeData theme, Color muted) {
     final open = GobikerSos.instance.open;
     if (open.isEmpty) return const SizedBox.shrink();
-    const yellow = Color(0xFFEAB308);
-    // The label sat on a dark brown that vanished against the dark card.
-    final respondingInk = theme.brightness == Brightness.dark
-        ? const Color(0xFFFACC15)
-        : const Color(0xFF8A6A00);
+    final me = PresenceService.instance.latest.value;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionTitle('Assigned SOS', muted),
         for (final sos in open)
-          Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: _tint(theme, yellow),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: yellow, width: 1.5),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.sos_rounded, color: yellow, size: 26),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        sos.residentName,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      'Responding',
-                      style: TextStyle(
-                        color: respondingInk,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-                if (sos.place.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(sos.place, style: TextStyle(color: muted)),
-                ],
-                if (sos.description != null) ...[
-                  const SizedBox(height: 4),
-                  Text(sos.description!),
-                ],
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _onMap(focusSosId: sos.id),
-                        icon: const Icon(Icons.map_rounded),
-                        label: const Text('Map'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.redButton,
-                          side: BorderSide(
-                            color: AppColors.redButton.withValues(alpha: 0.6),
-                          ),
-                        ),
-                        onPressed: () => _declineSos(sos),
-                        icon: const Icon(Icons.close_rounded, size: 18),
-                        label: const Text('Decline'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppTheme.successGreen,
-                        ),
-                        onPressed: () => _resolveSos(sos),
-                        icon: const Icon(Icons.check_circle_rounded),
-                        label: const Text('Resolve'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: AssignedSosCard(
+              sos: sos,
+              from: me == null ? null : LatLng(me.latitude, me.longitude),
+              onDirections: () => _onDirections(sos),
+              onResolve: () => _resolveSos(sos),
+              onDecline: () => _declineSos(sos),
             ),
           ),
         const SizedBox(height: 12),
@@ -451,9 +384,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// replies, with the send bar at the bottom.
   void _openMessagesThread() {
     GobikerMessages.instance.markRepliesSeen();
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const GobikerMessagesScreen()),
-    );
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const GobikerMessagesScreen()));
   }
 
   /// Home visits finished today. The check-up recorded at a visit is not in any ronda, so each
@@ -535,8 +467,9 @@ class _DashboardScreenState extends State<DashboardScreen>
               // The map runs (GPS, refreshing every few seconds) only while it is open.
               _tab == 1
                   ? LiveMapScreen(
-                      key: ValueKey('map-$_mapFocus'),
+                      key: ValueKey('map-$_mapFocus-$_mapDirections'),
                       focusSosId: _mapFocus,
+                      directionsSosId: _mapDirections,
                     )
                   : const SizedBox.shrink(),
               _historyOpened
@@ -714,7 +647,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                     child: ListenableBuilder(
                       listenable: GobikerMessages.instance,
                       builder: (context, _) {
-                        final unseen = GobikerMessages.instance.unseenReplyCount;
+                        final unseen =
+                            GobikerMessages.instance.unseenReplyCount;
                         return OutlinedButton.icon(
                           onPressed: _openMessagesThread,
                           icon: Badge(

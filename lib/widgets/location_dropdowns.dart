@@ -82,8 +82,7 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
     setState(() {});
   }
 
-  List<String> get provinceNames =>
-      _locations.provinceNames;
+  List<String> get provinceNames => _locations.provinceNames;
 
   // ------------------------------------------------------------------ Province
   void _onProvinceSelected(String? name) {
@@ -136,12 +135,15 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
       items: _cities.map((c) => c.name).toList(growable: false),
       value: _cityName,
       onChanged: _cities.isEmpty ? null : _onCitySelected,
-      validator: (v) =>
-          v == null ? 'Select your city or municipality' : null,
+      validator: (v) => v == null ? 'Select your city or municipality' : null,
     );
   }
 
   // ------------------------------------------------------------------ Municipality
+  // Not shown: each City / Municipality on the server has exactly one
+  // municipality row of the same name, so a second dropdown would only repeat
+  // the town already picked. It is chosen here, out of sight, so the
+  // barangays can load from it.
   void _onMunicipalitySelected(String? name) {
     if (name == _municipalityName) return;
     setState(() {
@@ -151,20 +153,6 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
     });
     widget.onChanged(null);
     _loadBarangays();
-  }
-
-  Widget _buildMunicipality(BuildContext context) {
-    if (_cityName == null) return const SizedBox.shrink();
-    return AppDropdownField(
-      label: 'Municipality',
-      hint: 'Select your municipality',
-      icon: Icons.map_rounded,
-      items: _municipalities.map((m) => m.name).toList(growable: false),
-      value: _municipalityName,
-      onChanged: _municipalities.isEmpty ? null : _onMunicipalitySelected,
-      validator: (v) =>
-          v == null ? 'Select your municipality' : null,
-    );
   }
 
   // ------------------------------------------------------------------ Barangay
@@ -200,7 +188,8 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
       items: items,
       value: items.contains(_barangay) ? _barangay : null,
       onChanged: items.isEmpty ? null : _onBarangaySelected,
-      validator: widget.validator ?? (v) => v == null ? 'Select your barangay' : null,
+      validator:
+          widget.validator ?? (v) => v == null ? 'Select your barangay' : null,
     );
   }
 
@@ -227,12 +216,15 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
       return;
     }
     final muni = await _locations.municipalities(city.id);
-    if (!mounted) return;
+    // The person switched town while this was loading: a newer load wins.
+    if (!mounted || _cityName != city.name) return;
     setState(() => _municipalities = muni);
-    // Only one municipality under this city (the usual case): pick it and
-    // load its barangays straight away, so nobody taps twice for nothing.
-    if (muni.length == 1 && _municipalityName == null) {
-      _onMunicipalitySelected(muni.first.name);
+    // There is no Municipality dropdown: take the city's own municipality
+    // (the one with its name, else the first) and load its barangays.
+    if (muni.isNotEmpty && _municipalityName == null) {
+      final own =
+          muni.where((m) => m.name == city.name).firstOrNull ?? muni.first;
+      _onMunicipalitySelected(own.name);
     }
   }
 
@@ -243,10 +235,12 @@ class _LocationDropdownsState extends State<LocationDropdowns> {
       children: [
         _buildProvince(context),
         const SizedBox(height: 16),
-        _buildCity(context),
-        const SizedBox(height: 16),
-        _buildMunicipality(context),
-        const SizedBox(height: 16),
+        // The city field only appears once a province is picked; skip its gap
+        // until then so the barangay field doesn't sit under an empty space.
+        if (_province != null) ...[
+          _buildCity(context),
+          const SizedBox(height: 16),
+        ],
         _buildBarangay(context),
       ],
     );

@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/auth_service.dart';
+import '../core/directions.dart';
 import '../core/live_map.dart';
 import '../core/location_gate.dart';
 import '../core/presence_service.dart';
@@ -38,6 +39,14 @@ String formatDistance(double metres) => metres < 1000
     ? '${metres.round()} m'
     : '${(metres / 1000).toStringAsFixed(1)} km';
 
+/// A ride time, rounded up to the minute: "12 min", "1 h 5 min".
+String formatRideTime(double seconds) {
+  final minutes = (seconds / 60).ceil().clamp(1, 24 * 60);
+  if (minutes < 60) return '$minutes min';
+  final rest = minutes % 60;
+  return rest == 0 ? '${minutes ~/ 60} h' : '${minutes ~/ 60} h $rest min';
+}
+
 /// GoBiker colors: blue on an ordinary ronda, orange once they are responding,
 /// red while their own emergency alarm is still up.
 Color gobikerColor(String status) => switch (status) {
@@ -52,10 +61,14 @@ Color gobikerColor(String status) => switch (status) {
 ///
 /// Residents are never plotted for anyone.
 class LiveMapScreen extends StatefulWidget {
-  const LiveMapScreen({super.key, this.focusSosId});
+  const LiveMapScreen({super.key, this.focusSosId, this.directionsSosId});
 
   /// Opened from an "SOS assigned" notification: centre on that request.
   final int? focusSosId;
+
+  /// Opened from Home's Directions button: show the way to that request at
+  /// once, without the details sheet in between.
+  final int? directionsSosId;
 
   @override
   State<LiveMapScreen> createState() => _LiveMapScreenState();
@@ -68,9 +81,6 @@ class _LiveMapScreenState extends State<LiveMapScreen>
   static const Duration _refresh = Duration(seconds: 3);
   // Bugallon, Pangasinan: shown until the phone has a position.
   static const LatLng _fallbackCenter = LatLng(15.9566, 120.1866);
-
-  /// Route points for road-following directions (straight line if routing fails).
-  List<LatLng>? _routePoints;
 
   /// The satellite pictures stop at this zoom over Bugallon. Past it the
   /// server sends "Map data not yet available" tiles, so one more level is
@@ -99,7 +109,12 @@ class _LiveMapScreenState extends State<LiveMapScreen>
   LiveMapData _data = const LiveMapData();
   bool _centered = false;
   int? _focusSosId;
-  int? _directionsSosId;
+
+  /// Directions asked for from Home, waiting for the first map refresh.
+  int? _pendingDirectionsId;
+
+  /// The SOS directions are shown to, and the road route drawn to it.
+  final _directions = DirectionsTracker();
 
   bool get _isGobiker => AuthService.instance.currentUser?.isGoBiker ?? false;
 
@@ -107,6 +122,7 @@ class _LiveMapScreenState extends State<LiveMapScreen>
   void initState() {
     super.initState();
     _focusSosId = widget.focusSosId;
+    _pendingDirectionsId = widget.directionsSosId;
     PresenceService.instance.latest.addListener(_onMyPosition);
     PresenceService.instance.watch(); // the pin moves as the GoBiker rides
     PresenceService.instance.sendNow();
@@ -140,8 +156,9 @@ class _LiveMapScreenState extends State<LiveMapScreen>
 
   Future<void> _restoreMapStyle() async {
     try {
-      final saved =
-          (await SharedPreferences.getInstance()).getBool(_satelliteKey);
+      final saved = (await SharedPreferences.getInstance()).getBool(
+        _satelliteKey,
+      );
       if (saved != null && mounted) setState(() => _satellite = saved);
     } catch (_) {
       // Not remembered this time: the satellite view it opened with stays.
@@ -160,22 +177,72 @@ class _LiveMapScreenState extends State<LiveMapScreen>
 
   Position? get _me => PresenceService.instance.latest.value;
 
-  /// The emergency the GoBiker asked directions to, while it is still open.
-  AssignedSos? get _directionsSos {
-    final id = _directionsSosId;
-    if (id == null) return null;
+  /// The emergency the GoBiker asked directions to. It stays on screen
+  /// through refreshes that leave it out; see [DirectionsTracker].
+  AssignedSos? get _directionsSos =>
+      _directions.destination == null ? null : _directions.target;
 
-    return _data.sos.where((s) => s.id == id && s.hasPosition && s.isOpen).firstOrNull;
-  }
-
-  /// Points the map at the emergency: both ends on screen, and the line
-  /// between them. Everything stays in the app; no maps app is opened.
+  /// Points the map at the emergency: both ends on screen, and the road
+  /// route between them, asked for straight away.
   void _showDirections(AssignedSos sos) {
     if (!sos.hasPosition) return;
-    setState(() => _directionsSosId = sos.id);
+    setState(() => _directions.start(sos));
     // Stop the map re-centring on the GoBiker the moment their position moves.
     _centered = true;
     _fitToDirections(sos);
+    _reroute();
+  }
+
+  void _closeDirections() => setState(_directions.stop);
+
+  /// Asks for the road route when [DirectionsTracker.needsRoute] says so:
+  /// on the first tap, once the GoBiker leaves the route or the pin moves,
+  /// and once a minute. One request at a time.
+  Future<void> _reroute() async {
+    final me = _me;
+    final to = _directions.destination;
+    final id = _directions.target?.id;
+    if (me == null || to == null || id == null) return;
+    final now = DateTime.now();
+    if (!_directions.needsRoute(LatLng(me.latitude, me.longitude), now)) return;
+    setState(() => _directions.begin(to, now));
+    final route = await fetchRoadRoute(
+      fromLat: me.latitude,
+      fromLng: me.longitude,
+      toLat: to.latitude,
+      toLng: to.longitude,
+    );
+    // Closed, or switched to another SOS, while this was on its way.
+    if (!mounted || _directions.target?.id != id) return;
+    setState(() => _directions.finish(route));
+  }
+
+  void _retryRoute() {
+    _directions.retryNow();
+    _reroute();
+  }
+
+  /// Turn-by-turn in Google Maps, for a GoBiker who wants a voice telling
+  /// them where to turn. The route on this map stays the main view.
+  Future<void> _openInGoogleMaps() async {
+    final to = _directions.destination;
+    if (to == null) return;
+    final url = Uri.https('www.google.com', '/maps/dir/', {
+      'api': '1',
+      'destination': '${to.latitude},${to.longitude}',
+      'travelmode': 'bicycling',
+    });
+    var opened = false;
+    try {
+      opened = await launchUrl(url, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+    if (!opened && mounted) {
+      AppToast.show(
+        context,
+        "Couldn't open Google Maps.",
+        type: ToastType.error,
+      );
+    }
   }
 
   void _fitToDirections(AssignedSos sos) {
@@ -225,28 +292,25 @@ class _LiveMapScreenState extends State<LiveMapScreen>
       );
       _glideClock.forward(from: 0);
     }
+    var closed = false;
     setState(() {
-      if (result.data != null) _data = result.data!;
+      if (data != null) {
+        _data = data;
+        // Only an answer from the server can close the directions: a failed
+        // refresh says nothing about the emergency.
+        closed = _directions.refresh(data.sos);
+      }
     });
+    if (closed) AppToast.show(context, 'This SOS was closed.');
+    if (_directions.active) _reroute(); // the pin may have moved
 
-    // Road-following route toward the SOS if directions are shown.
-    if (_directionsSosId != null) {
-      final sos = _data.sos.where((s) => s.id == _directionsSosId).firstOrNull;
-      final me = _me;
-      if (sos != null && sos.hasPosition && me != null) {
-        final route = await fetchRoadRoute(
-          fromLat: me.latitude,
-          fromLng: me.longitude,
-          toLat: sos.latitude!,
-          toLng: sos.longitude!,
-        );
-        _routePoints = route ??
-            [
-              LatLng(me.latitude, me.longitude),
-              LatLng(sos.latitude!, sos.longitude!),
-            ];
-      } else {
-        _routePoints = null;
+    final pending = _pendingDirectionsId;
+    if (pending != null && data != null) {
+      final sos = data.sos.where((s) => s.id == pending).firstOrNull;
+      _pendingDirectionsId = null;
+      if (sos != null && sos.hasPosition && sos.isOpen) {
+        _focusSosId = null;
+        _showDirections(sos);
       }
     }
 
@@ -324,6 +388,8 @@ class _LiveMapScreenState extends State<LiveMapScreen>
       )) {
         _fitToDirections(directions);
       }
+      // The first fix after the tap, or a turn off the drawn road.
+      _reroute();
 
       return;
     }
@@ -457,9 +523,7 @@ class _LiveMapScreenState extends State<LiveMapScreen>
                 ),
               AnimatedBuilder(
                 animation: _glideClock,
-                builder: (context, _) => CircleLayer(
-                  circles: _rings(me),
-                ),
+                builder: (context, _) => CircleLayer(circles: _rings(me)),
               ),
               MarkerLayer(
                 markers: [
@@ -497,30 +561,41 @@ class _LiveMapScreenState extends State<LiveMapScreen>
                 ],
               ),
               if (directions != null && me != null)
-                AnimatedBuilder(
-                  animation: _glideClock,
-                  builder: (context, _) => PolylineLayer(
-                    polylines: [
+                PolylineLayer(
+                  polylines: [
+                    if (_directions.route case final route?)
+                      // The way along the roads.
                       Polyline(
-                        points: _routePoints ??
-                            [
-                              LatLng(me.latitude, me.longitude),
-                              LatLng(directions.latitude!, directions.longitude!),
-                            ],
+                        points: route.points,
                         color: AppTheme.orange,
                         strokeWidth: 5,
                         borderColor: Colors.white,
                         borderStrokeWidth: 2,
+                      )
+                    else
+                      // No road route (yet): a dashed grey line says "this
+                      // way", never passing for a road.
+                      Polyline(
+                        points: [
+                          LatLng(me.latitude, me.longitude),
+                          _directions.destination!,
+                        ],
+                        color: const Color(0xFF6B7280),
+                        strokeWidth: 3,
+                        borderColor: Colors.white,
+                        borderStrokeWidth: 1,
+                        pattern: StrokePattern.dashed(segments: const [12, 8]),
                       ),
-                    ],
-                  ),
+                  ],
                 ),
               // The imagery credit has to stay readable: above the phone's gesture strip
               // (and above the directions bar when it is open), on the left so the
               // "center on me" button never covers it.
               Padding(
                 padding: EdgeInsets.only(
-                  bottom: bottomGap(context) + (directions != null ? 92 : 0),
+                  bottom:
+                      bottomGap(context) +
+                      (directions != null ? _directionsBarSpace : 0),
                 ),
                 child: SimpleAttributionWidget(
                   source: Text(
@@ -540,9 +615,14 @@ class _LiveMapScreenState extends State<LiveMapScreen>
               bottom: 12 + bottomGap(context),
               child: _DirectionsBar(
                 residentName: directions.residentName,
-                distance: _distanceToSos,
+                located: me != null,
+                route: _directions.route,
+                routing: _directions.routing,
+                straightLine: _distanceToSos,
+                onRetry: _retryRoute,
+                onGoogleMaps: _openInGoogleMaps,
                 onRecenter: () => _fitToDirections(directions),
-                onClose: () => setState(() => _directionsSosId = null),
+                onClose: _closeDirections,
               ),
             ),
           Positioned(
@@ -561,7 +641,9 @@ class _LiveMapScreenState extends State<LiveMapScreen>
       // Lifted above the imagery credit along the bottom, and above the directions bar.
       floatingActionButton: Padding(
         padding: EdgeInsets.only(
-          bottom: extraBottomGap(context) + (directions != null ? 92 : 28),
+          bottom:
+              extraBottomGap(context) +
+              (directions != null ? _directionsBarSpace : 28),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -591,7 +673,10 @@ class _LiveMapScreenState extends State<LiveMapScreen>
     );
   }
 
-  /// Distance to the current directions target.
+  /// Room the directions bar takes along the bottom of the map.
+  static const double _directionsBarSpace = 128;
+
+  /// As the crow flies to the current directions target.
   String? get _distanceToSos {
     final sos = _directionsSos;
     final me = _me;
@@ -608,8 +693,11 @@ class _LiveMapScreenState extends State<LiveMapScreen>
   /// Circles around rough positions: the person may be anywhere inside.
   List<CircleMarker> _rings(Position? me) {
     CircleMarker ring(
-            LatLng point, double metres, Color color, bool satellite) =>
-        CircleMarker(
+      LatLng point,
+      double metres,
+      Color color,
+      bool satellite,
+    ) => CircleMarker(
       point: point,
       radius: metres,
       useRadiusInMeter: true,
@@ -737,7 +825,8 @@ class _LiveMapScreenState extends State<LiveMapScreen>
             ? child
             : Center(
                 child: CircularProgressIndicator(
-                  value: progress.cumulativeBytesLoaded /
+                  value:
+                      progress.cumulativeBytesLoaded /
                       (progress.expectedTotalBytes ?? 1),
                 ),
               ),
@@ -794,17 +883,17 @@ class _InfoBar extends StatelessWidget {
     }
 
     Widget legend(Color color, String label) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 4),
-            Text(label, style: theme.textTheme.labelSmall),
-          ],
-        );
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: theme.textTheme.labelSmall),
+      ],
+    );
 
     return Material(
       elevation: 3,
@@ -825,9 +914,7 @@ class _InfoBar extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               summary,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: muted,
-              ),
+              style: theme.textTheme.bodySmall?.copyWith(color: muted),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -850,53 +937,140 @@ class _InfoBar extends StatelessWidget {
   }
 }
 
-/// "2.4 km to Ana Reyes", under the map, while the way there is shown.
+/// "2.4 km by road · ~12 min" to the resident, under the map, while the way
+/// there is shown. Says plainly when only a straight line could be drawn.
 class _DirectionsBar extends StatelessWidget {
   const _DirectionsBar({
     required this.residentName,
-    required this.distance,
+    required this.located,
+    required this.route,
+    required this.routing,
+    required this.straightLine,
+    required this.onRetry,
+    required this.onGoogleMaps,
     required this.onRecenter,
     required this.onClose,
   });
 
   final String residentName;
-  final String? distance;
+
+  /// The phone has a position.
+  final bool located;
+  final RoadRoute? route;
+  final bool routing;
+
+  /// The straight-line distance, when the phone has a position.
+  final String? straightLine;
+  final VoidCallback onRetry;
+  final VoidCallback onGoogleMaps;
   final VoidCallback onRecenter;
   final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final muted = theme.textTheme.bodySmall?.color?.withValues(alpha: 0.75);
+    final r = route;
+    final noRoad = located && r == null && !routing;
+
+    final String headline;
+    final String detail;
+    if (!located) {
+      headline = 'Finding your position…';
+      detail = 'To $residentName';
+    } else if (r != null) {
+      headline =
+          '${formatDistance(r.distanceMetres)} by road · '
+          '~${formatRideTime(r.durationSeconds)}';
+      detail = 'To $residentName';
+    } else if (routing) {
+      headline = 'Finding the road…';
+      detail = '$straightLine straight line to $residentName';
+    } else {
+      headline = 'Road route unavailable';
+      detail = '$straightLine straight line to $residentName';
+    }
 
     return Material(
       elevation: 3,
       borderRadius: BorderRadius.circular(14),
       color: theme.colorScheme.surface,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
-        child: Row(
+        padding: const EdgeInsets.fromLTRB(14, 10, 4, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.directions_rounded, color: context.pal.orangeText),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                distance == null
-                    ? 'Finding your position…'
-                    : '$distance to $residentName',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        headline,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: noRoad ? const Color(0xFF9A4A06) : null,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        detail,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: muted,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                if (routing)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 14),
+                    child: SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                IconButton(
+                  tooltip: 'Fit both on screen',
+                  onPressed: onRecenter,
+                  icon: const Icon(Icons.fit_screen_rounded),
+                ),
+                IconButton(
+                  tooltip: 'Hide the way there',
+                  onPressed: onClose,
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
             ),
-            IconButton(
-              tooltip: 'Fit both on screen',
-              onPressed: onRecenter,
-              icon: const Icon(Icons.fit_screen_rounded),
-            ),
-            IconButton(
-              tooltip: 'Hide the way there',
-              onPressed: onClose,
-              icon: const Icon(Icons.close_rounded),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: onGoogleMaps,
+                  icon: const Icon(Icons.navigation_rounded, size: 18),
+                  label: const Text('Google Maps', maxLines: 1),
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+                if (noRoad) ...[
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: onRetry,
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Try again', maxLines: 1),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
         ),
@@ -947,8 +1121,10 @@ class _SosSheet extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
@@ -974,8 +1150,8 @@ class _SosSheet extends StatelessWidget {
                 theme,
                 Icons.gps_not_fixed_rounded,
                 'Approximate pin: they may be up to '
-                    '${formatDistance(sos.accuracy!)} from it. '
-                    'Go by the address and landmark.',
+                '${formatDistance(sos.accuracy!)} from it. '
+                'Go by the address and landmark.',
                 color: const Color(0xFF9A4A06),
               ),
             if (sos.description != null)
@@ -1003,8 +1179,8 @@ class _SosSheet extends StatelessWidget {
                 if (sos.hasPosition)
                   Expanded(
                     child: OutlinedButton.icon(
-                      // Stays on this map: a GoBiker on a call should not be
-                      // handed off to another app to find the way.
+                      // The way is drawn on this map first; Google Maps is
+                      // one tap away in the directions bar for turn-by-turn.
                       onPressed: onDirections,
                       icon: const Icon(Icons.directions_rounded),
                       label: const Text('Directions'),
