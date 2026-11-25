@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'auth_service.dart';
+import 'resident_sos.dart';
 
 /// Where the GoBiker's emergency stands.
 enum EmergencyPhase {
@@ -35,6 +36,7 @@ class EmergencyWatcher extends ChangeNotifier {
   static const Duration _interval = Duration(seconds: 8);
 
   EmergencyPhase _phase = EmergencyPhase.none;
+  SosEntry? _current;
   Timer? _timer;
   bool _checking = false;
   bool _loaded = false;
@@ -44,6 +46,11 @@ class EmergencyWatcher extends ChangeNotifier {
   void Function(EmergencyPhase phase)? onAnnounce;
 
   EmergencyPhase get phase => _phase;
+
+  /// The emergency as the server keeps it: who is coming, and its id for the
+  /// tracking map. Null until the server is asked, and from servers that only
+  /// send the status.
+  SosEntry? get current => _current;
 
   /// An emergency that still needs the admin: sent or being answered.
   bool get isOpen =>
@@ -88,10 +95,34 @@ class EmergencyWatcher extends ChangeNotifier {
         '/gobiker/emergency',
       );
       if (!res.ok) return;
-      applyServerStatus(res.body['status']?.toString());
+      applyServer(res.body);
     } finally {
       _checking = false;
     }
+  }
+
+  /// Applies the whole answer of `GET /gobiker/emergency`: `{status, sos}`.
+  @visibleForTesting
+  void applyServer(Map<dynamic, dynamic> body) {
+    final raw = body['sos'];
+    final sos = raw is Map
+        ? SosEntry.fromJson(Map<String, dynamic>.from(raw))
+        : null;
+    // Cancelled from another phone: it simply goes away, it was not resolved.
+    if (sos != null && sos.cancelled && body['status'] == null) {
+      _current = null;
+      if (_phase != EmergencyPhase.none) _setPhase(EmergencyPhase.none);
+      return;
+    }
+    final changed =
+        sos?.responderName != _current?.responderName ||
+        sos?.status != _current?.status ||
+        sos?.id != _current?.id;
+    _current = sos;
+    final before = _phase;
+    applyServerStatus(body['status']?.toString());
+    // A new helper while still "responding" changes no phase, only the card.
+    if (changed && before == _phase) notifyListeners();
   }
 
   /// Applies what the server says: 'emergency', 'responding' or null (none open).
@@ -114,10 +145,24 @@ class EmergencyWatcher extends ChangeNotifier {
     }
   }
 
+  /// The GoBiker no longer needs help. Null when the server took it, else
+  /// its message. The card just goes away: nothing is announced.
+  Future<String?> cancel() async {
+    final res = await AuthService.instance.callAuthed(
+      'POST',
+      '/gobiker/emergency/cancel',
+    );
+    if (!res.ok) return res.message;
+    _current = null;
+    _setPhase(EmergencyPhase.none);
+    return null;
+  }
+
   /// The GoBiker closed the "resolved" notice.
   Future<void> dismissResolved() async {
     if (_phase != EmergencyPhase.resolved) return;
     _phase = EmergencyPhase.none;
+    _current = null;
     await _save();
     notifyListeners();
   }
@@ -127,6 +172,7 @@ class EmergencyWatcher extends ChangeNotifier {
     _timer?.cancel();
     _timer = null;
     _phase = EmergencyPhase.none;
+    _current = null;
     _loaded = false;
     await _save();
     notifyListeners();

@@ -107,13 +107,10 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
       }
       // Keep listening while they type the address: a better reading replaces a rougher one.
       _updates?.cancel();
-      _updates = ResidentSos.positionUpdates().listen(
-        (p) {
-          if (!mounted) return;
-          setState(() => _best = Fix.better(_best, Fix(p)));
-        },
-        onError: (Object e) => debugPrint('[sos] position updates: $e'),
-      );
+      _updates = ResidentSos.positionUpdates().listen((p) {
+        if (!mounted) return;
+        setState(() => _best = Fix.better(_best, Fix(p)));
+      }, onError: (Object e) => debugPrint('[sos] position updates: $e'));
     });
   }
 
@@ -513,10 +510,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Your location',
-                        style: T.rowTitle,
-                      ),
+                      Text('Your location', style: T.rowTitle),
                       const SizedBox(height: 2),
                       Text(
                         _hasLocationFix

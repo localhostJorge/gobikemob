@@ -7,6 +7,7 @@ import '../../core/hotlines.dart';
 import '../../core/resident_sos.dart';
 import '../../widgets/initials_avatar.dart';
 import 'app_colors.dart';
+import 'sos_tracking_screen.dart';
 import 'ui_kit.dart';
 import 'visit_record.dart' show formatDate, formatTime;
 
@@ -265,15 +266,50 @@ class _HomeSosStatusState extends State<HomeSosStatus> with _SosPolling {
   }
 }
 
+/// Opens the map of [sos]: the resident's pin and the GoBiker coming to it.
+/// [trackingPath] is where to ask for it; null for a resident's SOS.
+Future<void> openSosMap(
+  BuildContext context,
+  SosEntry sos, {
+  String? trackingPath,
+}) => Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (_) => SosTrackingScreen(sosId: sos.id, path: trackingPath),
+  ),
+);
+
 /// One open SOS request: its status, what that means, who is coming, and a
 /// button to cancel it.
 ///
 /// The resident cannot mark it *resolved*: that is for the GoBiker sent to
 /// help, or the admin. They can only withdraw it, after a confirmation.
+///
+/// A GoBiker's own emergency uses the same card, with its own [title], the
+/// [noun] "emergency", [onCancel] and [trackingPath].
 class SosRequestCard extends StatefulWidget {
-  const SosRequestCard({super.key, required this.sos});
+  const SosRequestCard({
+    super.key,
+    required this.sos,
+    this.title = 'Your SOS request',
+    this.noun = 'SOS',
+    this.onCancel,
+    this.trackingPath,
+  });
 
   final SosEntry sos;
+  final String title;
+
+  /// What it is called in the button, dialog and snackbar: "SOS" or
+  /// "emergency".
+  final String noun;
+
+  /// Withdraws it; returns null on success, else the server's message.
+  /// Without one, the resident's SOS is cancelled.
+  final Future<String?> Function()? onCancel;
+
+  /// Where its tracking map asks the server; null for a resident's SOS.
+  final String? trackingPath;
 
   @override
   State<SosRequestCard> createState() => _SosRequestCardState();
@@ -283,16 +319,20 @@ class _SosRequestCardState extends State<SosRequestCard> {
   bool _cancelling = false;
 
   SosEntry get sos => widget.sos;
+  String get _noun => widget.noun;
+
+  /// "Cancel SOS", "Cancel emergency".
+  String get _cancelLabel => 'Cancel $_noun';
 
   Future<void> _cancel() async {
     final responder = sos.responderName;
     final ok = await showConfirm(
       context,
-      title: 'Cancel your SOS?',
+      title: 'Cancel your $_noun?',
       message: responder == null
           ? 'The admin will be told you no longer need help.'
           : '$responder is on the way. They will be told not to come.',
-      confirmLabel: 'Cancel SOS',
+      confirmLabel: _cancelLabel,
       cancelLabel: 'Keep it',
       destructive: true,
     );
@@ -302,11 +342,16 @@ class _SosRequestCardState extends State<SosRequestCard> {
     // messenger of the page, which outlives it.
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _cancelling = true);
-    final error = await ResidentSos.instance.cancel(sos.id);
+    final cancel = widget.onCancel;
+    final error = cancel != null
+        ? await cancel()
+        : await ResidentSos.instance.cancel(sos.id);
     if (mounted) setState(() => _cancelling = false);
+    // "SOS cancelled.", "Emergency cancelled."
+    final done = '${_noun[0].toUpperCase()}${_noun.substring(1)} cancelled.';
     messenger
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(error ?? 'SOS cancelled.')));
+      ..showSnackBar(SnackBar(content: Text(error ?? done)));
   }
 
   @override
@@ -322,9 +367,7 @@ class _SosRequestCardState extends State<SosRequestCard> {
           children: [
             Row(
               children: [
-                const Expanded(
-                  child: Text('Your SOS request', style: T.rowTitle),
-                ),
+                Expanded(child: Text(widget.title, style: T.rowTitle)),
                 _StatusPill(sos),
               ],
             ),
@@ -343,8 +386,19 @@ class _SosRequestCardState extends State<SosRequestCard> {
             ],
             if (sos.isOpen) ...[
               const SizedBox(height: Sp.lg),
+              // Where the GoBiker sent to help is, live; before one is sent the map
+              // shows the SOS pin and says it is waiting.
+              PrimaryButton(
+                label: sos.responderName != null
+                    ? 'View map · track your GoBiker'
+                    : 'View map',
+                icon: Icons.map_rounded,
+                onPressed: () =>
+                    openSosMap(context, sos, trackingPath: widget.trackingPath),
+              ),
+              const SizedBox(height: Sp.sm),
               SecondaryButton(
-                label: 'Cancel SOS',
+                label: _cancelLabel,
                 icon: Icons.close_rounded,
                 destructive: true,
                 loading: _cancelling,

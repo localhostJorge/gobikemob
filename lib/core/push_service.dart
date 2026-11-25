@@ -331,4 +331,3 @@ class PushStatus {
   final String state;
   final String? message;
 }
-   

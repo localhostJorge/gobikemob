@@ -60,7 +60,9 @@ class _DeclineReasonDialogState extends State<_DeclineReasonDialog> {
 
   String? get _error {
     if (!_touched) return null;
-    if (_reason.text.trim().isEmpty) return 'Please tell the admin why you cannot respond.';
+    if (_reason.text.trim().isEmpty) {
+      return 'Please tell the admin why you cannot respond.';
+    }
     return null;
   }
 

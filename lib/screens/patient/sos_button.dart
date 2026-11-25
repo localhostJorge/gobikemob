@@ -188,15 +188,16 @@ class _LocationStatusLine extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          Icons.my_location_rounded,
-          size: 14,
-          color: context.pal.muted,
-        ),
+        Icon(Icons.my_location_rounded, size: 14, color: context.pal.muted),
         const SizedBox(width: 4),
-        Text(
-          'Location will be sent with SOS',
-          style: T.meta.copyWith(color: context.pal.muted),
+        // Flexible: on a narrow phone with large text the line wraps instead
+        // of running off the screen.
+        Flexible(
+          child: Text(
+            'Location will be sent with SOS',
+            textAlign: TextAlign.center,
+            style: T.meta.copyWith(color: context.pal.muted),
+          ),
         ),
       ],
     );

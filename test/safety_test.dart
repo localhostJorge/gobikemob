@@ -197,11 +197,12 @@ void main() {
       ),
     );
     expect(find.text('Mark as resolved'), findsNothing);
-    // ...but the resident can withdraw it: one button, and only that one.
+    // ...but the resident can withdraw it, or open the map: those two buttons only.
     expect(find.text('Cancel SOS'), findsOneWidget);
+    expect(find.text('View map'), findsOneWidget);
     expect(
       find.byWidgetPredicate((w) => w is ButtonStyleButton),
-      findsOneWidget,
+      findsNWidgets(2),
     );
 
     // Requests a resident closed before cancelling existed still read that way.
@@ -212,6 +213,7 @@ void main() {
     );
     expect(find.text('You marked this request as resolved.'), findsOneWidget);
     expect(find.text('Cancel SOS'), findsNothing);
+    expect(find.textContaining('View map'), findsNothing);
   });
 
   test('a cancelled SOS comes as resolved but reads as cancelled', () {

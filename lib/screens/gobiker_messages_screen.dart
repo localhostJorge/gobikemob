@@ -37,8 +37,11 @@ class _GobikerMessagesScreenState extends State<GobikerMessagesScreen> {
   Future<void> _send() async {
     final text = _ctrl.text.trim();
     if (text.isEmpty) {
-      AppToast.show(context, 'Please type a message first.',
-          type: ToastType.error);
+      AppToast.show(
+        context,
+        'Please type a message first.',
+        type: ToastType.error,
+      );
       return;
     }
     setState(() => _sending = true);
@@ -73,10 +76,7 @@ class _GobikerMessagesScreenState extends State<GobikerMessagesScreen> {
     final pal = context.pal;
 
     return Scaffold(
-      appBar: AppBar(
-        scrolledUnderElevation: 0,
-        title: const Text('Messages'),
-      ),
+      appBar: AppBar(scrolledUnderElevation: 0, title: const Text('Messages')),
       body: SafeArea(
         child: Column(
           children: [
@@ -88,9 +88,7 @@ class _GobikerMessagesScreenState extends State<GobikerMessagesScreen> {
 
                   if (GobikerMessages.instance.loading &&
                       conversation.isEmpty) {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
+                    return const Center(child: CircularProgressIndicator());
                   }
 
                   if (conversation.isEmpty) {
@@ -103,8 +101,9 @@ class _GobikerMessagesScreenState extends State<GobikerMessagesScreen> {
                             Icon(
                               Icons.chat_bubble_outline_rounded,
                               size: 56,
-                              color: theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.4),
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.4,
+                              ),
                             ),
                             const SizedBox(height: 16),
                             const Text(
@@ -135,9 +134,8 @@ class _GobikerMessagesScreenState extends State<GobikerMessagesScreen> {
                     controller: _scroll,
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                     itemCount: conversation.length,
-                    itemBuilder: (context, index) => _ThreadEntry(
-                      message: conversation[index],
-                    ),
+                    itemBuilder: (context, index) =>
+                        _ThreadEntry(message: conversation[index]),
                   );
                 },
               ),
@@ -335,8 +333,7 @@ class _SendBar extends StatelessWidget {
                     required currentLength,
                     required isFocused,
                     maxLength,
-                  }) =>
-                      null,
+                  }) => null,
                   textInputAction: TextInputAction.newline,
                   style: TextStyle(fontSize: 14, color: pal.ink),
                   decoration: InputDecoration(

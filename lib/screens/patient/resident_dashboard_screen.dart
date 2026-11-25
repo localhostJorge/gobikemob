@@ -279,6 +279,14 @@ Appointment? _declinedForHome(List<Appointment> all) {
   return declined.firstOrNull;
 }
 
+/// The open SOS the Map row opens: the newest one a GoBiker was sent to,
+/// else the newest one still waiting. Null when none is open.
+SosEntry? trackedSos(List<SosEntry> requests) {
+  final open = requests.where((r) => r.isOpen).toList();
+  return open.where((r) => r.responderName != null).firstOrNull ??
+      open.firstOrNull;
+}
+
 /// Medical history and home visits as one plain list, each row saying what
 /// is actually there (last check-up, visit status) instead of a slogan.
 class _HealthList extends StatelessWidget {
@@ -290,6 +298,7 @@ class _HealthList extends StatelessWidget {
       listenable: Listenable.merge([
         ResidentVisits.instance,
         ResidentAppointments.instance,
+        ResidentSos.instance,
         PatientStore.instance, // which declined requests were hidden
       ]),
       builder: (context, _) {
@@ -338,11 +347,22 @@ class _HealthList extends StatelessWidget {
               NavRow(
                 icon: Icons.map_outlined,
                 title: 'Map',
-                subtitle: 'View live map',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LiveMapScreen()),
-                ),
+                subtitle: trackedSos(ResidentSos.instance.requests) != null
+                    ? 'Track the GoBiker coming to your SOS'
+                    : 'View live map',
+                onTap: () {
+                  // With an SOS open, the map the resident needs is the one
+                  // showing the GoBiker sent to them.
+                  final sos = trackedSos(ResidentSos.instance.requests);
+                  if (sos != null) {
+                    openSosMap(context, sos);
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LiveMapScreen()),
+                  );
+                },
               ),
               // Requests still open (waiting, or accepted and not done yet). Once answered for
               // good they leave Home and stay in History.

@@ -107,12 +107,14 @@ class ExpandableAnnouncementCard extends StatefulWidget {
       _ExpandableAnnouncementCardState();
 }
 
-class _ExpandableAnnouncementCardState extends State<ExpandableAnnouncementCard> {
+class _ExpandableAnnouncementCardState
+    extends State<ExpandableAnnouncementCard> {
   bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
-    final hasContent = widget.announcement.content != null &&
+    final hasContent =
+        widget.announcement.content != null &&
         widget.announcement.content!.isNotEmpty;
 
     return InkWell(
@@ -215,7 +217,9 @@ class AnnouncementCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  (maxLines == null && announcement.content != null && announcement.content!.isNotEmpty)
+                  (maxLines == null &&
+                          announcement.content != null &&
+                          announcement.content!.isNotEmpty)
                       ? announcement.content!
                       : announcement.body,
                   maxLines: maxLines,

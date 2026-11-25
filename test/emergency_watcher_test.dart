@@ -4,7 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:go_bike_app/core/app_navigator.dart';
 import 'package:go_bike_app/core/emergency_watcher.dart';
+import 'package:go_bike_app/core/theme.dart';
 import 'package:go_bike_app/widgets/emergency_status_card.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 void main() {
   late EmergencyWatcher watcher;
@@ -108,6 +111,124 @@ void main() {
     expect(watcher.phase, EmergencyPhase.none);
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('emergency_phase'), isNull);
+  });
+
+  const responding = {
+    'status': 'responding',
+    'sos': {
+      'id': 5,
+      'status': 'responding',
+      'status_label': 'Responding',
+      'barangay': 'Poblacion',
+      'created_at': '2026-11-25T10:00:00+00:00',
+      'responder': {'name': 'Jose Lim'},
+    },
+  };
+
+  test('keeps the SOS the server sends with the status', () async {
+    await watcher.markSent();
+
+    watcher.applyServer(responding);
+
+    expect(watcher.phase, EmergencyPhase.responding);
+    expect(watcher.current?.id, 5);
+    expect(watcher.current?.responderName, 'Jose Lim');
+  });
+
+  test('an old server without an SOS leaves it empty', () {
+    watcher.applyServer({'status': 'emergency'});
+
+    expect(watcher.phase, EmergencyPhase.waiting);
+    expect(watcher.current, isNull);
+  });
+
+  test('cancelling does not announce resolved', () async {
+    await watcher.markSent();
+    watcher.applyServer(responding);
+    announced.clear();
+
+    final asked = <String>[];
+    final error = await http.runWithClient(
+      () => watcher.cancel(),
+      () => MockClient((req) async {
+        asked.add('${req.method} ${req.url.path}');
+        return http.Response(
+          '{"message":"Emergency cancelled.","sos":null}',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+
+    expect(error, isNull);
+    expect(asked.single, endsWith('/gobiker/emergency/cancel'));
+    expect(asked.single, startsWith('POST'));
+    expect(watcher.phase, EmergencyPhase.none);
+    expect(watcher.current, isNull);
+    expect(announced, isEmpty);
+  });
+
+  test('a refused cancel keeps the emergency and says why', () async {
+    await watcher.markSent();
+    watcher.applyServer(responding);
+
+    final error = await http.runWithClient(
+      () => watcher.cancel(),
+      () => MockClient(
+        (req) async => http.Response(
+          '{"message":"This emergency is already closed."}',
+          422,
+          headers: {'content-type': 'application/json'},
+        ),
+      ),
+    );
+
+    expect(error, 'This emergency is already closed.');
+    expect(watcher.phase, EmergencyPhase.responding);
+    expect(watcher.current?.id, 5);
+  });
+
+  testWidgets('the GoBiker sees who is coming and can cancel the emergency', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: const Scaffold(
+          body: SingleChildScrollView(child: EmergencyStatusCard()),
+        ),
+      ),
+    );
+
+    await watcher.markSent();
+    watcher.applyServer(responding);
+    await tester.pump();
+
+    expect(find.text('Your emergency'), findsOneWidget);
+    expect(find.text('Jose Lim is on the way to help you.'), findsOneWidget);
+    expect(find.text('Cancel emergency'), findsOneWidget);
+    expect(find.text('The admin saw your alert'), findsNothing);
+    // Stops the watcher's polling timer before the test ends.
+    await watcher.reset();
+    await tester.pump();
+  });
+
+  testWidgets('an old server without an SOS still shows the plain card', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: EmergencyStatusCard())),
+    );
+
+    await watcher.markSent();
+    watcher.applyServer({'status': 'emergency'});
+    await tester.pump();
+
+    expect(find.text('Emergency alert sent'), findsOneWidget);
+    expect(find.text('Cancel emergency'), findsNothing);
+    // Stops the watcher's polling timer before the test ends.
+    await watcher.reset();
+    await tester.pump();
   });
 
   testWidgets('the status card follows the emergency', (tester) async {

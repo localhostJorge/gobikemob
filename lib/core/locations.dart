@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+
 import 'dart:convert';
 
 import 'api_config.dart';
@@ -43,15 +44,19 @@ class BarangayEntry {
 
   static List<BarangayEntry> list(dynamic raw) {
     if (raw is! List) return const [];
-    return raw.whereType<Map>().map((m) {
-      final name = '${m['name'] ?? ''}'.trim();
-      return BarangayEntry(
-        name: name,
-        municipalityId: int.tryParse('${m['municipality_id'] ?? ''}'),
-        cityId: int.tryParse('${m['city_id'] ?? ''}'),
-        provinceId: int.tryParse('${m['province_id'] ?? ''}'),
-      );
-    }).where((b) => b.name.isNotEmpty).toList();
+    return raw
+        .whereType<Map>()
+        .map((m) {
+          final name = '${m['name'] ?? ''}'.trim();
+          return BarangayEntry(
+            name: name,
+            municipalityId: int.tryParse('${m['municipality_id'] ?? ''}'),
+            cityId: int.tryParse('${m['city_id'] ?? ''}'),
+            provinceId: int.tryParse('${m['province_id'] ?? ''}'),
+          );
+        })
+        .where((b) => b.name.isNotEmpty)
+        .toList();
   }
 }
 
@@ -124,9 +129,7 @@ class Locations extends ChangeNotifier {
     try {
       final res = await http
           .get(
-            Uri.parse(
-              '$kApiBaseUrl/locations/cities?province_id=${p.id}',
-            ),
+            Uri.parse('$kApiBaseUrl/locations/cities?province_id=${p.id}'),
             headers: const {'Accept': 'application/json'},
           )
           .timeout(const Duration(seconds: 15));
@@ -179,9 +182,9 @@ class Locations extends ChangeNotifier {
           .timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         final body = jsonDecode(res.body);
-        return BarangayEntry.list(
-          body['barangays'],
-        ).map((b) => b.name).toList(growable: false);
+        return BarangayEntry.list(body['barangays'])
+            .map((b) => b.name)
+            .toList(growable: false);
       }
     } catch (_) {}
     return const [];

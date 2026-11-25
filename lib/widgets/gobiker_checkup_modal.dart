@@ -54,9 +54,8 @@ class GobikerCheckupModal extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             'Status: Active',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: colorScheme.onSurfaceVariant),
                           ),
                         ],
                       ),

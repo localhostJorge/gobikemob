@@ -642,19 +642,28 @@ void main() {
         expect(find.byType(RondaNavBar), findsOneWidget);
         // A tab, not a page pushed on top: nothing to go back to.
         expect(find.byTooltip('Back'), findsNothing);
-        expect(tester.widget<RondaNavBar>(find.byType(RondaNavBar)).selectedIndex, 2);
+        expect(
+          tester.widget<RondaNavBar>(find.byType(RondaNavBar)).selectedIndex,
+          2,
+        );
 
         await tap('Profile');
         expect(find.byType(GobikerProfileTab), findsOneWidget);
         expect(find.byType(RondaNavBar), findsOneWidget);
-        expect(tester.widget<RondaNavBar>(find.byType(RondaNavBar)).selectedIndex, 3);
+        expect(
+          tester.widget<RondaNavBar>(find.byType(RondaNavBar)).selectedIndex,
+          3,
+        );
 
         // Android Back from a tab returns to Home instead of leaving the app.
         await inServer(() async {
           await tester.binding.handlePopRoute();
           await tester.pump();
         });
-        expect(tester.widget<RondaNavBar>(find.byType(RondaNavBar)).selectedIndex, 0);
+        expect(
+          tester.widget<RondaNavBar>(find.byType(RondaNavBar)).selectedIndex,
+          0,
+        );
         expect(find.byType(DashboardScreen), findsOneWidget);
       },
     );

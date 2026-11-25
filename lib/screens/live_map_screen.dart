@@ -55,9 +55,10 @@ Color gobikerColor(String status) => switch (status) {
   _ => AppTheme.blue,
 };
 
-/// The live map. GoBikers see the other GoBikers of their barangay and the
-/// exact location of the SOS requests the admin assigned to them; residents
-/// see the GoBikers of their barangay and themselves.
+/// The live map. GoBikers see every other GoBiker of their town whose app is
+/// open, and the exact location of the SOS requests the admin assigned to
+/// them; residents see those GoBikers and themselves. Residents are never
+/// shown to anyone.
 ///
 /// Residents are never plotted for anyone.
 class LiveMapScreen extends StatefulWidget {
@@ -629,7 +630,8 @@ class _LiveMapScreenState extends State<LiveMapScreen>
             left: 12,
             right: 12,
             top: 12,
-            child: _InfoBar(
+            child: LiveMapInfoBar(
+              town: _data.town,
               barangay: barangay,
               isGobiker: _isGobiker,
               gobikersCount: _data.gobikers.length,
@@ -732,6 +734,10 @@ class _LiveMapScreenState extends State<LiveMapScreen>
     ];
   }
 
+  /// "Jose Lim · Hacienda": the whole town is on the map, so say where each one covers.
+  static String _whoAndWhere(MapPerson p) =>
+      p.barangay == null ? p.name : '${p.name} · ${p.barangay}';
+
   Marker _personMarker(
     MapPerson p, {
     required LatLng point,
@@ -748,9 +754,9 @@ class _LiveMapScreenState extends State<LiveMapScreen>
         onTap: onTap,
         child: Semantics(
           button: true,
-          label: '${p.name} (${p.status})',
+          label: '${_whoAndWhere(p)} (${p.status})',
           child: Tooltip(
-            message: p.name,
+            message: _whoAndWhere(p),
             triggerMode: TooltipTriggerMode.tap,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(size * 0.15),
@@ -851,15 +857,19 @@ class _LiveMapScreenState extends State<LiveMapScreen>
   );
 }
 
-/// The card on top of the map: barangay, who is online, the legend.
-class _InfoBar extends StatelessWidget {
-  const _InfoBar({
+/// The card on top of the map: the town, who is online, the legend.
+class LiveMapInfoBar extends StatelessWidget {
+  const LiveMapInfoBar({
+    super.key,
+    this.town,
     required this.barangay,
     required this.isGobiker,
     required this.gobikersCount,
     required this.openSosCount,
   });
 
+  /// Every online GoBiker of this town is on the map.
+  final String? town;
   final String? barangay;
   final bool isGobiker;
   final int gobikersCount;
@@ -869,13 +879,20 @@ class _InfoBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final muted = theme.textTheme.bodySmall?.color?.withValues(alpha: 0.75);
+    final unplaced = town == null && barangay == null;
+    final title =
+        town ?? (barangay == null ? 'Live Map' : 'Barangay $barangay');
 
     String summary;
-    if (barangay == null) {
+    if (unplaced) {
       summary = 'Set your barangay in your profile to see who is nearby.';
     } else {
+      final plural = gobikersCount == 1 ? '' : 's';
       final parts = [
-        '$gobikersCount other GoBiker${gobikersCount == 1 ? '' : 's'} online',
+        // A GoBiker is on the map too, so the count leaves them out.
+        isGobiker
+            ? '$gobikersCount other GoBiker$plural online'
+            : '$gobikersCount GoBiker$plural online',
         if (isGobiker && openSosCount > 0)
           '$openSosCount SOS ${openSosCount == 1 ? 'assigned' : 'assigned'} to you',
       ];
@@ -906,7 +923,7 @@ class _InfoBar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              barangay == null ? 'Live Map' : 'Barangay $barangay',
+              title,
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
               ),

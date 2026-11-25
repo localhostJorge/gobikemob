@@ -34,7 +34,8 @@ class GobikerMessage {
     return GobikerMessage(
       id: id,
       message: text,
-      sentAt: DateTime.tryParse('${raw['sent_at'] ?? ''}')?.toLocal() ??
+      sentAt:
+          DateTime.tryParse('${raw['sent_at'] ?? ''}')?.toLocal() ??
           DateTime.now(),
       reply: () {
         final s = '${raw['reply'] ?? ''}'.trim();
@@ -118,10 +119,7 @@ class GobikerMessages extends ChangeNotifier {
       if (res.ok) {
         final raw = res.body['messages'];
         _items = raw is List
-            ? raw
-                  .map(GobikerMessage.from)
-                  .whereType<GobikerMessage>()
-                  .toList()
+            ? raw.map(GobikerMessage.from).whereType<GobikerMessage>().toList()
             : [];
         _loaded = true;
         notifyListeners();

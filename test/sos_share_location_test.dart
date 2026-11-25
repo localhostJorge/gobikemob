@@ -170,14 +170,19 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('looks for location automatically and shows status', (tester) async {
+  testWidgets('looks for location automatically and shows status', (
+    tester,
+  ) async {
     await run(tester, () async {
       await open(tester);
       await waitForLocation(tester);
 
       // Should show location status row instead of share location toggle
       expect(find.text('Your location'), findsOneWidget);
-      expect(find.textContaining('Responders will see a pin where you are'), findsOneWidget);
+      expect(
+        find.textContaining('Responders will see a pin where you are'),
+        findsOneWidget,
+      );
       expect(find.text('Share my location'), findsNothing);
       expect(lookups, 1);
     });
@@ -240,7 +245,9 @@ void main() {
     });
   });
 
-  testWidgets('does not send when GPS is off: Send stays disabled', (tester) async {
+  testWidgets('does not send when GPS is off: Send stays disabled', (
+    tester,
+  ) async {
     final phone = FakePhone(serviceOn: false);
     LocationGate.instance = LocationGate(phone);
     gps = foundNothing;
@@ -248,7 +255,9 @@ void main() {
       await open(tester);
 
       expect(
-        find.text('Location is off on this phone. Turn it on to share your location.'),
+        find.text(
+          'Location is off on this phone. Turn it on to share your location.',
+        ),
         findsOneWidget,
       );
       expect(find.text('Open settings'), findsOneWidget);
@@ -266,9 +275,11 @@ void main() {
         'Beside the chapel',
       );
       expect(
-        tester.widget<PrimaryButton>(
-          find.widgetWithText(PrimaryButton, 'Send SOS'),
-        ).enabled,
+        tester
+            .widget<PrimaryButton>(
+              find.widgetWithText(PrimaryButton, 'Send SOS'),
+            )
+            .enabled,
         isFalse,
       );
       await tester.tap(find.text('Send SOS'), warnIfMissed: false);
@@ -277,7 +288,9 @@ void main() {
     });
   });
 
-  testWidgets('does not send when permission is denied forever', (tester) async {
+  testWidgets('does not send when permission is denied forever', (
+    tester,
+  ) async {
     final phone = FakePhone(permission: LocationPermission.deniedForever);
     LocationGate.instance = LocationGate(phone);
     gps = foundNothing;
@@ -305,9 +318,11 @@ void main() {
         'Beside the chapel',
       );
       expect(
-        tester.widget<PrimaryButton>(
-          find.widgetWithText(PrimaryButton, 'Send SOS'),
-        ).enabled,
+        tester
+            .widget<PrimaryButton>(
+              find.widgetWithText(PrimaryButton, 'Send SOS'),
+            )
+            .enabled,
         isFalse,
       );
       await tester.tap(find.text('Send SOS'), warnIfMissed: false);

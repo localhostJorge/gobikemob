@@ -64,7 +64,9 @@ class AssignedSosCard extends StatelessWidget {
                     const SizedBox(width: Sp.sm),
                     Expanded(
                       child: Text(
-                        'SOS · Responding',
+                        sos.fromGobiker
+                            ? 'GoBiker emergency · Responding'
+                            : 'SOS · Responding',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: T.meta.copyWith(

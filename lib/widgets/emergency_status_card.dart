@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 import '../core/emergency_watcher.dart';
 import '../core/theme.dart';
 import '../screens/patient/app_colors.dart';
+import '../screens/patient/safety_tab.dart' show SosRequestCard;
 
 /// Shows where the GoBiker's emergency stands. Nothing is shown when no
 /// emergency was sent. Used on the dashboard and the active ronda screen.
+///
+/// When the server sends the emergency itself, it is the resident's SOS card:
+/// who is on the way, their position on a map, and "Cancel emergency".
 class EmergencyStatusCard extends StatelessWidget {
   const EmergencyStatusCard({super.key});
 
@@ -16,6 +20,34 @@ class EmergencyStatusCard extends StatelessWidget {
       builder: (context, _) {
         final phase = EmergencyWatcher.instance.phase;
         if (phase == EmergencyPhase.none) return const SizedBox.shrink();
+
+        final sos = EmergencyWatcher.instance.current;
+        if (sos != null) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (phase == EmergencyPhase.resolved)
+                  IconButton(
+                    tooltip: 'Dismiss',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: EmergencyWatcher.instance.dismissResolved,
+                  ),
+                SosRequestCard(
+                  // A new id is a new emergency: start the card afresh.
+                  key: ValueKey(sos.id),
+                  sos: sos,
+                  title: 'Your emergency',
+                  noun: 'emergency',
+                  onCancel: EmergencyWatcher.instance.cancel,
+                  trackingPath: '/gobiker/emergency/${sos.id}/tracking',
+                ),
+              ],
+            ),
+          );
+        }
 
         final (color, icon, title, body) = switch (phase) {
           EmergencyPhase.waiting => (

@@ -26,12 +26,16 @@ class MapPerson {
     this.status = 'active',
     this.accuracy,
     this.photoUrl,
+    this.barangay,
   });
 
   final int id;
   final String name;
   final double latitude;
   final double longitude;
+
+  /// The barangay this GoBiker covers (null from servers that predate it).
+  final String? barangay;
 
   /// How far out the position may be, in metres (null when the server does
   /// not know).
@@ -58,12 +62,16 @@ class MapPerson {
       longitude: lng,
       status: '${j['status'] ?? 'active'}',
       accuracy: _metres(j['accuracy']),
-      photoUrl: () {
-        final s = '${j['photo_url'] ?? ''}'.trim();
-        return s.isEmpty ? null : s;
-      }(),
+      photoUrl: _text(j['photo_url']),
+      barangay: _text(j['barangay']),
     );
   }
+}
+
+/// A trimmed string, or null when missing or blank.
+String? _text(dynamic v) {
+  final s = '${v ?? ''}'.trim();
+  return s.isEmpty ? null : s;
 }
 
 /// A resident's SOS request the admin assigned to this GoBiker.
@@ -80,6 +88,7 @@ class AssignedSos {
     this.longitude,
     this.accuracy,
     this.createdAt,
+    this.fromGobiker = false,
   });
 
   final int id;
@@ -97,6 +106,10 @@ class AssignedSos {
   /// How far out the pin may be, in metres (null when it was not reported).
   final double? accuracy;
   final DateTime? createdAt;
+
+  /// The one in trouble is another GoBiker (their own emergency), not a
+  /// resident.
+  final bool fromGobiker;
 
   bool get isOpen => status != 'resolved';
   bool get hasPosition => latitude != null && longitude != null;
@@ -127,6 +140,7 @@ class AssignedSos {
       longitude: (j['longitude'] as num?)?.toDouble(),
       accuracy: _metres(j['accuracy']),
       createdAt: DateTime.tryParse('${j['created_at'] ?? ''}')?.toLocal(),
+      fromGobiker: j['from_gobiker'] == true,
     );
   }
 }
@@ -187,13 +201,30 @@ List<AssignedSos> _sosList(dynamic raw) => raw is List
 class LiveMapData {
   const LiveMapData({
     this.barangay,
+    this.town,
     this.gobikers = const [],
     this.sos = const [],
   });
 
+  /// The viewer's barangay.
   final String? barangay;
+
+  /// The viewer's town: every online GoBiker in it is on the map.
+  final String? town;
   final List<MapPerson> gobikers;
   final List<AssignedSos> sos;
+
+  factory LiveMapData.fromJson(Map<String, dynamic> j) {
+    final raw = j['gobikers'];
+    return LiveMapData(
+      barangay: _text(j['barangay']),
+      town: _text(j['town']),
+      gobikers: raw is List
+          ? raw.map(MapPerson.fromJson).whereType<MapPerson>().toList()
+          : const [],
+      sos: _sosList(j['sos']),
+    );
+  }
 
   static Future<({LiveMapData? data, String? error})> fetch() async {
     final gobiker = AuthService.instance.currentUser?.isGoBiker ?? false;
@@ -203,15 +234,8 @@ class LiveMapData {
     );
     if (!res.ok) return (data: null, error: res.message);
 
-    List<MapPerson> people(dynamic raw) => raw is List
-        ? raw.map(MapPerson.fromJson).whereType<MapPerson>().toList()
-        : const [];
     return (
-      data: LiveMapData(
-        barangay: res.body['barangay']?.toString(),
-        gobikers: people(res.body['gobikers']),
-        sos: _sosList(res.body['sos']),
-      ),
+      data: LiveMapData.fromJson(Map<String, dynamic>.from(res.body)),
       error: null,
     );
   }

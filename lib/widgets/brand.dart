@@ -116,7 +116,9 @@ class GoBikeWordmark extends StatelessWidget {
           TextSpan(
             text: 'Bike',
             // On navy: the dark palette's brand, the blue lifted so it reads there.
-            style: TextStyle(color: onNavy ? AppPalette.dark.brand : kGoBikeBlue),
+            style: TextStyle(
+              color: onNavy ? AppPalette.dark.brand : kGoBikeBlue,
+            ),
           ),
         ],
       ),
