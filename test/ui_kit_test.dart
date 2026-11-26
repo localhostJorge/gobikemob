@@ -584,7 +584,13 @@ void main() {
         Brightness.light,
       );
 
-      await tester.tap(find.byType(Switch));
+      // The Account card has a "Two-step login" switch too: tap this one.
+      await tester.tap(
+        find.descendant(
+          of: find.widgetWithText(SwitchListTile, 'Dark mode'),
+          matching: find.byType(Switch),
+        ),
+      );
       await tester.pump(); // the theme's fade starts on the next frame
       // Not pumpAndSettle: the About row's loading shimmer waits for the app version,
       // which a test never gets, and so never stops animating.

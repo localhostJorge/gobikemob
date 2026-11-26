@@ -4,6 +4,7 @@ import '../../core/auth_service.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/delete_account_sheet.dart';
 import '../../widgets/loading_card.dart';
+import '../../widgets/two_step_login_tile.dart';
 import '../legal_screen.dart';
 import '../login_screen.dart';
 import 'app_colors.dart';
@@ -139,6 +140,7 @@ class ProfileTab extends StatelessWidget {
                         onTap: () =>
                             _open(context, const ChangePasswordScreen()),
                       ),
+                      const TwoStepLoginSettings(),
                       NavRow(
                         icon: Icons.delete_outline_rounded,
                         color: context.pal.redText,

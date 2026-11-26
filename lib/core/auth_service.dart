@@ -57,6 +57,7 @@ class AppUser {
     this.birthdate,
     this.photoUrl,
     this.hasPassword = true,
+    this.mfaEnabled = false,
     this.notificationPrefs = const {},
   });
 
@@ -84,8 +85,29 @@ class AppUser {
   /// False for a Google sign-in account that never set its own password.
   final bool hasPassword;
 
+  /// Two-step login (an authenticator app code after the password) is on.
+  final bool mfaEnabled;
+
   /// The resident's notification switches as saved on the server.
   final Map<String, bool> notificationPrefs;
+
+  AppUser copyWith({Map<String, bool>? notificationPrefs, bool? mfaEnabled}) =>
+      AppUser(
+        id: id,
+        name: name,
+        email: email,
+        role: role,
+        mobile: mobile,
+        barangay: barangay,
+        province: province,
+        city: city,
+        municipality: municipality,
+        birthdate: birthdate,
+        photoUrl: photoUrl,
+        hasPassword: hasPassword,
+        mfaEnabled: mfaEnabled ?? this.mfaEnabled,
+        notificationPrefs: notificationPrefs ?? this.notificationPrefs,
+      );
 
   bool get hasMobile => (mobile ?? '').trim().isNotEmpty;
 
@@ -106,6 +128,7 @@ class AppUser {
     birthdate: birthdateFromApi(json['birthdate']),
     photoUrl: _text(json['photo_url']),
     hasPassword: json['has_password'] != false,
+    mfaEnabled: json['mfa_enabled'] == true,
     notificationPrefs: {
       if (json['notification_prefs'] is Map)
         for (final e in (json['notification_prefs'] as Map).entries)
@@ -131,6 +154,7 @@ class AuthResult {
     this.user,
     this.pendingApproval = false,
     this.cancelled = false,
+    this.mfaRequired = false,
   });
 
   final bool ok;
@@ -138,6 +162,10 @@ class AuthResult {
   final AppUser? user;
   final bool pendingApproval;
   final bool cancelled;
+
+  /// The password was right, but two-step login is on: ask for the
+  /// authenticator code (or a backup code) and log in again with it.
+  final bool mfaRequired;
 
   factory AuthResult.success({
     String? message,
@@ -155,6 +183,49 @@ class AuthResult {
 
   factory AuthResult.cancelled() =>
       const AuthResult._(ok: false, cancelled: true);
+
+  factory AuthResult.mfaRequired([String? message]) =>
+      AuthResult._(ok: false, mfaRequired: true, message: message);
+}
+
+/// What "Reset password" returns. [field] is the form field the server
+/// refused: 'code' (wrong or expired) or 'password' (too short, no match).
+class ResetPasswordResult {
+  const ResetPasswordResult({required this.ok, this.message, this.field});
+
+  final bool ok;
+  final String? message;
+  final String? field;
+}
+
+/// What starting two-step login returns: the key to put in the authenticator
+/// app, and the otpauth:// link that opens one with the key filled in.
+class MfaSetupResult {
+  const MfaSetupResult({
+    required this.ok,
+    this.message,
+    this.secret,
+    this.otpauthUrl,
+  });
+
+  final bool ok;
+  final String? message;
+  final String? secret;
+  final String? otpauthUrl;
+}
+
+/// The one-time backup codes, shown once after turning two-step login on or
+/// asking for new ones.
+class MfaCodesResult {
+  const MfaCodesResult({
+    required this.ok,
+    this.message,
+    this.backupCodes = const [],
+  });
+
+  final bool ok;
+  final String? message;
+  final List<String> backupCodes;
 }
 
 class _ApiResponse {
@@ -197,23 +268,7 @@ class AuthService {
   /// After the resident changed a notification switch, so the next
   /// PatientStore.load() starts from what the server now has.
   void updateNotificationPrefs(Map<String, bool> prefs) {
-    final u = _user;
-    if (u == null) return;
-    _user = AppUser(
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      role: u.role,
-      mobile: u.mobile,
-      barangay: u.barangay,
-      province: u.province,
-      city: u.city,
-      municipality: u.municipality,
-      birthdate: u.birthdate,
-      photoUrl: u.photoUrl,
-      hasPassword: u.hasPassword,
-      notificationPrefs: prefs,
-    );
+    _user = _user?.copyWith(notificationPrefs: prefs);
   }
 
   String? get token => _token;
@@ -493,17 +548,178 @@ class AuthService {
 
   // ---------------------------------------------------------- public calls
 
+  /// [mfaCode] is the authenticator code or a backup code, sent on the second
+  /// try once the first one came back [AuthResult.mfaRequired].
   Future<AuthResult> login({
     required String email,
     required String password,
     required bool remember,
+    String? mfaCode,
   }) async {
+    final code = mfaCode?.trim() ?? '';
     final res = await _request(
       'POST',
       '/mobile/login',
-      body: {'email': email.trim(), 'password': password},
+      body: {
+        'email': email.trim(),
+        'password': password,
+        if (code.isNotEmpty) 'mfa_code': code,
+      },
     );
+    if (res.status == 422 && res.body['mfa_required'] == true) {
+      return AuthResult.mfaRequired(res.body['message']?.toString());
+    }
+    // A wrong or used-up code: still on the code step.
+    final errors = res.body['errors'];
+    if (res.status == 422 && errors is Map && errors.containsKey('mfa_code')) {
+      return AuthResult.mfaRequired(res.errorMessage);
+    }
     return _sessionFrom(res, remember: remember);
+  }
+
+  /// "Forgot password": the server emails a 6-digit code. It answers the same
+  /// for an email with no account, so this says nothing about who signed up.
+  Future<({bool ok, String message})> forgotPassword(String email) async {
+    final res = await _request(
+      'POST',
+      '/mobile/password/forgot',
+      body: {'email': email.trim()},
+    );
+    if (!res.ok) return (ok: false, message: res.errorMessage);
+    return (
+      ok: true,
+      message:
+          res.body['message']?.toString() ??
+          'If that email has an account, we sent a code.',
+    );
+  }
+
+  /// Sets a new password with the emailed code. It does not log in: every
+  /// phone is signed out, and the person signs in again with the new password.
+  Future<ResetPasswordResult> resetPassword({
+    required String email,
+    required String code,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    final res = await _request(
+      'POST',
+      '/mobile/password/reset',
+      body: {
+        'email': email.trim(),
+        'code': code.trim(),
+        'password': password,
+        'password_confirmation': passwordConfirmation,
+      },
+    );
+    if (res.ok) {
+      return ResetPasswordResult(
+        ok: true,
+        message: res.body['message']?.toString(),
+      );
+    }
+
+    final errors = res.body['errors'];
+    if (res.status == 422 && errors is Map) {
+      if (errors.containsKey('code')) {
+        return const ResetPasswordResult(
+          ok: false,
+          field: 'code',
+          message: 'That code is wrong or has expired.',
+        );
+      }
+      final password = errors['password'] ?? errors['password_confirmation'];
+      if (password != null) {
+        return ResetPasswordResult(
+          ok: false,
+          field: 'password',
+          message: password is List && password.isNotEmpty
+              ? password.first.toString()
+              : password.toString(),
+        );
+      }
+    }
+    return ResetPasswordResult(ok: false, message: res.errorMessage);
+  }
+
+  //  two-step login (authenticator app)
+
+  /// Keeps the signed-in user's two-step switch in step with the server.
+  void _setMfa(_ApiResponse res, bool enabled) {
+    final u = res.body['user'];
+    _user = u is Map<String, dynamic>
+        ? AppUser.fromJson(u)
+        : _user?.copyWith(mfaEnabled: enabled);
+  }
+
+  static List<String> _codes(dynamic value) => [
+    if (value is List)
+      for (final code in value) code.toString(),
+  ];
+
+  /// Starts turning two-step login on: a new key for the authenticator app.
+  /// It is not on until [mfaEnable] gets a right code.
+  Future<MfaSetupResult> mfaSetup() async {
+    final res = await _request('POST', '/mobile/mfa/setup', auth: true);
+    final secret = _text(res.body['secret']);
+    if (!res.ok || secret == null) {
+      return MfaSetupResult(
+        ok: false,
+        message: res.ok
+            ? 'Unexpected response from the server.'
+            : res.errorMessage,
+      );
+    }
+    return MfaSetupResult(
+      ok: true,
+      secret: secret,
+      otpauthUrl: _text(res.body['otpauth_url']),
+    );
+  }
+
+  /// Turns two-step login on with the first code from the authenticator app.
+  /// Returns the 10 backup codes, which the server shows only this once.
+  Future<MfaCodesResult> mfaEnable(String code) async {
+    final res = await _request(
+      'POST',
+      '/mobile/mfa/verify',
+      body: {'code': code.trim()},
+      auth: true,
+    );
+    if (!res.ok) return MfaCodesResult(ok: false, message: res.errorMessage);
+    _setMfa(res, true);
+    return MfaCodesResult(
+      ok: true,
+      backupCodes: _codes(res.body['backup_codes']),
+    );
+  }
+
+  /// Turns two-step login off, with a code from the authenticator app.
+  Future<({bool ok, String message})> mfaDisable(String code) async {
+    final res = await _request(
+      'POST',
+      '/mobile/mfa/disable',
+      body: {'code': code.trim()},
+      auth: true,
+    );
+    if (!res.ok) return (ok: false, message: res.errorMessage);
+    _setMfa(res, false);
+    return (ok: true, message: res.body['message']?.toString() ?? '');
+  }
+
+  /// Replaces the backup codes with 10 new ones; the old ones stop working.
+  Future<MfaCodesResult> mfaNewBackupCodes(String code) async {
+    final res = await _request(
+      'POST',
+      '/mobile/mfa/backup-codes',
+      body: {'code': code.trim()},
+      auth: true,
+    );
+    if (!res.ok) return MfaCodesResult(ok: false, message: res.errorMessage);
+    return MfaCodesResult(
+      ok: true,
+      backupCodes: _codes(res.body['backup_codes']),
+    );
   }
 
   /// [role] is "Resident" or "GoBiker".

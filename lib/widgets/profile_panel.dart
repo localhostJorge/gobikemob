@@ -20,6 +20,7 @@ import 'delete_account_sheet.dart';
 import 'loading_card.dart';
 import 'initials_avatar.dart';
 import 'photo_flow.dart';
+import 'two_step_login_tile.dart';
 import '../screens/global_state.dart';
 import '../core/ronda_store.dart';
 
@@ -374,6 +375,7 @@ class _GobikerProfileTabState extends State<GobikerProfileTab> {
                 const SizedBox(height: 24),
 
                 _SectionLabel('ACCOUNT', muted),
+                const TwoStepLoginSettings(inCard: false),
                 _LinkRow(
                   icon: Icons.delete_outline_rounded,
                   label: 'Delete account',
