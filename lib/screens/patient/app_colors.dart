@@ -45,6 +45,7 @@ class AppColors {
   static const divider = Color(0xFFEEF2F7); // rules inside a card
   static const redText = Color(0xFFC62828);
   static const orangeText = Color(0xFFC2410C);
+  static const amberText = Color(0xFF8A6100);
   static const greenText = Color(0xFF1B7F4B);
   static const skeleton = Color(0xFFE4EAF2);
   static const skeletonShine = Color(0xFFF2F5FA);
@@ -70,6 +71,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.muted,
     required this.redText,
     required this.orangeText,
+    required this.amberText,
     required this.greenText,
     required this.redSoft,
     required this.skeleton,
@@ -111,6 +113,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
 
   final Color redText;
   final Color orangeText;
+
+  /// Between green and orange: a "moderate" SOS.
+  final Color amberText;
   final Color greenText;
 
   /// A pale red panel behind a warning.
@@ -135,6 +140,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     muted: AppColors.textMuted,
     redText: AppColors.redText,
     orangeText: AppColors.orangeText,
+    amberText: AppColors.amberText,
     greenText: AppColors.greenText,
     redSoft: AppColors.redSoft,
     skeleton: AppColors.skeleton,
@@ -157,6 +163,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     muted: Color(0xFFA9B4C6),
     redText: Color(0xFFFF8F89),
     orangeText: Color(0xFFFFB27A),
+    amberText: Color(0xFFF2C94C),
     greenText: Color(0xFF6FD3A0),
     redSoft: Color(0xFF3A2024),
     skeleton: Color(0xFF1C2638),
@@ -199,6 +206,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? muted,
     Color? redText,
     Color? orangeText,
+    Color? amberText,
     Color? greenText,
     Color? redSoft,
     Color? skeleton,
@@ -217,6 +225,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     muted: muted ?? this.muted,
     redText: redText ?? this.redText,
     orangeText: orangeText ?? this.orangeText,
+    amberText: amberText ?? this.amberText,
     greenText: greenText ?? this.greenText,
     redSoft: redSoft ?? this.redSoft,
     skeleton: skeleton ?? this.skeleton,
@@ -241,6 +250,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
       muted: mix(muted, other.muted),
       redText: mix(redText, other.redText),
       orangeText: mix(orangeText, other.orangeText),
+      amberText: mix(amberText, other.amberText),
       greenText: mix(greenText, other.greenText),
       redSoft: mix(redSoft, other.redSoft),
       skeleton: mix(skeleton, other.skeleton),

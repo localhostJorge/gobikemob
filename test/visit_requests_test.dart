@@ -359,6 +359,26 @@ void main() {
     });
   });
 
+  group('asking from the map', () {
+    testWidgets('opens the form with the tapped GoBiker already chosen', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(900, 2600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      setRequests([]);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AppointmentScreen(gobiker: gobiker(7, 'Maria Santos')),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Maria Santos · Poblacion'), findsOneWidget);
+      expect(find.text('Choose a GoBiker'), findsNothing);
+    });
+  });
+
   group('which answers are new', () {
     test(
       'only an answer from a GoBiker counts, and opening it clears it',

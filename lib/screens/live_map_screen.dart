@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/appointments.dart';
 import '../core/auth_service.dart';
 import '../core/directions.dart';
 import '../core/live_map.dart';
@@ -16,10 +17,12 @@ import '../core/presence_service.dart';
 import '../core/routing_service.dart';
 import '../core/theme.dart';
 import 'patient/app_colors.dart';
+import 'patient/appointment_screen.dart';
+import 'patient/visit_request_screen.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/bottom_gap.dart';
 import '../widgets/confirm_modal.dart';
-import '../widgets/gobiker_checkup_modal.dart';
+import '../widgets/gobiker_checkup_sheet.dart';
 import '../widgets/location_help.dart';
 
 /// SOS colors: red while waiting, yellow while a GoBiker responds, green once
@@ -400,25 +403,59 @@ class _LiveMapScreenState extends State<LiveMapScreen>
     }
   }
 
-  /// Called when a GoBiker marker is tapped (residents only).
+  /// A resident tapped a GoBiker: show who it is and let them ask for a check-up.
   void _onGobikerTap(MapPerson gobiker) {
-    if (_isGobiker) return; // GoBikers don't see other GoBikers' checkup modals
+    if (_isGobiker) return;
+    final store = ResidentAppointments.instance;
+    // Fresh counts for the limits; the sheet updates when they arrive.
+    unawaited(store.load());
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: context.pal.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (sheetContext) => GobikerCheckupModal(
-        gobiker: gobiker,
-        onRequestCheckup: () {
-          Navigator.pop(sheetContext);
-          // Navigate to appointment screen with pre-filled GoBiker
-          Navigator.pushNamed(sheetContext, '/appointment');
+      builder: (sheetContext) => ListenableBuilder(
+        listenable: store,
+        builder: (_, _) {
+          final open = store.open;
+          final asked = open
+              .where((a) => a.gobikerId == gobiker.id)
+              .firstOrNull;
+          return GobikerCheckupSheet(
+            gobiker: gobiker,
+            openRequest: asked,
+            atLimit: open.length >= ResidentAppointments.maxOpen,
+            onRequest: () {
+              Navigator.pop(sheetContext);
+              _openPage(
+                AppointmentScreen(
+                  gobiker: GobikerOption(
+                    id: gobiker.id,
+                    name: gobiker.name,
+                    barangay: gobiker.barangay ?? '',
+                    photoUrl: gobiker.photoUrl,
+                  ),
+                ),
+              );
+            },
+            onViewRequest: () {
+              Navigator.pop(sheetContext);
+              if (asked != null) {
+                _openPage(VisitRequestScreen(appointmentId: asked.id));
+              }
+            },
+          );
         },
       ),
     );
+  }
+
+  /// Opens [page] from the map itself, never from a sheet that is closing.
+  void _openPage(Widget page) {
+    if (!mounted) return;
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
   }
 
   // ------------------------------------------------------------- SOS sheet
@@ -746,6 +783,10 @@ class _LiveMapScreenState extends State<LiveMapScreen>
     required double size,
     VoidCallback? onTap,
   }) {
+    final photo = ClipRRect(
+      borderRadius: BorderRadius.circular(size * 0.15),
+      child: _photoImage(p.photoUrl, size: size),
+    );
     return Marker(
       point: point,
       width: size,
@@ -755,14 +796,15 @@ class _LiveMapScreenState extends State<LiveMapScreen>
         child: Semantics(
           button: true,
           label: '${_whoAndWhere(p)} (${p.status})',
-          child: Tooltip(
-            message: _whoAndWhere(p),
-            triggerMode: TooltipTriggerMode.tap,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(size * 0.15),
-              child: _photoImage(p.photoUrl, size: size),
-            ),
-          ),
+          // A tap tooltip would take the tap from a marker that opens a sheet,
+          // and the sheet names the GoBiker anyway.
+          child: onTap != null
+              ? photo
+              : Tooltip(
+                  message: _whoAndWhere(p),
+                  triggerMode: TooltipTriggerMode.tap,
+                  child: photo,
+                ),
         ),
       ),
     );
@@ -1168,7 +1210,7 @@ class _SosSheet extends StatelessWidget {
                 Icons.gps_not_fixed_rounded,
                 'Approximate pin: they may be up to '
                 '${formatDistance(sos.accuracy!)} from it. '
-                'Go by the address and landmark.',
+                'Go by the landmark.',
                 color: const Color(0xFF9A4A06),
               ),
             if (sos.description != null)

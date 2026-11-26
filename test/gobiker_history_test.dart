@@ -478,10 +478,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.descendant(
-          of: sosPage,
-          matching: find.text('12 Rizal St., Poblacion · Chapel'),
-        ),
+        find.descendant(of: sosPage, matching: find.text('Poblacion · Chapel')),
         findsOneWidget,
       );
 

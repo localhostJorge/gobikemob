@@ -12,7 +12,11 @@ import 'visit_record.dart' show formatDate;
 /// It always opens the request form, even while another request is waiting: they can have up
 /// to [ResidentAppointments.maxOpen] open at once, and see each one's answer in History.
 class AppointmentScreen extends StatefulWidget {
-  const AppointmentScreen({super.key});
+  const AppointmentScreen({super.key, this.gobiker});
+
+  /// The GoBiker to start with, e.g. the one tapped on the live map. The resident can
+  /// still change it.
+  final GobikerOption? gobiker;
 
   @override
   State<AppointmentScreen> createState() => _AppointmentScreenState();
@@ -70,6 +74,7 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                       _RequestForm(
                         key: _formKey,
                         sending: _sending,
+                        gobiker: widget.gobiker,
                         disabledGobikerIds: _store.openGobikerIds,
                       ),
                     ],
@@ -148,8 +153,12 @@ class _RequestForm extends StatefulWidget {
   const _RequestForm({
     super.key,
     required this.sending,
+    this.gobiker,
     this.disabledGobikerIds = const {},
   });
+
+  /// The GoBiker picked when the form opens.
+  final GobikerOption? gobiker;
 
   /// The screen's button shows this while the request is being sent.
   final ValueNotifier<bool> sending;
@@ -168,7 +177,7 @@ class _RequestFormState extends State<_RequestForm> {
   late String? _barangay = _homeBarangay();
   DateTime? _date;
   bool _dateMissing = false;
-  GobikerOption? _gobiker;
+  late GobikerOption? _gobiker = widget.gobiker;
   bool _gobikerMissing = false;
   String _window = 'morning';
 

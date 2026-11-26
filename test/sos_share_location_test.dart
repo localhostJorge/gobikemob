@@ -148,11 +148,20 @@ void main() {
   Future<void> run(WidgetTester tester, Future<void> Function() body) =>
       http.runWithClient(body, () => MockClient(handle));
 
+  /// Picks a severity and an injured answer: both are required before Send.
+  Future<void> answerQuestions(WidgetTester tester) async {
+    await tester.tap(find.text('Critical'));
+    await tester.pump();
+    await tester.tap(find.text('Yes'));
+    await tester.pump();
+  }
+
+  bool sendEnabled(WidgetTester tester) => tester
+      .widget<PrimaryButton>(find.widgetWithText(PrimaryButton, 'Send SOS'))
+      .enabled;
+
   Future<void> fillAndSend(WidgetTester tester) async {
-    await tester.enterText(
-      find.widgetWithText(TextField, 'House no., street, purok'),
-      '12 Rizal St.',
-    );
+    await answerQuestions(tester);
     await tester.enterText(
       find.widgetWithText(TextField, 'e.g. Beside the barangay hall'),
       'Beside the chapel',
@@ -266,10 +275,7 @@ void main() {
       expect(phone.locationSettingsOpened, 1);
 
       // The form still fills, but Send is disabled without a fix.
-      await tester.enterText(
-        find.widgetWithText(TextField, 'House no., street, purok'),
-        '12 Rizal St.',
-      );
+      await answerQuestions(tester);
       await tester.enterText(
         find.widgetWithText(TextField, 'e.g. Beside the barangay hall'),
         'Beside the chapel',
@@ -309,10 +315,7 @@ void main() {
       expect(phone.appSettingsOpened, 1);
 
       // The form still fills, but Send is disabled without a fix.
-      await tester.enterText(
-        find.widgetWithText(TextField, 'House no., street, purok'),
-        '12 Rizal St.',
-      );
+      await answerQuestions(tester);
       await tester.enterText(
         find.widgetWithText(TextField, 'e.g. Beside the barangay hall'),
         'Beside the chapel',
@@ -328,6 +331,62 @@ void main() {
       await tester.tap(find.text('Send SOS'), warnIfMissed: false);
       await tester.pump(const Duration(milliseconds: 100));
       expect(posted, isEmpty);
+    });
+  });
+
+  testWidgets(
+    'asks for no address: the profile and the pin find the resident',
+    (tester) async {
+      await run(tester, () async {
+        await open(tester);
+        expect(find.text('Address'), findsNothing);
+        expect(
+          find.widgetWithText(TextField, 'House no., street, purok'),
+          findsNothing,
+        );
+      });
+    },
+  );
+
+  testWidgets('Send waits for both answers, with nothing picked at first', (
+    tester,
+  ) async {
+    await run(tester, () async {
+      await open(tester);
+      await waitForLocation(tester);
+
+      expect(
+        find.textContaining('How serious is it?', findRichText: true),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Are there injured people?', findRichText: true),
+        findsOneWidget,
+      );
+      expect(find.text('Someone could die without help'), findsOneWidget);
+      expect(find.text('Not sure'), findsOneWidget);
+
+      expect(sendEnabled(tester), isFalse);
+      await tester.tap(find.text('Critical'));
+      await tester.pump();
+      expect(sendEnabled(tester), isFalse);
+      await tester.tap(find.text('Yes'));
+      await tester.pump();
+      expect(sendEnabled(tester), isTrue);
+    });
+  });
+
+  testWidgets('sends the severity and injured answers and no address', (
+    tester,
+  ) async {
+    await run(tester, () async {
+      await open(tester);
+      await waitForLocation(tester);
+      await fillAndSend(tester);
+
+      expect(posted.single['severity'], 'critical');
+      expect(posted.single['injured'], 'yes');
+      expect(posted.single.containsKey('address'), isFalse);
     });
   });
 

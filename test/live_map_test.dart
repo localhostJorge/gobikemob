@@ -39,6 +39,31 @@ void main() {
       expect(data.gobikers.single.barangay, isNull);
       expect(data.sos, isEmpty);
     });
+
+    test('reads which GoBikers are on a ronda, and not from older servers', () {
+      final data = LiveMapData.fromJson({
+        'barangay': 'Poblacion',
+        'gobikers': [
+          {
+            'id': 2,
+            'name': 'Jose Lim',
+            'latitude': 15.95,
+            'longitude': 120.18,
+            'on_ronda': true,
+          },
+          {
+            'id': 3,
+            'name': 'Pia Tan',
+            'latitude': 15.96,
+            'longitude': 120.19,
+            'on_ronda': false,
+          },
+          {'id': 4, 'name': 'Ana Cruz', 'latitude': 15.97, 'longitude': 120.2},
+        ],
+      });
+
+      expect(data.gobikers.map((g) => g.onRonda), [true, false, false]);
+    });
   });
 
   group('the card on top of the map', () {

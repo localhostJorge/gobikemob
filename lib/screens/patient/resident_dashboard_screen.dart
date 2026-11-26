@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_navigator.dart' show vibratePhone;
 import '../../core/appointments.dart';
 import '../../core/auth_service.dart';
 import '../../core/feedback_prompt.dart';
+import '../../core/hotlines.dart';
+import '../../core/night_hours.dart';
 import '../../core/presence_service.dart';
 import '../../core/resident_sos.dart';
 import '../../core/resident_visits.dart';
 import '../live_map_screen.dart';
 import '../../widgets/bottom_gap.dart';
+import '../../widgets/night_sos_notice.dart';
 import '../../widgets/ronda_hero.dart';
 import '../../widgets/ronda_nav_bar.dart';
 import 'app_colors.dart';
@@ -129,6 +133,30 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
     ResidentSos.instance.load(),
   ]);
 
+  /// After the hold: at night, first say help may take longer and offer 911.
+  /// Dismissing the notice sends nothing and opens nothing.
+  Future<void> _onSosHeld() async {
+    if (isNightHours(DateTime.now())) {
+      final choice = await showNightSosNotice(context);
+      if (!mounted || choice == null) return;
+      if (choice == NightSosChoice.call911) {
+        final number = kNationalEmergency.numbers.first;
+        final opened = await launchUrl(Uri(scheme: 'tel', path: number));
+        if (!opened && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Couldn't open the dialer. Call $number.")),
+          );
+        }
+        return;
+      }
+    }
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const EmergencyRequestScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -179,12 +207,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
                     // New key so the button restarts when the hold time changes.
                     key: ValueKey(hold),
                     holdDuration: Duration(seconds: hold),
-                    onActivated: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const EmergencyRequestScreen(),
-                      ),
-                    ),
+                    onActivated: _onSosHeld,
                   );
                 },
               ),

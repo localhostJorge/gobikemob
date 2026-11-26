@@ -3,11 +3,35 @@ import 'package:flutter/material.dart';
 import '../../core/appointments.dart';
 import '../../core/auth_service.dart';
 import 'app_colors.dart';
-import 'emergency_request_screen.dart' show kLocations;
 import 'ui_kit.dart';
 
 /// Where GoBikers can be looked up from: the barangays of Bugallon.
-List<String> get kPickerBarangays => kLocations['Bugallon'] ?? const [];
+const List<String> kPickerBarangays = [
+  'Angarian',
+  'Asinan',
+  'Bañaga',
+  'Bacabac',
+  'Bolaoen',
+  'Buenlag',
+  'Cabayaoasan',
+  'Cayanga',
+  'Gueset',
+  'Hacienda',
+  'Laguit Centro',
+  'Laguit Padilla',
+  'Magtaking',
+  'Pangascasan',
+  'Pantal',
+  'Poblacion',
+  'Polong',
+  'Portic',
+  'Salasa',
+  'Salomague Norte',
+  'Salomague Sur',
+  'Samat',
+  'San Francisco',
+  'Umanday',
+];
 
 /// Loads the GoBikers of a barangay (the resident's own when null). Replaced in tests.
 typedef GobikerLoader =

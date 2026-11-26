@@ -8,21 +8,28 @@ import 'package:latlong2/latlong.dart';
 
 final _sent = DateTime(2026, 11, 25, 9);
 
-AssignedSos _sos({String? mobile = '09171234567', bool pin = true}) =>
-    AssignedSos(
-      id: 7,
-      status: 'responding',
-      residentName: 'Maria Concepcion Dela Cruz-Villanueva',
-      address: 'Purok 3, Barangay Salomague Norte',
-      landmark: 'beside the green sari-sari store',
-      mobile: mobile,
-      description:
-          'My father fell in the kitchen and cannot stand up. He is 78 '
-          'and has diabetes. Please come quickly, the gate is open.',
-      latitude: pin ? 15.96 : null,
-      longitude: pin ? 120.19 : null,
-      createdAt: _sent,
-    );
+AssignedSos _sos({
+  String? mobile = '09171234567',
+  bool pin = true,
+  bool asked = false,
+}) => AssignedSos(
+  id: 7,
+  status: 'responding',
+  residentName: 'Maria Concepcion Dela Cruz-Villanueva',
+  barangay: 'Salomague Norte',
+  landmark: 'beside the green sari-sari store',
+  severity: asked ? 'critical' : null,
+  severityLabel: asked ? 'Critical' : null,
+  injured: asked ? 'yes' : null,
+  injuredLabel: asked ? 'Yes' : null,
+  mobile: mobile,
+  description:
+      'My father fell in the kitchen and cannot stand up. He is 78 '
+      'and has diabetes. Please come quickly, the gate is open.',
+  latitude: pin ? 15.96 : null,
+  longitude: pin ? 120.19 : null,
+  createdAt: _sent,
+);
 
 Future<void> _pump(
   WidgetTester tester,
@@ -129,5 +136,47 @@ void main() {
     expect(find.textContaining('km away'), findsNothing);
     await tester.tap(find.text('Directions'));
     expect(directions, 0);
+  });
+
+  testWidgets('shows how serious it is and whether anyone is injured', (
+    tester,
+  ) async {
+    await _pump(tester, _sos(asked: true));
+    expect(tester.takeException(), isNull);
+    expect(find.text('Critical'), findsOneWidget);
+    expect(find.text('Injured people: Yes'), findsOneWidget);
+    expect(
+      find.text('Salomague Norte · beside the green sari-sari store'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('an SOS from an older app shows neither', (tester) async {
+    await _pump(tester, _sos());
+    expect(find.text('Critical'), findsNothing);
+    expect(find.textContaining('Injured people'), findsNothing);
+  });
+
+  test('reads severity and injured, and the place without an address', () {
+    final sos = AssignedSos.fromJson({
+      'id': 3,
+      'resident_name': 'Ana',
+      'barangay': 'Poblacion',
+      'landmark': 'Beside the chapel',
+      'severity': 'high',
+      'severity_label': 'High',
+      'injured': 'unsure',
+      'injured_label': 'Not sure',
+    });
+    expect(sos.severity, 'high');
+    expect(sos.severityLabel, 'High');
+    expect(sos.injured, 'unsure');
+    expect(sos.injuredLabel, 'Not sure');
+    expect(sos.place, 'Poblacion · Beside the chapel');
+
+    // An older server sent only the typed address.
+    final old = AssignedSos.fromJson({'id': 4, 'address': 'Purok 2'});
+    expect(old.severity, isNull);
+    expect(old.place, 'Purok 2');
   });
 }

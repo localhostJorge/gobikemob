@@ -53,7 +53,7 @@ void main() {
       'address': '12 Rizal St., Purok 2',
       'landmark': 'Beside the chapel',
     });
-    expect(typed.place, '12 Rizal St., Purok 2, Poblacion · Beside the chapel');
+    expect(typed.place, 'Poblacion · Beside the chapel');
 
     // Requests sent before the address field existed.
     final older = SosEntry.fromJson({

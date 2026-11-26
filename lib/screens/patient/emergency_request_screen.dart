@@ -10,40 +10,11 @@ import '../../core/auth_service.dart';
 import '../../core/fix.dart';
 import '../../core/location_gate.dart';
 import '../../core/resident_sos.dart';
+import '../../core/sos_questions.dart';
+import '../../widgets/sos_severity.dart';
 
 import 'app_colors.dart';
 import 'ui_kit.dart';
-
-/// Municipality -> list of barangays.
-/// To support another municipality later, just add another entry here.
-const Map<String, List<String>> kLocations = {
-  'Bugallon': [
-    'Angarian',
-    'Asinan',
-    'Bañaga',
-    'Bacabac',
-    'Bolaoen',
-    'Buenlag',
-    'Cabayaoasan',
-    'Cayanga',
-    'Gueset',
-    'Hacienda',
-    'Laguit Centro',
-    'Laguit Padilla',
-    'Magtaking',
-    'Pangascasan',
-    'Pantal',
-    'Poblacion',
-    'Polong',
-    'Portic',
-    'Salasa',
-    'Salomague Norte',
-    'Salomague Sur',
-    'Samat',
-    'San Francisco',
-    'Umanday',
-  ],
-};
 
 class EmergencyRequestScreen extends StatefulWidget {
   const EmergencyRequestScreen({super.key});
@@ -54,8 +25,11 @@ class EmergencyRequestScreen extends StatefulWidget {
 
 class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   final _description = TextEditingController();
-  final _address = TextEditingController();
   final _landmark = TextEditingController();
+
+  /// Both asked with nothing picked: a guess the resident never made must not reach the admin.
+  String? _severity;
+  String? _injured;
   final _picker = ImagePicker();
 
   /// Shows "Required" under empty fields after the resident taps Send.
@@ -79,6 +53,9 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
 
   /// Whether we currently have a valid location fix to send with the SOS.
   bool get _hasLocationFix => _best != null;
+
+  /// Send waits for the pin and for both answers.
+  bool get _canSend => _hasLocationFix && _severity != null && _injured != null;
 
   // The server accepts videos up to 50 MB.
   static const int _maxVideoBytes = 50 * 1024 * 1024;
@@ -105,7 +82,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
         if (position == null) setState(() => _locationProblem = state);
         return;
       }
-      // Keep listening while they type the address: a better reading replaces a rougher one.
+      // Keep listening while they fill the form: a better reading replaces a rougher one.
       _updates?.cancel();
       _updates = ResidentSos.positionUpdates().listen((p) {
         if (!mounted) return;
@@ -118,7 +95,6 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   void dispose() {
     _updates?.cancel();
     _description.dispose();
-    _address.dispose();
     _landmark.dispose();
     _videoCtrl?.dispose();
     super.dispose();
@@ -192,13 +168,15 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   // ---------- send ----------
 
   Future<void> _send() async {
-    if (_address.text.trim().isEmpty || _landmark.text.trim().isEmpty) {
+    if (_landmark.text.trim().isEmpty ||
+        _severity == null ||
+        _injured == null) {
       setState(() => _showErrors = true);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('Please enter your address and a landmark'),
+            content: Text('Please add a landmark and answer both questions'),
           ),
         );
       return;
@@ -226,8 +204,9 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
     // 1) The request itself: this is what alerts the admin.
     final fix = _best!;
     final result = await ResidentSos.instance.send(
-      address: _address.text,
       landmark: _landmark.text,
+      severity: _severity!,
+      injured: _injured!,
       description: _description.text,
       fix: fix,
     );
@@ -310,21 +289,6 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                     const SizedBox(height: Sp.md),
                     _locationStatusRow(),
                     const SizedBox(height: Sp.lg),
-                    _fieldLabel('Address'),
-                    TextField(
-                      style: T.body.copyWith(color: context.pal.ink),
-                      cursorColor: context.pal.brand,
-                      controller: _address,
-                      textCapitalization: TextCapitalization.words,
-                      textInputAction: TextInputAction.next,
-                      onChanged: (_) => _showErrors ? setState(() {}) : null,
-                      decoration: _inputDecoration(
-                        'House no., street, purok',
-                        prefix: Icons.home_outlined,
-                        error: _requiredError(_address),
-                      ),
-                    ),
-                    const SizedBox(height: Sp.lg),
                     _fieldLabel('Landmark'),
                     TextField(
                       style: T.body.copyWith(color: context.pal.ink),
@@ -338,6 +302,14 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                         error: _requiredError(_landmark),
                       ),
                     ),
+                    const SizedBox(height: Sp.xl),
+                    _requiredHeader('How serious is it?'),
+                    const SizedBox(height: Sp.md),
+                    _severityChoices(),
+                    const SizedBox(height: Sp.xl),
+                    _requiredHeader('Are there injured people?'),
+                    const SizedBox(height: Sp.md),
+                    _injuredChoices(),
                     const SizedBox(height: Sp.xl),
                     _sectionHeader('What happened?'),
                     const SizedBox(height: Sp.md),
@@ -429,7 +401,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                 icon: Icons.send_rounded,
                 danger: true,
                 loading: _sending,
-                enabled: _hasLocationFix,
+                enabled: _canSend,
                 onPressed: _send,
               ),
             ),
@@ -623,6 +595,67 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
 
   Widget _sectionHeader(String title) => Text(title, style: T.heading);
 
+  /// A section the resident must answer, marked like a required field.
+  Widget _requiredHeader(String title) => Text.rich(
+    TextSpan(
+      text: title,
+      style: T.heading,
+      children: [
+        TextSpan(
+          text: ' *',
+          style: TextStyle(color: context.pal.redText),
+        ),
+      ],
+    ),
+    semanticsLabel: '$title, required',
+  );
+
+  /// Four choices, mildest first, each in its color with a line saying what it means.
+  Widget _severityChoices() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (final c in kSosSeverities) ...[
+        _ChoiceTile(
+          label: c.label,
+          hint: c.hint,
+          color: severityColor(context, c.value)!,
+          selected: _severity == c.value,
+          onTap: () => setState(() => _severity = c.value),
+        ),
+        if (c != kSosSeverities.last) const SizedBox(height: Sp.sm),
+      ],
+      if (_showErrors && _severity == null) _choiceError(),
+    ],
+  );
+
+  /// Yes / No / Not sure, one row of radio buttons.
+  Widget _injuredChoices() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Row(
+        children: [
+          for (final c in kSosInjured) ...[
+            Expanded(
+              child: _ChoiceTile(
+                label: c.label,
+                color: context.pal.brand,
+                selected: _injured == c.value,
+                onTap: () => setState(() => _injured = c.value),
+              ),
+            ),
+            if (c != kSosInjured.last) const SizedBox(width: Sp.sm),
+          ],
+        ],
+      ),
+      if (_showErrors && _injured == null) _choiceError(),
+    ],
+  );
+
+  Widget _choiceError() => Padding(
+    padding: const EdgeInsets.only(top: 6, left: Sp.md),
+    child: Text('Required', style: T.meta.copyWith(color: context.pal.redText)),
+  );
+
   Widget _warning() {
     return Container(
       padding: const EdgeInsets.all(Sp.md),
@@ -745,6 +778,87 @@ class _UploadTile extends StatelessWidget {
                 const SizedBox(height: Sp.sm),
                 Text(label, style: T.label),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One answer to pick: a radio mark, the label (and a hint line), outlined in [color]
+/// once picked. Only one in a group is picked at a time.
+class _ChoiceTile extends StatelessWidget {
+  const _ChoiceTile({
+    required this.label,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+    this.hint = '',
+  });
+
+  final String label;
+  final String hint;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      inMutuallyExclusiveGroup: true,
+      checked: selected,
+      button: true,
+      label: hint.isEmpty ? label : '$label. $hint',
+      excludeSemantics: true,
+      child: Material(
+        color: selected ? color.withValues(alpha: 0.12) : context.pal.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Rd.control),
+          side: BorderSide(
+            color: selected ? color : context.pal.line,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: Sp.md,
+                vertical: Sp.sm,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    selected
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: selected ? color : context.pal.muted,
+                    size: 22,
+                  ),
+                  const SizedBox(width: Sp.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          label,
+                          style: T.label.copyWith(
+                            color: hint.isEmpty ? context.pal.ink : color,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (hint.isNotEmpty)
+                          Text(hint, style: T.meta.muted(context)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

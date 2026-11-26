@@ -40,10 +40,14 @@ class SosHistory {
   /// When it ended: the newest date it has.
   DateTime get endedAt => resolvedAt ?? respondedAt ?? createdAt;
 
-  String get place => [
-    [address, barangay].where((s) => s.trim().isNotEmpty).join(', '),
-    landmark,
-  ].where((s) => s.trim().isNotEmpty).join(' · ');
+  /// "Poblacion · Chapel"; an old typed address only when neither is known.
+  String get place {
+    final where = [
+      barangay,
+      landmark,
+    ].where((s) => s.trim().isNotEmpty).join(' · ');
+    return where.isNotEmpty ? where : address.trim();
+  }
 
   factory SosHistory.fromJson(Map<String, dynamic> j) {
     DateTime? date(dynamic v) => DateTime.tryParse('${v ?? ''}')?.toLocal();

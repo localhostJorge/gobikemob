@@ -6,6 +6,7 @@ import '../core/live_map.dart';
 import '../screens/live_map_screen.dart' show formatDistance, sosRed;
 import '../screens/patient/app_colors.dart';
 import '../screens/patient/ui_kit.dart';
+import 'sos_severity.dart';
 
 /// An SOS the admin sent this GoBiker to, on Home.
 ///
@@ -87,6 +88,31 @@ class AssignedSosCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: T.heading.copyWith(color: pal.heading),
                 ),
+                // How bad it is, as the resident judged it: hidden when they were not asked.
+                if (sos.severity != null && sos.severityLabel != null ||
+                    sos.injuredLabel != null) ...[
+                  const SizedBox(height: Sp.sm),
+                  Wrap(
+                    spacing: Sp.sm,
+                    runSpacing: Sp.xs,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      if (sos.severity != null && sos.severityLabel != null)
+                        SosSeverityChip(
+                          severity: sos.severity!,
+                          label: sos.severityLabel!,
+                        ),
+                      if (sos.injuredLabel != null)
+                        Text(
+                          'Injured people: ${sos.injuredLabel}',
+                          style: T.meta.copyWith(
+                            color: sos.injured == 'yes' ? pal.redText : pal.ink,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
                 if (sos.place.isNotEmpty) ...[
                   const SizedBox(height: Sp.xs),
                   Text(

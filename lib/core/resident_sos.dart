@@ -36,6 +36,8 @@ class SosEntry {
     required this.landmark,
     required this.createdAt,
     this.address = '',
+    this.severity,
+    this.injured,
     this.description,
     this.hasPhoto = false,
     this.hasVideo = false,
@@ -57,9 +59,13 @@ class SosEntry {
   final String municipality;
   final String barangay;
 
-  /// Typed by the resident (house no., street, purok). Empty on older requests.
+  /// Typed by the resident in apps that still asked for it. Empty on newer requests.
   final String address;
   final String landmark;
+
+  /// `low` to `critical`, and `yes`/`no`/`unsure`. Null on requests from older apps.
+  final String? severity;
+  final String? injured;
   final String? description;
   final bool hasPhoto;
   final bool hasVideo;
@@ -88,11 +94,12 @@ class SosEntry {
 
   bool get isOpen => status != 'resolved';
 
-  /// Where the emergency is, e.g. "12 Rizal St., Poblacion · Beside the chapel".
-  String get place => [
-    [address, barangay].where((s) => s.isNotEmpty).join(', '),
-    landmark,
-  ].where((s) => s.isNotEmpty).join(' · ');
+  /// Where the emergency is, e.g. "Poblacion · Beside the chapel". The GPS pin and
+  /// the profile's barangay find the resident; an old typed address is the last resort.
+  String get place {
+    final where = [barangay, landmark].where((s) => s.isNotEmpty).join(' · ');
+    return where.isNotEmpty ? where : address;
+  }
 
   factory SosEntry.fromJson(Map<String, dynamic> j) {
     DateTime? date(dynamic v) => DateTime.tryParse('${v ?? ''}')?.toLocal();
@@ -110,6 +117,8 @@ class SosEntry {
       barangay: '${j['barangay'] ?? ''}',
       address: '${j['address'] ?? ''}'.trim(),
       landmark: '${j['landmark'] ?? ''}',
+      severity: j['severity'] as String?,
+      injured: j['injured'] as String?,
       description: (j['description'] as String?)?.trim(),
       hasPhoto: j['image_url'] != null,
       hasVideo: j['video_url'] != null,
@@ -171,11 +180,12 @@ class ResidentSos extends ChangeNotifier {
 
   /// Sends the request itself (no media). The admin is alerted as soon as
   /// this succeeds, so it must not wait for a photo or video upload.
-  /// The server files it under the resident's own barangay.
+  /// The server files it under the resident's own barangay, so no address is sent.
   /// Requires a valid location fix.
   Future<({SosEntry? sos, String? error})> send({
-    required String address,
     required String landmark,
+    required String severity,
+    required String injured,
     String? description,
     required Fix fix,
   }) async {
@@ -183,8 +193,9 @@ class ResidentSos extends ChangeNotifier {
       'POST',
       '/resident/sos',
       body: {
-        'address': address.trim(),
         'landmark': landmark.trim(),
+        'severity': severity,
+        'injured': injured,
         if (description != null && description.trim().isNotEmpty)
           'description': description.trim(),
         // With how precise the pin is and how old, so the admin and the

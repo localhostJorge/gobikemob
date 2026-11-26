@@ -27,12 +27,19 @@ class MapPerson {
     this.accuracy,
     this.photoUrl,
     this.barangay,
+    this.onRonda = false,
   });
 
   final int id;
   final String name;
   final double latitude;
   final double longitude;
+
+  /// Whether this GoBiker has started a ronda (false from servers that predate it).
+  final bool onRonda;
+
+  /// Busy with an emergency: their own, or an SOS they are responding to.
+  bool get isBusy => status == 'emergency' || status == 'responding';
 
   /// The barangay this GoBiker covers (null from servers that predate it).
   final String? barangay;
@@ -64,6 +71,7 @@ class MapPerson {
       accuracy: _metres(j['accuracy']),
       photoUrl: _text(j['photo_url']),
       barangay: _text(j['barangay']),
+      onRonda: j['on_ronda'] == true,
     );
   }
 }
@@ -80,8 +88,13 @@ class AssignedSos {
     required this.id,
     required this.status,
     required this.residentName,
-    required this.address,
+    this.address = '',
+    this.barangay = '',
     required this.landmark,
+    this.severity,
+    this.severityLabel,
+    this.injured,
+    this.injuredLabel,
     this.mobile,
     this.description,
     this.latitude,
@@ -98,8 +111,20 @@ class AssignedSos {
   /// responding (yellow) or resolved (green, shown for a while).
   final String status;
   final String residentName;
+
+  /// Only from older servers: the resident no longer types an address.
   final String address;
+  final String barangay;
   final String landmark;
+
+  /// `low` to `critical`, with its label. Null when the resident was not asked
+  /// (an older app, or a GoBiker's own emergency).
+  final String? severity;
+  final String? severityLabel;
+
+  /// `yes`/`no`/`unsure`, with its label ("Not sure"). Null when not asked.
+  final String? injured;
+  final String? injuredLabel;
   final String? mobile;
   final String? description;
   final double? latitude;
@@ -128,8 +153,14 @@ class AssignedSos {
   bool get isApproximate =>
       hasPosition && (accuracy ?? 0) > approximateAccuracy;
 
-  String get place =>
-      [address, landmark].where((s) => s.trim().isNotEmpty).join(' · ');
+  /// "Poblacion · Beside the chapel"; an old typed address only when neither is known.
+  String get place {
+    final where = [
+      barangay,
+      landmark,
+    ].where((s) => s.trim().isNotEmpty).join(' · ');
+    return where.isNotEmpty ? where : address.trim();
+  }
 
   factory AssignedSos.fromJson(Map<String, dynamic> j) {
     String? text(dynamic v) {
@@ -142,7 +173,12 @@ class AssignedSos {
       status: '${j['status'] ?? 'responding'}',
       residentName: text(j['resident_name']) ?? 'Resident',
       address: '${j['address'] ?? ''}',
+      barangay: '${j['barangay'] ?? ''}',
       landmark: '${j['landmark'] ?? ''}',
+      severity: text(j['severity']),
+      severityLabel: text(j['severity_label']),
+      injured: text(j['injured']),
+      injuredLabel: text(j['injured_label']),
       mobile: text(j['mobile']),
       description: text(j['description']),
       latitude: (j['latitude'] as num?)?.toDouble(),
