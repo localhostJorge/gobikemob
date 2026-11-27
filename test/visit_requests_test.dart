@@ -293,6 +293,60 @@ void main() {
       },
     );
 
+    testWidgets(
+      'greys out a GoBiker who just declined, until the wait is over',
+      (tester) async {
+        final now = DateTime.now();
+        final picked = <GobikerOption>[];
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: GobikerPickerBody(
+                  startBarangay: 'Poblacion',
+                  scrollable: false,
+                  loader: (_) async => (
+                    gobikers: [
+                      GobikerOption(
+                        id: 7,
+                        name: 'Maria Santos',
+                        barangay: 'Poblacion',
+                        askAgainAt: now.add(
+                          const Duration(hours: 4, minutes: 30),
+                        ),
+                      ),
+                      GobikerOption(
+                        id: 8,
+                        name: 'Jose Lim',
+                        barangay: 'Poblacion',
+                        askAgainAt: now.subtract(const Duration(minutes: 1)),
+                      ),
+                    ],
+                    error: null,
+                  ),
+                  onPick: picked.add,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(
+          find.text('Declined your last request · ask again in 5 h'),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Maria Santos'));
+        await tester.pump();
+        expect(picked, isEmpty);
+
+        // Jose's wait has passed: he can be asked again.
+        await tester.tap(find.text('Jose Lim'));
+        await tester.pump();
+        expect(picked.map((g) => g.id), [8]);
+      },
+    );
+
     testWidgets('looks in another barangay when asked', (tester) async {
       await show(tester);
       expect(asked, ['Poblacion']);

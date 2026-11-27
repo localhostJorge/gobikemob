@@ -67,4 +67,34 @@ void main() {
     expect(g.visitsDone, 3);
     expect(GobikerOption.fromJson({'id': 8}).visitsDone, 0);
   });
+
+  test('reads when a GoBiker who declined can be asked again', () {
+    final later = DateTime.now().add(const Duration(hours: 5)).toUtc();
+    final g = GobikerOption.fromJson({
+      'id': 7,
+      'ask_again_at': later.toIso8601String(),
+    });
+    expect(g.askAgainAt!.isAtSameMomentAs(later), isTrue);
+    expect(g.waiting, isTrue);
+
+    final none = GobikerOption.fromJson({'id': 8, 'ask_again_at': null});
+    expect(none.askAgainAt, isNull);
+    expect(none.waiting, isFalse);
+  });
+
+  test('says how long until the GoBiker can be asked again', () {
+    final now = DateTime(2026, 11, 27, 9);
+    expect(
+      askAgainLabel(now.add(const Duration(hours: 4, minutes: 1)), now: now),
+      'in 5 h',
+    );
+    expect(
+      askAgainLabel(now.add(const Duration(hours: 1)), now: now),
+      'in 1 h',
+    );
+    expect(
+      askAgainLabel(now.add(const Duration(minutes: 20)), now: now),
+      'in under 1 h',
+    );
+  });
 }

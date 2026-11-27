@@ -110,6 +110,7 @@ class GobikerOption {
     required this.barangay,
     this.visitsDone = 0,
     this.photoUrl,
+    this.askAgainAt,
   });
 
   final int id;
@@ -120,6 +121,13 @@ class GobikerOption {
   /// The GoBiker's profile photo, null when they haven't set one.
   final String? photoUrl;
 
+  /// Set when this GoBiker declined the resident recently: they can't be asked again until
+  /// then. Older servers never send it.
+  final DateTime? askAgainAt;
+
+  /// Still in the wait after a decline.
+  bool get waiting => askAgainAt?.isAfter(DateTime.now()) ?? false;
+
   factory GobikerOption.fromJson(Map<String, dynamic> j) => GobikerOption(
     id: (j['id'] as num?)?.toInt() ?? 0,
     name: '${j['name'] ?? ''}',
@@ -129,7 +137,15 @@ class GobikerOption {
       final s = '${j['photo_url'] ?? ''}'.trim();
       return s.isEmpty ? null : s;
     }(),
+    askAgainAt: DateTime.tryParse('${j['ask_again_at'] ?? ''}')?.toLocal(),
   );
+}
+
+/// How long until a GoBiker who declined can be asked again: "in 5 h", "in under 1 h".
+String askAgainLabel(DateTime at, {DateTime? now}) {
+  final minutes = at.difference(now ?? DateTime.now()).inMinutes;
+  if (minutes < 60) return 'in under 1 h';
+  return 'in ${(minutes / 60).ceil()} h';
 }
 
 List<Appointment> _parseList(dynamic raw) => raw is List

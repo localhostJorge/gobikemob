@@ -260,7 +260,9 @@ class _GobikerPickerBodyState extends State<GobikerPickerBody> {
 
   Widget _tile(GobikerOption g) {
     final selected = g.id == widget.selectedId;
-    final disabled = widget.disabledIds.contains(g.id);
+    final asked = widget.disabledIds.contains(g.id);
+    final waitUntil = g.waiting ? g.askAgainAt : null;
+    final disabled = asked || waitUntil != null;
     final done = g.visitsDone == 1
         ? '1 visit done'
         : '${g.visitsDone} visits done';
@@ -282,8 +284,10 @@ class _GobikerPickerBodyState extends State<GobikerPickerBody> {
             : T.rowTitle,
       ),
       subtitle: Text(
-        disabled
+        asked
             ? 'Already asked, waiting for their answer'
+            : waitUntil != null
+            ? 'Declined your last request · ask again ${askAgainLabel(waitUntil)}'
             : '${g.barangay} · $done',
         style: T.secondary.muted(context),
       ),
