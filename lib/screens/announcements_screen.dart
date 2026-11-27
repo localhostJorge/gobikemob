@@ -1,7 +1,10 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/announcements.dart';
+import '../core/link_text.dart';
 import '../core/theme.dart';
 import 'patient/app_colors.dart';
 
@@ -91,7 +94,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   }
 }
 
-/// Announcement card that expands on tap to show full content.
+/// Announcement card that opens on tap to show the whole message, with tappable links.
 class ExpandableAnnouncementCard extends StatefulWidget {
   const ExpandableAnnouncementCard({
     super.key,
@@ -113,20 +116,90 @@ class _ExpandableAnnouncementCardState
 
   @override
   Widget build(BuildContext context) {
-    final hasContent =
-        widget.announcement.content != null &&
-        widget.announcement.content!.isNotEmpty;
-
+    // Every card opens: admin posts only have a message, and its links work once opened.
     return InkWell(
-      onTap: hasContent ? () => setState(() => _expanded = !_expanded) : null,
+      onTap: () => setState(() => _expanded = !_expanded),
       borderRadius: BorderRadius.circular(16),
       child: AnnouncementCard(
         announcement: widget.announcement,
         isNew: widget.isNew,
         maxLines: _expanded ? null : 3,
-        showExpandIcon: hasContent,
+        showExpandIcon: true,
       ),
     );
+  }
+}
+
+/// The opened message: links open in the browser, and a long press selects text to copy.
+class _LinkedMessage extends StatefulWidget {
+  const _LinkedMessage({required this.text, required this.style});
+
+  final String text;
+  final TextStyle style;
+
+  @override
+  State<_LinkedMessage> createState() => _LinkedMessageState();
+}
+
+class _LinkedMessageState extends State<_LinkedMessage> {
+  final _recognizers = <TapGestureRecognizer>[];
+
+  @override
+  void dispose() {
+    _disposeRecognizers();
+    super.dispose();
+  }
+
+  void _disposeRecognizers() {
+    for (final r in _recognizers) {
+      r.dispose();
+    }
+    _recognizers.clear();
+  }
+
+  Future<void> _open(Uri uri) async {
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    ).catchError((_) => false);
+    if (!opened && mounted) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text("Couldn't open that link.")),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _disposeRecognizers();
+    final linkStyle = TextStyle(
+      color: context.pal.brand,
+      decoration: TextDecoration.underline,
+      decorationColor: context.pal.brand,
+    );
+
+    return SelectableText.rich(
+      TextSpan(
+        style: widget.style,
+        children: [
+          for (final part in splitLinks(widget.text))
+            if (part.link == null)
+              TextSpan(text: part.text)
+            else
+              TextSpan(
+                text: part.text,
+                style: linkStyle,
+                recognizer: _tapToOpen(part.link!),
+              ),
+        ],
+      ),
+    );
+  }
+
+  TapGestureRecognizer _tapToOpen(Uri uri) {
+    final r = TapGestureRecognizer()..onTap = () => _open(uri);
+    _recognizers.add(r);
+    return r;
   }
 }
 
@@ -216,16 +289,20 @@ class AnnouncementCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  (maxLines == null &&
-                          announcement.content != null &&
-                          announcement.content!.isNotEmpty)
-                      ? announcement.content!
-                      : announcement.body,
-                  maxLines: maxLines,
-                  overflow: maxLines == null ? null : TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13, height: 1.4, color: muted),
-                ),
+                if (maxLines == null)
+                  _LinkedMessage(
+                    text: (announcement.content?.isNotEmpty ?? false)
+                        ? announcement.content!
+                        : announcement.body,
+                    style: TextStyle(fontSize: 13, height: 1.4, color: muted),
+                  )
+                else
+                  Text(
+                    announcement.body,
+                    maxLines: maxLines,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 13, height: 1.4, color: muted),
+                  ),
                 if (showExpandIcon)
                   Align(
                     alignment: Alignment.centerRight,

@@ -158,4 +158,45 @@ void main() {
 
     expect(find.textContaining('No announcements right now'), findsOneWidget);
   });
+
+  testWidgets(
+    'an admin post opens on tap and its link can be tapped and selected',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ExpandableAnnouncementCard(
+              announcement: _a(
+                5,
+                'Sign-up form',
+                body: 'Fill in https://forms.gle/abc by Friday.',
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Closed: plain text, nothing to tap or select yet.
+      expect(find.byType(SelectableText), findsNothing);
+
+      await tester.tap(find.text('Sign-up form'));
+      await tester.pump();
+
+      final selectable = tester.widget<SelectableText>(
+        find.byType(SelectableText),
+      );
+      final spans = (selectable.textSpan!.children!).cast<TextSpan>();
+      final link = spans.firstWhere((s) => s.recognizer != null);
+      expect(link.text, 'https://forms.gle/abc');
+      expect(
+        spans.map((s) => s.text).join(),
+        'Fill in https://forms.gle/abc by Friday.',
+      );
+
+      // Tapping the title again closes it.
+      await tester.tap(find.text('Sign-up form'));
+      await tester.pump();
+      expect(find.byType(SelectableText), findsNothing);
+    },
+  );
 }
