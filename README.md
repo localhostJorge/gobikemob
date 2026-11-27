@@ -34,7 +34,6 @@ You need:
 |---|---|
 | **Resident** | Install the app (steps below), then create a **Resident** account. |
 | **GoBiker** | Install the app (steps below), then create a **GoBiker** account. |
-| **Admin** | You do not need the app. Use the web admin panel instead ([see below](#for-admins)). |
 
 ---
 
@@ -191,17 +190,6 @@ patient to see their past records.
 
 **History** lists the check-ups, home visits and emergencies you handled. On **Home** you can
 send a message to the admin and read the admin's announcements.
-
----
-
-## For admins
-
-Admin accounts do not use the mobile app (the app tells admins to use the web admin panel).
-Open the admin panel in a web browser on a computer or phone:
-
-### 👉 [gobikeproject.org/admin](https://gobikeproject.org/admin)
-
-Sign in with your admin account.
 
 ---
 
